@@ -9,7 +9,7 @@ name: Build and deploy Node.js app to Azure Web App - TranScripts
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
     paths:
       - '2_Code/transfer-app/**'
       - '.github/workflows/master_transcripts.yml'
