@@ -22,4 +22,19 @@
   .step-pending {
     @apply bg-gray-200 text-gray-500;
   }
+
+  /* Staff portal: page headings use the serif display face; scoped so student pages are unchanged */
+  .staff-shell main h1 {
+    @apply font-display tracking-tight;
+    font-weight: 650;
+  }
+  .staff-card {
+    @apply bg-white border border-staff-line rounded-xl shadow-card;
+  }
+  .staff-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.07em] text-staff-muted;
+  }
+  .staff-th {
+    @apply text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-staff-muted whitespace-nowrap;
+  }
 }

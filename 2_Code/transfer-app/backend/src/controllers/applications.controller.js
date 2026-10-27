@@ -10,6 +10,8 @@ const listQuerySchema = z.object({
   source: z.string().optional(),
   search: z.string().optional(),
   assigned_evaluator_id: z.string().uuid().optional(),
+  date_from: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional(),
+  date_to: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sort: z.string().optional().default('created_at'),
@@ -50,9 +52,12 @@ export async function listApplications(req, res, next) {
   try {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) return next(badRequest('Invalid query parameters'));
-    const { status, source, search, assigned_evaluator_id, page, limit, sort, order } = parseResult.data;
-    const result = await applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, page, limit, sort, order });
-    return res.status(200).json({ data: result.applications, meta: { total: result.total, page: result.page, limit: result.limit, pages: result.pages } });
+    const { status, source, search, assigned_evaluator_id, date_from, date_to, page, limit, sort, order } = parseResult.data;
+    const [result, stats] = await Promise.all([
+      applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, dateFrom: date_from, dateTo: date_to, page, limit, sort, order }),
+      applicationService.getApplicationStats(),
+    ]);
+    return res.status(200).json({ data: result.applications, meta: { total: result.total, page: result.page, limit: result.limit, pages: result.pages }, stats });
   } catch (err) { return next(err); }
 }
 
