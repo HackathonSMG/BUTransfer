@@ -41,6 +41,14 @@ export async function createApplication(data, source = 'website', createdBy = nu
 
   await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: application.status }, details: { source } });
   await notificationService.applicationSubmitted(application);
+
+  // Auto-trigger AI evaluation in the background so evaluators see results immediately
+  setImmediate(() => {
+    triggerEvaluation(application.id, createdBy).catch((err) => {
+      console.error(`[AI] Auto-trigger failed for application ${application.reference_number}:`, err.message);
+    });
+  });
+
   return application;
 }
 
@@ -241,11 +249,23 @@ export async function runEvaluation(evaluationId) {
       creditError = err.message;
     }
 
-    // The agent reviews only what the engine left open; if it fails, the engine's results still stand
+    // The agent runs Phase 1 validation + Phase 2 review; validation failure short-circuits the evaluation
     let agent = { status: 'off' };
     if (credit && isAgentConfigured()) {
       try {
         agent = await reviewWithAgent(application, credit);
+        if (agent.status === 'validation_failed') {
+          await query(
+            `UPDATE ai_evaluations SET status = 'completed', validation_status = 'failed',
+               validation_result = $1, completed_at = NOW() WHERE id = $2`,
+            [JSON.stringify({ reason: agent.reason, details: agent.details }), evaluationId]
+          );
+          await updateApplicationStatus(applicationId, 'validation_failed', null,
+            `Agent validation failed: ${agent.reason} — ${agent.details}`);
+          await auditLog({ applicationId, action: 'validation_failed', details: { evaluation_id: evaluationId, reason: agent.reason, details: agent.details } });
+          console.log(`[AI] Evaluation ${evaluationId} halted — validation failed: ${agent.reason}`);
+          return;
+        }
       } catch (err) {
         console.error(`[Agent] Review failed for ${application.reference_number}:`, err.message);
         agent = { status: 'failed', error: err.message };
@@ -255,9 +275,11 @@ export async function runEvaluation(evaluationId) {
 
     await query(
       `UPDATE ai_evaluations SET status = 'completed', criteria_results = $1, missing_documents = $2, flags = $3, recommendations = $4, evaluation_report = $5,
-         confidence_score = $6, credit_summary = $7, agent_status = $8, agent_error = $9, completed_at = NOW() WHERE id = $10`,
+         confidence_score = $6, credit_summary = $7, agent_status = $8, agent_error = $9,
+         validation_status = $10, completed_at = NOW() WHERE id = $11`,
       [JSON.stringify(result.criteria_results), JSON.stringify(result.missing_documents), JSON.stringify(result.flags), result.recommendations, result.evaluation_report,
-        result.confidence_score, credit ? JSON.stringify(credit.summary) : null, agent.status, agent.error || null, evaluationId]
+        result.confidence_score, credit ? JSON.stringify(credit.summary) : null, agent.status, agent.error || null,
+        isAgentConfigured() ? 'passed' : 'skipped', evaluationId]
     );
 
     await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'AI evaluation completed');

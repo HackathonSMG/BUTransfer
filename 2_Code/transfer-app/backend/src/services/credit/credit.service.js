@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { createEngine, ENGINE_VERSION } from './engine.js';
 import { parseTranscript } from './transcript-parser.js';
+import { isAgentConfigured, getProjectClient } from '../ai/agent.service.js';
 
 let enginePromise = null;
 
@@ -36,7 +37,8 @@ export function invalidateEngine() {
  * Courses are appended after any already on the application, keeping transcript order.
  */
 export async function importTranscript(applicationId, documentId, buffer) {
-  const parsed = await parseTranscript(buffer);
+  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
+  const parsed = await parseTranscript(buffer, aiClient);
   if (!parsed.institution || parsed.courses.length === 0) return { institution: parsed.institution, courses: 0 };
 
   // The PDF truncates long titles; use the catalog title when the course is known

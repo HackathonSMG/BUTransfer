@@ -141,6 +141,19 @@ export async function recordCourseDecision({ applicationId, courseId, action, ou
     client.release();
   }
 
+  // Store feedback when the agent made a recommendation — used for confidence calibration
+  if (ev?.agent_outcome) {
+    const agentMatched = ev.agent_outcome === decision.outcome;
+    await query(
+      `INSERT INTO agent_feedback (course_evaluation_id, application_id, institution, course_code,
+         agent_outcome, agent_confidence, evaluator_outcome, evaluator_bu_award, matched)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT DO NOTHING`,
+      [ev.id, applicationId, course.institution, course.course_code,
+        ev.agent_outcome, ev.agent_confidence, decision.outcome, decision.award || null, agentMatched]
+    );
+  }
+
   invalidateEngine();
   await auditLog({
     applicationId, action: 'course_decision', actorId: user.id, actorEmail: user.email,

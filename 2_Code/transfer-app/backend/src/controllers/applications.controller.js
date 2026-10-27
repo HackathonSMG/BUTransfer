@@ -42,7 +42,7 @@ const decisionSchema = z.object({
 });
 
 const statusUpdateSchema = z.object({
-  status: z.enum(['draft','submitted','information_required','under_evaluation','evaluation_completed','under_evaluator_review','approved','rejected','closed']),
+  status: z.enum(['draft','submitted','information_required','under_evaluation','evaluation_completed','under_evaluator_review','validation_failed','approved','rejected','closed']),
   reason: z.string().max(500).optional().default('Manual status update'),
 });
 
