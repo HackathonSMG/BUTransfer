@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3 } from 'lucide-react'
+import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOverview, assignPendingApplications } from '../../api/admin'
 import { useAuth } from '../../hooks/useAuth'
@@ -10,8 +10,6 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
-
-const FINAL = ['approved', 'rejected', 'closed']
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -51,12 +49,17 @@ export default function AdminDashboard() {
   if (state.error) return <div className="staff-card"><EmptyState title="The overview could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
 
   const n = (s) => d.by_status[s] || 0
-  const completed = FINAL.reduce((sum, s) => sum + n(s), 0)
   const a = d.attention || {}
   const highWorkload = a.high_workload || []
 
   // Only what an administrator should act on, each one click from where it's handled
   const items = [
+    a.conflicts > 0 && {
+      icon: GitCompare, tone: 'warn',
+      title: `${a.conflicts} transfer course${a.conflicts === 1 ? ' has' : 's have'} conflicting equivalency decisions`,
+      detail: 'Compare the decisions and record a standard equivalency.',
+      to: '/admin/conflicts', cta: 'Review'
+    },
     a.unassigned_applications > 0 && {
       icon: Inbox, tone: 'warn',
       title: `${a.unassigned_applications} application${a.unassigned_applications === 1 ? ' has' : 's have'} courses not yet assigned`,
@@ -111,7 +114,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <Metric label="Applications" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
         <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
-        <Metric label="Completed" value={completed} detail={`${n('approved')} approved · ${n('rejected')} rejected`} />
+        <Metric label="Completed" value={d.completed_applications} detail={`${n('approved')} approved · ${n('rejected')} rejected`} />
         <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />
       </div>
 

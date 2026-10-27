@@ -1,22 +1,22 @@
 import React from 'react'
 import { STATUS_LABELS } from '../application/StatusBadge'
 
+// Five meanings only: neutral (in progress, general), info (new / ready), warn (needs attention, waiting),
+// ok (approved, completed), bad (rejected, failed)
 export const TONES = {
-  neutral: 'bg-staff-sunk text-slate-600 border-staff-line',
-  info: 'bg-blue-50 text-blue-800 border-blue-200',
-  ai: 'bg-violet-50 text-violet-800 border-violet-200',
-  ready: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+  neutral: 'bg-slate-50 text-slate-700 border-slate-200',
+  info: 'bg-sky-50 text-sky-800 border-sky-200',
   warn: 'bg-amber-50 text-amber-800 border-amber-200',
   ok: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  bad: 'bg-red-50 text-red-700 border-red-200'
+  bad: 'bg-rose-50 text-rose-800 border-rose-200'
 }
 
 export const STATUS_TONES = {
   draft: 'neutral',
-  submitted: 'info',
-  under_evaluation: 'ai',
+  submitted: 'neutral',
+  under_evaluation: 'neutral',
   information_required: 'warn',
-  evaluation_completed: 'ready',
+  evaluation_completed: 'info',
   under_evaluator_review: 'warn',
   validation_failed: 'bad',
   approved: 'ok',

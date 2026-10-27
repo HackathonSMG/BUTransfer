@@ -3,6 +3,26 @@
 @tailwind utilities;
 
 @layer base {
+  /* Primary palette as RGB channels: the public (student) pages keep the original blue */
+  :root {
+    --primary-50: 239 246 255;
+    --primary-100: 219 234 254;
+    --primary-500: 59 130 246;
+    --primary-600: 37 99 235;
+    --primary-700: 29 78 216;
+    --primary-800: 30 64 175;
+    --primary-900: 30 58 138;
+  }
+  /* Staff portal: Boston University red (#CC0000) as the accent for primary actions, navigation and links */
+  .staff-shell {
+    --primary-50: 253 243 243;
+    --primary-100: 250 224 224;
+    --primary-500: 214 31 31;
+    --primary-600: 204 0 0;
+    --primary-700: 168 0 0;
+    --primary-800: 133 0 0;
+    --primary-900: 99 0 0;
+  }
   body {
     @apply bg-gray-50 text-gray-900 font-sans;
     font-family: 'Inter', sans-serif;
