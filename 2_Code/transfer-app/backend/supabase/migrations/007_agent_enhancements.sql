@@ -2,14 +2,9 @@
 -- Migration 007: Agent enhancements — validation, feedback, AI transcript
 -- ============================================================
 
--- Allow validation_failed status on applications
-ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
-ALTER TABLE applications ADD CONSTRAINT applications_status_check
-  CHECK (status IN (
-    'draft','submitted','information_required','under_evaluation',
-    'evaluation_completed','under_evaluator_review','validation_failed',
-    'approved','rejected','closed'
-  ));
+-- Allow validation_failed status on applications. applications.status is the application_status enum
+-- (001), so the value is added to the enum; a CHECK constraint naming it fails because the enum has no such value.
+ALTER TYPE application_status ADD VALUE IF NOT EXISTS 'validation_failed';
 
 -- Store Phase 1 validation result from the agent
 ALTER TABLE ai_evaluations ADD COLUMN IF NOT EXISTS validation_status TEXT
