@@ -1,6 +1,7 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import Layout from './components/layout/Layout'
 
@@ -18,7 +19,18 @@ import AdminDashboard from './pages/admin/Dashboard'
 import EligibilityCriteria from './pages/admin/EligibilityCriteria'
 import AuditLogs from './pages/admin/AuditLogs'
 import UserManagement from './pages/admin/UserManagement'
+import MyDashboard from './pages/evaluator/MyDashboard'
+import MyEvaluations from './pages/evaluator/MyEvaluations'
+import MyProfile from './pages/evaluator/MyProfile'
 import NotFound from './pages/NotFound'
+
+// /evaluator is the evaluator's dashboard; older links that sent admins here now go to the applications list
+function EvaluatorHome() {
+  const { user } = useAuth()
+  const { search } = useLocation()
+  if (user?.role === 'admin') return <Navigate to={`/admin/applications${search}`} replace />
+  return <Layout><MyDashboard /></Layout>
+}
 
 export default function App() {
   return (
@@ -32,13 +44,31 @@ export default function App() {
         <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
 
-        {/* Evaluator protected routes */}
+        {/* Evaluator workspace; admins who land on /evaluator go to the admin applications list */}
         <Route
           path="/evaluator"
           element={
             <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+              <EvaluatorHome />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluator/my-evaluations"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator']}>
               <Layout>
-                <EvaluatorDashboard />
+                <MyEvaluations />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluator/profile"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator']}>
+              <Layout>
+                <MyProfile />
               </Layout>
             </ProtectedRoute>
           }
@@ -46,7 +76,7 @@ export default function App() {
         <Route
           path="/evaluator/applications/new"
           element={
-            <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+            <ProtectedRoute allowedRoles={['admin']}>
               <Layout>
                 <NewApplication />
               </Layout>
@@ -75,6 +105,16 @@ export default function App() {
         />
 
         {/* Admin protected routes */}
+        <Route
+          path="/admin/applications"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Layout>
+                <EvaluatorDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={

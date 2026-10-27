@@ -88,7 +88,7 @@ export default function ApplicationDetail() {
     setTriggering(true)
     try {
       await triggerEvaluation(id)
-      toast.success('AI evaluation triggered. This may take a minute...')
+      toast.success('Evaluation started. This may take a minute...')
       setTimeout(load, 3000)
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to trigger evaluation')
@@ -255,8 +255,8 @@ export default function ApplicationDetail() {
             <CreditEvaluation courses={transcriptCourses} summary={evaluation?.credit_summary} />
           </Card>
 
-          {/* AI Evaluation */}
-          <Card title="AI Evaluation Report">
+          {/* Evaluation */}
+          <Card title="Evaluation Report">
             <AIEvaluationReport
               evaluation={evaluation}
               onTrigger={handleTriggerEvaluation}
@@ -375,7 +375,7 @@ export default function ApplicationDetail() {
                 loading={triggering}
               >
                 <Brain className="w-4 h-4" />
-                Trigger AI Evaluation
+                Run Evaluation
               </Button>
             )}
 

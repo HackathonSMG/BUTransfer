@@ -8,27 +8,35 @@ import {
   ScrollText,
   FilePlus,
   Library,
-  Sparkles,
+  ClipboardCheck,
+  UserCircle,
+  ShieldCheck,
   X
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import BUCrest from './BUCrest'
 
-// An application's detail page keeps "Applications" (or the evaluator's "Dashboard") highlighted
+// An application's detail page keeps "Applications" (admin) or "My Evaluations" (evaluator) highlighted
 const isApplicationDetail = (path) => /^\/evaluator\/applications\/(?!new$)[^/]+$/.test(path)
 
 const evaluatorSections = [
   {
-    title: 'Evaluation',
+    title: 'My workspace',
     links: [
-      { to: '/evaluator', label: 'Dashboard', icon: LayoutDashboard, end: true, alsoActive: isApplicationDetail },
-      { to: '/evaluator/applications/new', label: 'New Application', icon: FilePlus }
+      { to: '/evaluator', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: isApplicationDetail }
     ]
   },
   {
-    title: 'Knowledge base',
+    title: 'Reference',
     links: [
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library }
+    ]
+  },
+  {
+    title: 'Account',
+    links: [
+      { to: '/evaluator/profile', label: 'My Profile', icon: UserCircle }
     ]
   }
 ]
@@ -41,18 +49,28 @@ const adminSections = [
     ]
   },
   {
-    title: 'Evaluation',
+    title: 'Applications',
     links: [
-      { to: '/evaluator', label: 'Applications', icon: FileText, end: true, alsoActive: isApplicationDetail },
-      { to: '/evaluator/applications/new', label: 'New Application', icon: FilePlus },
+      { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
+      { to: '/evaluator/applications/new', label: 'New Application', icon: FilePlus }
+    ]
+  },
+  {
+    title: 'People',
+    links: [
+      { to: '/admin/users', label: 'Evaluators', icon: Users }
+    ]
+  },
+  {
+    title: 'Course mapping',
+    links: [
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library }
     ]
   },
   {
-    title: 'Administration',
+    title: 'System',
     links: [
-      { to: '/admin/users', label: 'Evaluators', icon: Users },
-      { to: '/admin/criteria', label: 'Criteria', icon: Settings },
+      { to: '/admin/criteria', label: 'Eligibility Criteria', icon: Settings },
       { to: '/admin/audit', label: 'Audit Logs', icon: ScrollText }
     ]
   }
@@ -61,7 +79,8 @@ const adminSections = [
 export default function Sidebar({ open = false, onClose }) {
   const { user } = useAuth()
   const { pathname } = useLocation()
-  const sections = user?.role === 'admin' ? adminSections : evaluatorSections
+  const isAdmin = user?.role === 'admin'
+  const sections = isAdmin ? adminSections : evaluatorSections
 
   return (
     <>
@@ -119,10 +138,13 @@ export default function Sidebar({ open = false, onClose }) {
         </nav>
 
         <div className="p-3 border-t border-staff-line2">
-          <div className="flex gap-2 items-start rounded-lg bg-staff-sunk p-2.5 text-xs leading-snug text-staff-ink2">
-            <Sparkles className="w-4 h-4 flex-shrink-0 text-primary-600 mt-px" />
-            <span>
-              <b className="font-semibold text-primary-800">AI prepares the evidence.</b> Evaluators make every credit decision.
+          <div className="flex gap-2.5 items-center rounded-lg bg-staff-sunk p-2.5 text-xs leading-snug">
+            <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${isAdmin ? 'bg-brand/10 text-brand' : 'bg-primary-100 text-primary-700'}`}>
+              {isAdmin ? <ShieldCheck className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold text-staff-ink">{isAdmin ? 'Administrator' : 'Evaluator'} workspace</span>
+              <span className="block text-staff-muted truncate">{user?.department || 'Transfer Credit Evaluation'}</span>
             </span>
           </div>
         </div>

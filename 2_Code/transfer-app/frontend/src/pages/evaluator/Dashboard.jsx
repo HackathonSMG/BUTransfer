@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ClipboardList, Clock, MessageSquare, CheckCircle, Globe, Mail, UserCheck,
-  RefreshCw, FilePlus, ArrowRight, ChevronRight, Sparkles, Library
+  RefreshCw, FilePlus, ArrowRight, ChevronRight, Library
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { listApplications } from '../../api/applications'
@@ -38,7 +38,8 @@ const SOURCE_LABELS = {
 const PIPELINE = [
   { status: 'draft', label: 'Draft', hideWhenEmpty: true },
   { status: 'submitted', label: 'Submitted' },
-  { status: 'under_evaluation', label: 'AI evaluation running' },
+  { status: 'under_evaluation', label: 'Evaluation in progress' },
+  { status: 'validation_failed', label: 'Validation failed', hideWhenEmpty: true },
   { status: 'information_required', label: 'Waiting on student' },
   { status: 'evaluation_completed', label: 'Ready for review' },
   { status: 'under_evaluator_review', label: 'Under evaluator review' },
@@ -89,7 +90,17 @@ export default function EvaluatorDashboard() {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const urlSearch = searchParams.get('search') || ''
-  const [filters, setFilters] = useState(() => (urlSearch ? { ...DEFAULT_FILTERS, search: urlSearch } : DEFAULT_FILTERS))
+  const urlStatus = searchParams.get('status') || ''
+  const [filters, setFilters] = useState(() => ({
+    ...DEFAULT_FILTERS,
+    ...(urlSearch && { search: urlSearch }),
+    ...(urlStatus && { status: urlStatus })
+  }))
+
+  // The admin dashboard's status chart links here with ?status=
+  useEffect(() => {
+    if (urlStatus) setFilters(f => (f.status === urlStatus ? f : { ...f, status: urlStatus, page: 1 }))
+  }, [urlStatus])
   const [state, setState] = useState({ loading: true, data: null, error: null })
   const [memory, setMemory] = useState({ loading: true, data: null })
   const [starting, setStarting] = useState(false)
@@ -181,15 +192,8 @@ export default function EvaluatorDashboard() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-staff-ink2">
               <span>{user?.role === 'admin' ? 'Administrator' : 'Evaluator'} · Transfer Credit Evaluation</span>
               <span className="text-staff-muted">{today}</span>
-              {hasStats && inPipeline > 0 && <span className="text-staff-muted">{inPipeline} more in AI pre-evaluation</span>}
+              {hasStats && inPipeline > 0 && <span className="text-staff-muted">{inPipeline} more being evaluated</span>}
             </div>
-            <p className="mt-3 flex items-start gap-2 text-[12.5px] text-staff-ink2 max-w-[640px]">
-              <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0 mt-px" />
-              <span>
-                <b className="font-semibold text-primary-800">AI prepares the evidence. You make the decision.</b>{' '}
-                Every recommendation shows its reasons, and no credit is posted without an evaluator.
-              </span>
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={refresh} aria-label="Refresh" title="Refresh">
@@ -350,7 +354,7 @@ export default function EvaluatorDashboard() {
                     <th className="staff-th hidden md:table-cell">From Institution → BU Program</th>
                     <th className="staff-th">Status</th>
                     <th className="staff-th hidden lg:table-cell">Submitted</th>
-                    <th className="staff-th hidden md:table-cell">AI Confidence</th>
+                    <th className="staff-th hidden md:table-cell">Eligibility</th>
                     <th className="staff-th text-right"><span className="sr-only">Action</span></th>
                   </tr>
                 </thead>
@@ -393,7 +397,7 @@ export default function EvaluatorDashboard() {
                           {formatDate(app.submitted_at || app.created_at)}
                         </td>
                         <td className="px-4 py-3 align-top hidden md:table-cell">
-                          <ScoreMeter score={app.ai_confidence_score} />
+                          <ScoreMeter score={app.ai_confidence_score} label="Eligibility" />
                         </td>
                         <td className="px-4 py-3 align-top text-right">
                           <Button

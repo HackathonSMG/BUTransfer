@@ -8,6 +8,7 @@ export const STATUS_LABELS = {
   under_evaluation: 'Under Evaluation',
   evaluation_completed: 'Evaluation Completed',
   under_evaluator_review: 'Under Evaluator Review',
+  validation_failed: 'Validation Failed',
   approved: 'Approved',
   rejected: 'Rejected',
   closed: 'Closed'

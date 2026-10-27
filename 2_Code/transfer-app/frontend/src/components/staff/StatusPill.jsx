@@ -18,6 +18,7 @@ export const STATUS_TONES = {
   information_required: 'warn',
   evaluation_completed: 'ready',
   under_evaluator_review: 'warn',
+  validation_failed: 'bad',
   approved: 'ok',
   rejected: 'bad',
   closed: 'neutral'

@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react'
-import { Plus, Edit2, Power, Users, X } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import {
+  Plus, Edit2, Power, Users, X, Upload, Mail, Search, Building2, BookOpen, ClipboardList, CheckCircle2, Clock
+} from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getEvaluators, createEvaluator, updateEvaluator } from '../../api/admin'
+import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster } from '../../api/admin'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
-import Badge from '../../components/ui/Badge'
+import Select from '../../components/ui/Select'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
+import KpiCard from '../../components/staff/KpiCard'
+import StatusPill from '../../components/staff/StatusPill'
+import { initials, avatarTint } from '../../lib/reviews'
 
 const INITIAL_FORM = {
   full_name: '',
@@ -246,11 +251,154 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
   )
 }
 
+function ImportRosterModal({ isOpen, onClose, onDone }) {
+  const [secret, setSecret] = useState('')
+  const [error, setError] = useState('')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState(null)
+
+  useEffect(() => {
+    if (isOpen) { setSecret(''); setError(''); setResult(null) }
+  }, [isOpen])
+
+  const run = async () => {
+    if (secret.length < 8) { setError('Use at least 8 characters'); return }
+    setRunning(true)
+    try {
+      const res = await importStaffRoster(secret)
+      setResult(res.data)
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'The roster could not be imported')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const created = result?.accounts.filter(a => a.created) || []
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Import staff roster" size="md">
+      {!result ? (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Creates or updates the administrator and evaluator accounts in the staff roster, with each evaluator's department,
+            subjects and courses. Existing accounts keep their password. Unassigned courses are then routed to the right evaluators.
+          </p>
+          <Input
+            label="Initial password for new accounts"
+            type="password"
+            required
+            value={secret}
+            onChange={e => { setSecret(e.target.value); setError('') }}
+            error={error}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+          />
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="secondary" onClick={onClose} disabled={running}>Cancel</Button>
+            <Button onClick={run} loading={running}><Upload className="w-4 h-4" />Import roster</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-2.5">
+            <MiniStat label="Accounts created" value={created.length} />
+            <MiniStat label="Accounts updated" value={result.accounts.length - created.length} />
+            <MiniStat label="Courses assigned" value={result.assigned} />
+          </div>
+          <ul className="max-h-64 overflow-y-auto divide-y divide-staff-line2 border border-staff-line2 rounded-lg">
+            {result.accounts.map(a => (
+              <li key={a.email} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block font-medium text-staff-ink truncate">{a.full_name}</span>
+                  <span className="block text-xs text-staff-muted truncate">{a.email}</span>
+                </span>
+                <span className="flex items-center gap-1.5 flex-shrink-0">
+                  <StatusPill tone={a.role === 'admin' ? 'bad' : 'info'}>{a.role === 'admin' ? 'Admin' : 'Evaluator'}</StatusPill>
+                  <StatusPill tone={a.created ? 'ok' : 'neutral'}>{a.created ? 'Created' : 'Updated'}</StatusPill>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end"><Button onClick={onClose}>Done</Button></div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="rounded-[9px] bg-staff-sunk px-3 py-2.5">
+      <span className="block text-[11.5px] font-medium text-staff-muted">{label}</span>
+      <b className="block text-lg font-bold text-staff-ink tabular-nums">{value}</b>
+    </div>
+  )
+}
+
+// One evaluator: identity, expertise, workload against capacity, actions
+function EvaluatorCard({ ev, onEdit, onToggle, toggling }) {
+  const capacity = ev.max_concurrent_cases || 20
+  const open = ev.open_reviews || 0
+  const load = Math.min(100, (open / capacity) * 100)
+  const subjects = ev.expertise_subjects?.length ? ev.expertise_subjects : (ev.specializations || [])
+  return (
+    <div className={`staff-card p-4 flex flex-col gap-3 ${ev.is_active ? '' : 'opacity-70'}`}>
+      <div className="flex items-start gap-3">
+        <span className={`w-10 h-10 rounded-full grid place-items-center text-sm font-bold flex-shrink-0 ${avatarTint(ev.full_name)}`}>{initials(ev.full_name)}</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-staff-ink truncate">{ev.full_name}</p>
+          <p className="text-xs text-staff-muted truncate">{[ev.title, ev.department].filter(Boolean).join(' · ')}</p>
+          <p className="text-xs text-staff-ink2 flex items-center gap-1 mt-0.5 min-w-0"><Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{ev.email}</span></p>
+        </div>
+        <StatusPill tone={ev.is_active ? 'ok' : 'neutral'}>{ev.is_active ? 'Active' : 'Inactive'}</StatusPill>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+        {subjects.slice(0, 4).map(s => (
+          <span key={s} className="text-[11.5px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-100">{s === 'GEN' ? 'General' : s}</span>
+        ))}
+        {ev.expertise_courses?.length > 0 && (
+          <span className="text-[11.5px] px-2 py-0.5 rounded-md bg-staff-sunk text-staff-ink2" title={ev.expertise_courses.join(', ')}>
+            {ev.expertise_courses.length} BU courses
+          </span>
+        )}
+      </div>
+
+      <div>
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-staff-muted">Workload</span>
+          <span className="text-staff-ink2 tabular-nums"><b className="text-staff-ink">{open}</b> open of {capacity}</span>
+        </div>
+        <div className="h-2 rounded-full bg-staff-line2 overflow-hidden" title={`${open} open reviews, capacity ${capacity}`}>
+          <i className={`block h-full rounded-full ${load >= 90 ? 'bg-red-600' : load >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.max(open ? 3 : 0, load)}%` }} />
+        </div>
+        <div className="flex gap-4 mt-2 text-xs text-staff-ink2">
+          <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{ev.completed_reviews || 0} completed</span>
+          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-staff-muted" />{ev.queued_reviews || 0} upcoming</span>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1 border-t border-staff-line2">
+        <Button size="sm" variant="ghost" onClick={() => onEdit(ev)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>
+        {ev.evaluator_code && <span className="self-center font-mono text-[11.5px] text-staff-muted">{ev.evaluator_code}</span>}
+        <Button size="sm" variant="ghost" onClick={() => onToggle(ev)} loading={toggling} className="ml-auto">
+          <Power className="w-3.5 h-3.5" />{ev.is_active ? 'Deactivate' : 'Reactivate'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function UserManagement() {
   const [evaluators, setEvaluators] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState({ open: false, evaluator: null })
+  const [importOpen, setImportOpen] = useState(false)
   const [toggling, setToggling] = useState(null)
+  const [search, setSearch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [status, setStatus] = useState('active')
 
   const load = async () => {
     try {
@@ -269,7 +417,7 @@ export default function UserManagement() {
     setToggling(ev.id)
     try {
       await updateEvaluator(ev.id, { is_active: !ev.is_active })
-      toast.success(`Evaluator ${!ev.is_active ? 'activated' : 'deactivated'}`)
+      toast.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}`)
       await load()
     } catch {
       toast.error('Failed to update evaluator status')
@@ -278,110 +426,101 @@ export default function UserManagement() {
     }
   }
 
+  const departments = useMemo(() => [...new Set(evaluators.map(e => e.department || 'Other'))].sort(), [evaluators])
+  const q = search.trim().toLowerCase()
+  const visible = evaluators.filter(e =>
+    (!department || (e.department || 'Other') === department) &&
+    (status === 'all' || (status === 'active') === Boolean(e.is_active)) &&
+    (!q || [e.full_name, e.email, e.department, e.evaluator_code, ...(e.expertise_subjects || []), ...(e.expertise_courses || [])]
+      .some(f => f && String(f).toLowerCase().includes(q)))
+  )
+
+  const active = evaluators.filter(e => e.is_active)
+  const coveredCourses = new Set(active.flatMap(e => e.expertise_courses || [])).size
+  const openTotal = active.reduce((s, e) => s + (e.open_reviews || 0), 0)
+
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner size="xl" className="text-primary-600" /></div>
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Evaluator Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage evaluator accounts and assignments</p>
+          <h1 className="text-[26px] leading-tight text-staff-ink">Evaluators</h1>
+          <p className="text-sm text-staff-muted mt-1">Evaluator accounts, the departments and courses they review, and their current workload.</p>
         </div>
-        <Button onClick={() => setModal({ open: true, evaluator: null })}>
-          <Plus className="w-4 h-4" />
-          Add Evaluator
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            Import staff roster
+          </Button>
+          <Button onClick={() => setModal({ open: true, evaluator: null })}>
+            <Plus className="w-4 h-4" />
+            Add Evaluator
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {evaluators.length === 0 ? (
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <KpiCard icon={Users} tone="info" label="Active evaluators" value={active.length} sub={`${evaluators.length - active.length} inactive`} />
+        <KpiCard icon={Building2} tone="neutral" label="Departments" value={new Set(active.map(e => e.department || 'Other')).size} sub="with an active evaluator" />
+        <KpiCard icon={BookOpen} tone="ok" label="BU courses covered" value={coveredCourses} sub="by named course expertise" />
+        <KpiCard icon={ClipboardList} tone="warn" label="Open reviews" value={openTotal} sub="across all evaluators" />
+      </div>
+
+      <div className="staff-card p-4 space-y-3">
+       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_14rem] gap-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name, email, subject or course..."
+            aria-label="Search evaluators"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+          />
+        </div>
+        <Select aria-label="Status" placeholder="Active and inactive" options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+          value={status === 'all' ? '' : status} onChange={e => setStatus(e.target.value || 'all')} />
+       </div>
+       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Department">
+          {[['', 'All departments', evaluators.length], ...departments.map(dep => [dep, dep, evaluators.filter(e => (e.department || 'Other') === dep).length])].map(([value, label, n]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setDepartment(value)}
+              aria-pressed={department === value}
+              className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                department === value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-staff-line text-staff-ink2 hover:bg-staff-sunk'
+              }`}
+            >
+              {label} <span className={department === value ? 'text-white/80' : 'text-staff-muted'}>{n}</span>
+            </button>
+          ))}
+       </div>
+      </div>
+
+      {evaluators.length === 0 ? (
+        <div className="staff-card">
           <EmptyState
             icon={Users}
             title="No evaluators yet"
-            description="Add evaluator accounts to start assigning and reviewing transfer applications."
-            action={() => setModal({ open: true, evaluator: null })}
-            actionLabel="Add First Evaluator"
+            description="Import the staff roster to create the evaluator accounts for each department, or add evaluators one at a time."
+            action={() => setImportOpen(true)}
+            actionLabel="Import staff roster"
           />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600">Name</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden sm:table-cell">Email</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Department</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden lg:table-cell">Expertise</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Open Reviews</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
-                  <th className="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {evaluators.map(ev => (
-                  <tr key={ev.id} className={`hover:bg-gray-50 transition-colors ${!ev.is_active ? 'opacity-60' : ''}`}>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-gray-900">{ev.full_name}</p>
-                      <p className="text-xs text-gray-500">
-                        {[ev.evaluator_code, ev.title].filter(Boolean).join(' · ')}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3 hidden sm:table-cell text-gray-600">{ev.email}</td>
-                    <td className="px-5 py-3 hidden md:table-cell text-gray-600">{ev.department || '—'}</td>
-                    <td className="px-5 py-3 hidden lg:table-cell">
-                      {(() => {
-                        const tags = ev.expertise_subjects?.length ? ev.expertise_subjects : (ev.specializations || [])
-                        return tags.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {tags.slice(0, 3).map(s => (
-                              <Badge key={s} variant="info">{s}</Badge>
-                            ))}
-                            {tags.length > 3 && (
-                              <span className="text-xs text-gray-400">+{tags.length - 3}</span>
-                            )}
-                            {ev.expertise_courses?.length > 0 && (
-                              <span className="text-xs text-gray-500 self-center">{ev.expertise_courses.length} courses</span>
-                            )}
-                          </div>
-                        ) : <span className="text-gray-400">—</span>
-                      })()}
-                    </td>
-                    <td className="px-5 py-3 hidden md:table-cell font-medium text-gray-700">
-                      {ev.open_reviews ?? ev.active_cases ?? ev.current_case_count ?? '—'}
-                    </td>
-                    <td className="px-5 py-3">
-                      {ev.is_active
-                        ? <Badge variant="approved">Active</Badge>
-                        : <Badge variant="closed">Inactive</Badge>
-                      }
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setModal({ open: true, evaluator: ev })}
-                          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(ev)}
-                          disabled={toggling === ev.id}
-                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                          title={ev.is_active ? 'Deactivate' : 'Activate'}
-                        >
-                          <Power className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="staff-card"><EmptyState icon={Search} title="No evaluators match" description="Try another name, subject or department." /></div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {visible.map(ev => (
+            <EvaluatorCard key={ev.id} ev={ev} onEdit={e => setModal({ open: true, evaluator: e })} onToggle={handleToggle} toggling={toggling === ev.id} />
+          ))}
+        </div>
+      )}
 
       <EvaluatorModal
         isOpen={modal.open}
@@ -389,6 +528,7 @@ export default function UserManagement() {
         evaluator={modal.evaluator}
         onSave={load}
       />
+      <ImportRosterModal isOpen={importOpen} onClose={() => setImportOpen(false)} onDone={load} />
     </div>
   )
 }

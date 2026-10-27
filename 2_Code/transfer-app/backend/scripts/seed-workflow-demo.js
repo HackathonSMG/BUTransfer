@@ -1,35 +1,20 @@
 /**
- * Seeds the evaluation-workflow demo: six fictional evaluators (evaluator master data) and scenario
- * applications built on the sponsor's course codes, then assigns every evaluated application that has
- * courses without a review (including ones already in the database). Everything created here is marked
- * data_source = 'synthetic'. Safe to re-run: existing evaluators are updated, existing students skipped.
+ * Seeds the evaluation-workflow demo: the staff roster (src/data/staff-roster.json: the admin and the evaluator
+ * master data) and scenario applications built on the sponsor's course codes, then assigns every evaluated
+ * application that has courses without a review (including ones already in the database). Scenario
+ * applications are marked data_source = 'synthetic'. Safe to re-run: existing accounts are updated, existing
+ * students skipped. The same roster import is available to admins on the Evaluators page.
  * Run after `npm run db:migrate`, `npm run db:seed:credit` and `npm run db:import:sponsor`.
  * Usage: node scripts/seed-workflow-demo.js
  */
 import 'dotenv/config';
 import { query, pool } from '../src/config/db.js';
-import { supabaseAdmin } from '../src/config/supabase.js';
 import * as applicationService from '../src/services/application.service.js';
 import { assignPendingApplications } from '../src/services/workflow/assignment.service.js';
+import { importRoster } from '../src/services/staff/roster.service.js';
 
-// Construct the auth field name at runtime, as seed.js does
-const PW = ['pass', 'word'].join('');
+// Initial password for accounts this seed creates (development only)
 const DEMO_SECRET = 'Demo@1234';
-
-const EVALUATORS = [
-  { email: 'michael.smith@demo.edu', full_name: 'Dr. Michael Smith', title: 'Associate Professor', department: 'Computer Science',
-    subjects: ['CS'], courses: ['CAS CS 111', 'CAS CS 112', 'CAS CS 131', 'CAS CS 132', 'CAS CS 210', 'CAS CS 235', 'CAS CS 237', 'CAS CS 330'] },
-  { email: 'anita.rao@demo.edu', full_name: 'Dr. Anita Rao', title: 'Senior Lecturer', department: 'Mathematics & Statistics',
-    subjects: ['MA'], courses: ['CAS MA 123', 'CAS MA 124', 'CAS MA 225', 'CAS MA 226', 'CAS MA 242', 'CAS MA 293', 'CAS MA 581'] },
-  { email: 'rachel.adams@demo.edu', full_name: 'Dr. Rachel Adams', title: 'Professor', department: 'Biology',
-    subjects: ['BI', 'CH'], courses: ['CAS BI 107', 'CAS BI 108', 'CAS BI 203', 'CAS BI 206', 'CAS CH 101', 'CAS CH 102', 'CAS CH 203', 'CAS CH 204'] },
-  { email: 'david.okafor@demo.edu', full_name: 'Prof. David Okafor', title: 'Professor', department: 'Economics',
-    subjects: ['EC'], courses: ['CAS EC 101', 'CAS EC 102', 'CAS EC 201', 'CAS EC 202', 'CAS EC 203', 'CAS EC 204'] },
-  { email: 'laura.bennett@demo.edu', full_name: 'Dr. Laura Bennett', title: 'Associate Professor', department: 'Psychological & Brain Sciences',
-    subjects: ['PS'], courses: ['CAS PS 101', 'CAS PS 211', 'CAS PS 222', 'CAS PS 231', 'CAS PS 241', 'CAS PS 251', 'CAS PS 261', 'CAS PS 336', 'CAS PS 371'] },
-  { email: 'maria.santos@demo.edu', full_name: 'Maria Santos', title: 'Transfer Credit Specialist', department: 'Credit Evaluation Department',
-    subjects: ['GEN'], courses: [] },
-];
 
 // Each scenario is one application. Titles and credits come from the catalog (sponsor data) at run time;
 // a title is given only for a course the catalog doesn't have.
@@ -58,33 +43,6 @@ const SCENARIOS = [
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function upsertEvaluator(ev) {
-  const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-  if (error) throw new Error(`Could not list auth users: ${error.message}`);
-  let userId = list.users.find((u) => u.email === ev.email)?.id;
-  if (!userId) {
-    const { data, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: ev.email, [PW]: DEMO_SECRET, email_confirm: true, user_metadata: { full_name: ev.full_name, role: 'evaluator' },
-    });
-    if (createError) throw new Error(`Could not create ${ev.email}: ${createError.message}`);
-    userId = data.user.id;
-  }
-  await query(
-    `INSERT INTO profiles (id, role, full_name, email) VALUES ($1, 'evaluator', $2, $3)
-     ON CONFLICT (id) DO UPDATE SET role = 'evaluator', full_name = EXCLUDED.full_name, is_active = true`,
-    [userId, ev.full_name, ev.email]
-  );
-  const { rows: [row] } = await query(
-    `INSERT INTO evaluators (id, title, department, specializations, expertise_subjects, expertise_courses, max_concurrent_cases, data_source)
-     VALUES ($1, $2, $3, $4, $5, $6, 25, 'synthetic')
-     ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, department = EXCLUDED.department, specializations = EXCLUDED.specializations,
-       expertise_subjects = EXCLUDED.expertise_subjects, expertise_courses = EXCLUDED.expertise_courses, is_active = true, data_source = 'synthetic'
-     RETURNING evaluator_code`,
-    [userId, ev.title, ev.department, [ev.department], ev.subjects, ev.courses]
-  );
-  return row.evaluator_code;
-}
 
 // Waits until the application has no pending or running evaluation
 async function waitForEvaluations(applicationId) {
@@ -150,8 +108,9 @@ async function seedScenario(s) {
 }
 
 async function seed() {
-  console.log('[Seed workflow] Evaluators');
-  for (const ev of EVALUATORS) console.log(`  ${await upsertEvaluator(ev)}  ${ev.full_name.padEnd(20)} ${ev.email}  ${ev.subjects.join(', ')}`);
+  console.log('[Seed workflow] Staff roster');
+  const { accounts } = await importRoster({ initialSecret: DEMO_SECRET, actor: null });
+  for (const a of accounts) console.log(`  ${a.created ? 'created' : 'updated'}  ${a.role.padEnd(9)} ${a.full_name.padEnd(30)} ${a.email}`);
 
   console.log('\n[Seed workflow] Scenario applications');
   for (const s of SCENARIOS) console.log(`  ${await seedScenario(s)}`);
