@@ -20,21 +20,26 @@ async function seed() {
     await client.query('BEGIN');
     const syllabi = new Map(data.syllabi.map((s) => [`${s.institution}|${s.course_code}`, s.syllabus]));
 
+    // All of this sample data is synthetic; rows the sponsor import owns keep the sponsor's title, program and credits
     for (const c of data.catalog) {
       await client.query(
-        `INSERT INTO catalog_courses (institution, course_code, title, program, credits, credit_system, level, description, learning_outcomes, syllabus)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         ON CONFLICT (institution, course_code) DO UPDATE SET title = EXCLUDED.title, program = EXCLUDED.program, credits = EXCLUDED.credits,
+        `INSERT INTO catalog_courses (institution, course_code, title, program, credits, credit_system, level, description, learning_outcomes, syllabus,
+           data_source, description_source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'synthetic',CASE WHEN $8::text IS NULL THEN NULL ELSE 'synthetic' END)
+         ON CONFLICT (institution, course_code) DO UPDATE SET
+           title = CASE WHEN catalog_courses.data_source = 'sponsor' THEN catalog_courses.title ELSE EXCLUDED.title END,
+           program = CASE WHEN catalog_courses.data_source = 'sponsor' THEN catalog_courses.program ELSE EXCLUDED.program END,
+           credits = CASE WHEN catalog_courses.data_source = 'sponsor' THEN catalog_courses.credits ELSE EXCLUDED.credits END,
            credit_system = EXCLUDED.credit_system, level = EXCLUDED.level, description = EXCLUDED.description,
-           learning_outcomes = EXCLUDED.learning_outcomes, syllabus = EXCLUDED.syllabus`,
+           learning_outcomes = EXCLUDED.learning_outcomes, syllabus = EXCLUDED.syllabus, description_source = EXCLUDED.description_source`,
         [c.institution, c.course_code, c.title, c.program, c.credits, c.credit_system, c.level, orNull(c.description), orNull(c.learning_outcomes),
           syllabi.get(`${c.institution}|${c.course_code}`) || null],
       );
     }
     for (const e of data.equivalencies) {
       await client.query(
-        `INSERT INTO equivalencies (eq_id, institution, course_code, title, bu_course, outcome, dept, approved_on, evaluator)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `INSERT INTO equivalencies (eq_id, institution, course_code, title, bu_course, outcome, dept, approved_on, evaluator, data_source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'synthetic')
          ON CONFLICT (eq_id) DO UPDATE SET institution = EXCLUDED.institution, course_code = EXCLUDED.course_code, title = EXCLUDED.title,
            bu_course = EXCLUDED.bu_course, outcome = EXCLUDED.outcome, dept = EXCLUDED.dept, approved_on = EXCLUDED.approved_on, evaluator = EXCLUDED.evaluator`,
         [e.eq_id, e.institution, e.course_code, e.title, orNull(e.bu_course), e.outcome, orNull(e.dept), orNull(e.approved_on), orNull(e.evaluator)],
@@ -42,8 +47,8 @@ async function seed() {
     }
     for (const p of data.pastDecisions) {
       await client.query(
-        `INSERT INTO past_decisions (decision_id, institution, course_code, proposed_bu, decision, bu_awarded, reason, credit_system, decided_on, evaluator, days_to_decision)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        `INSERT INTO past_decisions (decision_id, institution, course_code, proposed_bu, decision, bu_awarded, reason, credit_system, decided_on, evaluator, days_to_decision, data_source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'synthetic')
          ON CONFLICT (decision_id) DO UPDATE SET institution = EXCLUDED.institution, course_code = EXCLUDED.course_code, proposed_bu = EXCLUDED.proposed_bu,
            decision = EXCLUDED.decision, bu_awarded = EXCLUDED.bu_awarded, reason = EXCLUDED.reason, credit_system = EXCLUDED.credit_system,
            decided_on = EXCLUDED.decided_on, evaluator = EXCLUDED.evaluator, days_to_decision = EXCLUDED.days_to_decision`,

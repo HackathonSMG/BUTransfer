@@ -18,7 +18,8 @@ export async function requireAuth(req, res, next) {
     }
     const supabaseUser = data.user;
     const profileResult = await query(
-      `SELECT id, role, full_name, email, is_active FROM profiles WHERE id = $1 LIMIT 1`,
+      `SELECT p.id, p.role, p.full_name, p.email, p.is_active, e.is_active AS evaluator_active
+       FROM profiles p LEFT JOIN evaluators e ON e.id = p.id WHERE p.id = $1 LIMIT 1`,
       [supabaseUser.id]
     );
     if (profileResult.rows.length === 0) {
@@ -27,6 +28,10 @@ export async function requireAuth(req, res, next) {
     const profile = profileResult.rows[0];
     if (!profile.is_active) {
       return next(unauthorized('Your account has been deactivated.'));
+    }
+    // A deactivated evaluator loses access immediately, even with a valid session
+    if (profile.role === 'evaluator' && !profile.evaluator_active) {
+      return next(unauthorized('Your account is not registered as an active evaluator.'));
     }
     req.user = { id: profile.id, email: profile.email, role: profile.role, full_name: profile.full_name };
     req.accessToken = token;

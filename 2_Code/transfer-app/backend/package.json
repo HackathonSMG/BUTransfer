@@ -10,6 +10,8 @@
     "db:seed": "node scripts/seed.js",
     "db:seed:credit": "node scripts/seed-credit-data.js",
     "db:seed:samples": "node scripts/seed-sample-students.js",
+    "db:import:sponsor": "node scripts/import-sponsor-data.js",
+    "db:seed:workflow": "node scripts/seed-workflow-demo.js",
     "credit:eval": "node scripts/eval-credit-engine.js",
     "agent:create": "node scripts/create-agent.js",
     "db:reset": "node scripts/reset.js"

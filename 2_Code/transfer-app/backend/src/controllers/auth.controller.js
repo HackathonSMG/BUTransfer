@@ -11,12 +11,17 @@ export async function login(req, res, next) {
     if (error || !data?.user) return next(unauthorized(error?.message || 'Invalid email or password'));
 
     const profileResult = await query(
-      `SELECT id, role, full_name, email, is_active, created_at FROM profiles WHERE id = $1 LIMIT 1`,
+      `SELECT p.id, p.role, p.full_name, p.email, p.is_active, p.created_at, e.is_active AS evaluator_active
+       FROM profiles p LEFT JOIN evaluators e ON e.id = p.id WHERE p.id = $1 LIMIT 1`,
       [data.user.id]
     );
     if (profileResult.rows.length === 0) return next(unauthorized('User profile not found.'));
     const profile = profileResult.rows[0];
     if (!profile.is_active) return next(unauthorized('Your account has been deactivated.'));
+    // Evaluators must be in the evaluator master data and active
+    if (profile.role === 'evaluator' && !profile.evaluator_active) {
+      return next(unauthorized('Your account is not registered as an active evaluator. Please contact the Credit Evaluation office.'));
+    }
 
     return res.status(200).json({
       data: {
@@ -50,7 +55,11 @@ export async function refreshSession(req, res, next) {
 export async function getMe(req, res, next) {
   try {
     const profileResult = await query(
-      `SELECT p.id, p.role, p.full_name, p.email, p.phone, p.is_active, p.created_at, p.updated_at, e.department, e.specializations, e.max_concurrent_cases
+      // Evaluator master fields from migration 008 are read through to_jsonb so this works before it is applied
+      `SELECT p.id, p.role, p.full_name, p.email, p.phone, p.is_active, p.created_at, p.updated_at, e.department, e.specializations, e.max_concurrent_cases,
+              to_jsonb(e) ->> 'evaluator_code' AS evaluator_code, to_jsonb(e) ->> 'title' AS title,
+              COALESCE(to_jsonb(e) -> 'expertise_subjects', '[]'::jsonb) AS expertise_subjects,
+              COALESCE(to_jsonb(e) -> 'expertise_courses', '[]'::jsonb) AS expertise_courses
        FROM profiles p LEFT JOIN evaluators e ON e.id = p.id WHERE p.id = $1 LIMIT 1`,
       [req.user.id]
     );
