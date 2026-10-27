@@ -141,7 +141,12 @@ export const isAgentConfigured = () => Boolean(env.FOUNDRY_PROJECT_ENDPOINT && e
 
 let projectClient = null;
 export function getProjectClient() {
-  if (!projectClient) projectClient = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, new DefaultAzureCredential());
+  if (!projectClient) {
+    const credential = env.FOUNDRY_API_KEY
+      ? { getToken: async () => ({ token: env.FOUNDRY_API_KEY, expiresOnTimestamp: Date.now() + 3_600_000 }) }
+      : new DefaultAzureCredential();
+    projectClient = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, credential);
+  }
   return projectClient;
 }
 
@@ -287,7 +292,7 @@ export function assertNoStudentDetails(payload, application) {
  */
 export async function runAgent(agentCase, { client = getProjectClient().getOpenAIClient(), agentName = env.FOUNDRY_AGENT_NAME, ref } = {}) {
   const reference = ref || await loadReference();
-  const agentRef = { body: { agent: { type: 'agent_reference', name: agentName } } };
+  const agentRef = { body: { agent_reference: { name: agentName } } };
   const conversation = await client.conversations.create();
   try {
     let response = await client.responses.create(
