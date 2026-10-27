@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Search, ClipboardCheck, ChevronRight } from 'lucide-react'
 import { getMyReviews } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
-import ScoreMeter from '../../components/staff/ScoreMeter'
+import PageHeader from '../../components/staff/PageHeader'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchBasisLabel, formatDate, initials, avatarTint } from '../../lib/reviews'
+import { REVIEW_STATUS, matchLabel } from '../../lib/reviews'
 
 const TABS = [
   ['open', 'Open'],
   ['new', 'New'],
   ['in_progress', 'In progress'],
-  ['info_requested', 'Waiting on student'],
+  ['info_requested', 'Waiting'],
   ['upcoming', 'Upcoming'],
   ['completed', 'Completed'],
   ['all', 'All']
@@ -21,7 +21,6 @@ const TABS = [
 const SEARCH_DELAY_MS = 350
 
 export default function MyEvaluations() {
-  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(([k]) => k === params.get('status')) ? params.get('status') : 'open'
   const search = params.get('search') || ''
@@ -55,22 +54,19 @@ export default function MyEvaluations() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-[26px] leading-tight text-staff-ink">My Evaluations</h1>
-        <p className="text-sm text-staff-muted mt-1">Courses assigned to you, highest priority and longest waiting first. Select a row to open the application.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="My Evaluations" subtitle="Courses assigned to you, most urgent first. Open one to review it." />
 
       <section className="staff-card overflow-hidden">
         <div className="px-5 pt-4 pb-4 border-b border-staff-line2 flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-1 p-[3px] rounded-lg bg-staff-sunk" role="tablist">
-            {TABS.map(([key, label]) => (
+            {TABS.filter(([key]) => key !== 'upcoming' || state.counts.upcoming > 0 || tab === 'upcoming').map(([key, label]) => (
               <button
                 key={key}
                 role="tab"
                 aria-selected={tab === key}
                 onClick={() => setParam('status', key === 'open' ? '' : key)}
-                className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors flex items-center gap-1.5 ${
+                className={`px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors flex items-center gap-1.5 ${
                   tab === key ? 'bg-white text-staff-ink shadow-card' : 'text-staff-muted hover:text-staff-ink'
                 }`}
               >
@@ -81,7 +77,7 @@ export default function MyEvaluations() {
               </button>
             ))}
           </div>
-          <div className="relative ml-auto w-full sm:w-72">
+          <div className="relative ml-auto w-full sm:w-60">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
             <input
               type="text"
@@ -105,64 +101,51 @@ export default function MyEvaluations() {
             description={search ? 'Try another student, reference or course code.' : 'Courses assigned to you appear here as applications are evaluated.'}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-staff-line bg-staff-bg/60">
-                  <th className="staff-th">Student</th>
-                  <th className="staff-th">Course</th>
-                  <th className="staff-th hidden lg:table-cell">Target BU course</th>
-                  <th className="staff-th hidden md:table-cell">Course match</th>
-                  <th className="staff-th hidden xl:table-cell">Priority</th>
-                  <th className="staff-th">Status</th>
-                  <th className="staff-th hidden md:table-cell">Assigned</th>
-                  <th className="staff-th"><span className="sr-only">Open</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-staff-line2">
-                {state.rows.map(r => {
-                  const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
-                  return (
-                    <tr key={r.id} className="hover:bg-staff-bg cursor-pointer" onClick={() => navigate(`/evaluator/applications/${r.application_id}`)}>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex items-center gap-2.5">
-                          <span className={`w-8 h-8 rounded-full grid place-items-center text-[11px] font-bold flex-shrink-0 ${avatarTint(r.student_name)}`}>{initials(r.student_name)}</span>
-                          <span className="min-w-0">
-                            <span className="block font-semibold text-staff-ink whitespace-nowrap">{r.student_name}</span>
-                            <span className="block text-xs text-staff-muted font-mono">{r.reference_number}</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="whitespace-nowrap">
-                          <span className="font-mono text-[12.5px] font-medium text-staff-ink">{r.course_code}</span>
-                          <span className="text-staff-muted"> → </span>
-                          {r.target_bu_course
-                            ? <span className="font-mono text-[12.5px] font-semibold text-primary-800">{r.target_bu_course}</span>
-                            : <span className="text-xs italic text-staff-muted">target to be determined</span>}
-                        </p>
-                        <p className="text-xs text-staff-muted max-w-[260px] truncate" title={`${r.course_title || ''} · ${r.institution}`}>{r.course_title} · {r.institution}</p>
-                      </td>
-                      <td className="px-4 py-3 align-top hidden lg:table-cell">
-                        <p className="text-staff-ink2 max-w-[220px] truncate" title={r.target_title || ''}>{r.target_title || (r.target_bu_course ? '—' : 'Evaluator to decide')}</p>
-                        <p className="text-xs text-staff-muted">{matchBasisLabel(r)}</p>
-                      </td>
-                      <td className="px-4 py-3 align-top hidden md:table-cell"><ScoreMeter score={r.match_score} /></td>
-                      <td className="px-4 py-3 align-top hidden xl:table-cell">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${r.priority === 'high' ? 'text-red-700' : r.priority === 'low' ? 'text-staff-muted' : 'text-staff-ink2'}`}>
-                          <i className={`w-2 h-2 rounded-[2px] ${r.priority === 'high' ? 'bg-red-600' : r.priority === 'low' ? 'bg-slate-300' : 'bg-slate-400'}`} />
-                          {r.priority === 'high' ? 'High' : r.priority === 'low' ? 'Low' : 'Normal'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 align-top"><StatusPill tone={status.tone}>{status.label}</StatusPill></td>
-                      <td className="px-4 py-3 align-top hidden md:table-cell text-xs text-staff-ink2 whitespace-nowrap">{formatDate(r.assigned_at || r.created_at)}</td>
-                      <td className="px-4 py-3 align-top text-right"><ChevronRight className="w-4 h-4 text-staff-muted inline" /></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className="divide-y divide-staff-line2">
+            <li className="hidden md:grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_8rem_9rem_1rem] gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
+              <span>Application</span><span>Course mapping</span><span>Match</span><span>Status</span><span />
+            </li>
+            {state.rows.map(r => {
+              const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
+              const match = matchLabel(r.match_score)
+              return (
+                <li key={r.id}>
+                  <Link
+                    to={`/evaluator/reviews/${r.id}`}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_8rem_9rem_1rem] gap-x-4 gap-y-2 items-center px-6 py-4 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-medium text-staff-ink truncate">{r.student_name}</span>
+                      <span className="block text-[12.5px] text-staff-muted font-mono">{r.reference_number}</span>
+                    </span>
+                    <span className="min-w-0 order-3 md:order-none col-span-2 md:col-span-1">
+                      <span className="block text-[14px] text-staff-ink">
+                        <span className="font-mono">{r.course_code}</span>
+                        <span className="text-staff-muted"> → </span>
+                        {r.target_bu_course
+                          ? <span className="font-mono font-semibold text-primary-800">{r.target_bu_course}</span>
+                          : <span className="text-staff-muted italic">to be determined</span>}
+                      </span>
+                      <span className="block text-[12.5px] text-staff-muted truncate">{r.institution}</span>
+                    </span>
+                    <span className="hidden md:block">
+                      {match ? (
+                        <>
+                          <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{Math.round(r.match_score * 100)}%</span>
+                          <span className="block text-[12px] text-staff-muted">{match}</span>
+                        </>
+                      ) : <span className="text-[13px] text-staff-muted">Not scored</span>}
+                    </span>
+                    <span className="flex flex-col items-end md:items-start gap-1">
+                      <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                      {r.priority === 'high' && <span className="text-[11.5px] font-semibold text-red-700">High priority</span>}
+                    </span>
+                    <ChevronRight className="hidden md:block w-4 h-4 text-staff-muted" />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </section>
     </div>

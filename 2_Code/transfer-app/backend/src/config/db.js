@@ -56,24 +56,29 @@ export async function query(text, params) {
  */
 export async function getClient() {
   const client = await pool.connect();
-  const originalQuery = client.query.bind(client);
-  const release = client.release.bind(client);
+  // The wrappers below are removed on release: this client object goes back to the pool, and pool.query()
+  // calls client.query(text, values, callback); a wrapper that dropped the callback would hang that query.
+  const ownQuery = client.query;
+  const ownRelease = client.release;
 
   const timeout = setTimeout(() => {
     console.error('[DB] Client checkout has been outstanding for too long — releasing forcibly');
     client.release();
   }, 5000);
 
-  client.release = () => {
+  client.release = (err) => {
     clearTimeout(timeout);
-    release();
+    client.query = ownQuery;
+    client.release = ownRelease;
+    return ownRelease.call(client, err);
   };
 
-  client.query = (text, params) => {
+  client.query = (...args) => {
     if (env.NODE_ENV === 'development') {
+      const text = typeof args[0] === 'string' ? args[0] : args[0]?.text || '';
       console.log('[DB] Transaction query', { text: text.slice(0, 80) });
     }
-    return originalQuery(text, params);
+    return ownQuery.apply(client, args);
   };
 
   return client;

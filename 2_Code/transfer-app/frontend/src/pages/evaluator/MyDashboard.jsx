@@ -1,31 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Inbox, Loader, MessageSquare, CheckCircle2, ArrowRight, RefreshCw, ChevronRight, BookOpen, ClipboardList } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react'
 import { getMyDashboard } from '../../api/my'
 import { useAuth } from '../../hooks/useAuth'
-import KpiCard from '../../components/staff/KpiCard'
+import PageHeader from '../../components/staff/PageHeader'
+import Metric from '../../components/staff/Metric'
 import StatusPill from '../../components/staff/StatusPill'
-import ScoreMeter from '../../components/staff/ScoreMeter'
-import BUCrest from '../../components/layout/BUCrest'
-import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchBasisLabel, formatDate, initials, avatarTint } from '../../lib/reviews'
-
-function greeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-}
+import { REVIEW_STATUS } from '../../lib/reviews'
+import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export default function MyDashboard() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [state, setState] = useState({ loading: true, data: null, error: null })
 
   const load = useCallback(async () => {
-    setState(p => ({ ...p, loading: true }))
     try {
       const res = await getMyDashboard()
       setState({ loading: false, data: res.data, error: null })
@@ -36,170 +28,101 @@ export default function MyDashboard() {
 
   useEffect(() => { load() }, [load])
 
-  const d = state.data
-  const c = d?.counts
-  const profile = d?.profile
+  if (state.loading) return <div className="flex justify-center py-24"><Spinner size="lg" className="text-primary-600" /></div>
+  if (state.error) return <div className="staff-card"><EmptyState title="Your dashboard could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
+
+  const { counts: c, up_next: attention, recent_activity: activity } = state.data
   const firstName = (user?.full_name || '').replace(/^(Dr|Prof)\.?\s+/i, '').split(' ')[0]
   const today = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date())
-  const capacity = profile?.max_concurrent_cases || 20
-  const loadPct = c ? Math.min(100, (c.open / capacity) * 100) : 0
-  const goTo = (status) => navigate(`/evaluator/my-evaluations${status ? `?status=${status}` : ''}`)
 
   return (
-    <div className="space-y-4">
-      <section className="relative overflow-hidden rounded-2xl border border-[#dfe6f5] bg-gradient-to-br from-white via-[#f2f6fe] to-[#e9f0fd] px-5 sm:px-7 py-6">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-brand" aria-hidden="true" />
-        <BUCrest className="absolute -right-6 -bottom-10 w-48 h-56 opacity-[0.06] pointer-events-none" />
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-primary-800">{greeting()}{firstName ? `, ${firstName}` : ''}</p>
-            <h1 className="mt-1 mb-2 text-[26px] leading-tight text-staff-ink">
-              {!c ? 'Your evaluations' : c.open > 0
-                ? `${plural(c.open, 'course')} ${c.open === 1 ? 'is' : 'are'} waiting for your review.`
-                : "You're all caught up."}
-            </h1>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-staff-ink2">
-              {profile && <span>{[profile.title, profile.department].filter(Boolean).join(' · ')}</span>}
-              {profile?.evaluator_code && <span className="text-staff-muted">{profile.evaluator_code}</span>}
-              <span className="text-staff-muted">{today}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={load} aria-label="Refresh" title="Refresh">
-              <RefreshCw className={`w-4 h-4 ${state.loading ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button onClick={() => goTo()}>
-              Open my evaluations
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow={today}
+        title={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
+        subtitle={c.open > 0 ? `${plural(c.open, 'course')} ${c.open === 1 ? 'needs' : 'need'} your review.` : "You're all caught up."}
+      />
 
-      {state.loading && !d ? (
-        <div className="staff-card flex justify-center py-20"><Spinner size="lg" className="text-primary-600" /></div>
-      ) : state.error ? (
-        <div className="staff-card"><EmptyState icon={ClipboardList} title="Your dashboard could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard icon={Inbox} tone="info" label="New" value={c.new} sub="assigned, not yet opened" onClick={() => goTo('new')} />
-            <KpiCard icon={Loader} tone="neutral" label="In progress" value={c.in_progress} sub="opened and under review" onClick={() => goTo('in_progress')} />
-            <KpiCard icon={MessageSquare} tone="warn" label="Waiting on student" value={c.info_requested} sub="information requested" onClick={() => goTo('info_requested')} />
-            <KpiCard icon={CheckCircle2} tone="ok" label="Completed" value={c.completed} sub={`${c.completed_this_month} this month`} onClick={() => goTo('completed')} />
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Metric label="New" value={c.new} detail={c.upcoming ? `${c.upcoming} more coming after other reviews` : 'Assigned, not yet opened'} to="/evaluator/my-evaluations?status=new" accent={c.new > 0} />
+        <Metric label="In progress" value={c.in_progress + c.info_requested} detail={c.info_requested ? `${c.info_requested} waiting on the student` : 'Opened and under review'} to="/evaluator/my-evaluations?status=in_progress" />
+        <Metric label="Completed" value={c.completed} detail={`${c.completed_this_month} this month`} to="/evaluator/my-evaluations?status=completed" />
+      </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-4">
-            {/* Up next */}
-            <section className="staff-card overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-                <h2 className="text-[15px] font-semibold text-staff-ink">Up next</h2>
-                <Link to="/evaluator/my-evaluations" className="text-xs font-semibold text-primary-600 hover:text-primary-700">View all {c.open}</Link>
-              </div>
-              {d.up_next.length === 0 ? (
-                <EmptyState icon={CheckCircle2} title="Nothing waiting" description="New assignments appear here as applications are evaluated." />
-              ) : (
-                <ul className="divide-y divide-staff-line2 border-t border-staff-line2">
-                  {d.up_next.map(r => <ReviewRow key={r.id} r={r} onOpen={() => navigate(`/evaluator/applications/${r.application_id}`)} />)}
-                </ul>
-              )}
-            </section>
-
-            <div className="space-y-4">
-              {/* Workload */}
-              <section className="staff-card p-5">
-                <h2 className="text-[15px] font-semibold text-staff-ink mb-3">Current workload</h2>
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-[26px] font-bold text-staff-ink tabular-nums leading-none">{c.open}<span className="text-sm font-medium text-staff-muted"> / {capacity}</span></span>
-                  <span className="text-xs text-staff-muted">open courses</span>
-                </div>
-                <div className="h-2.5 rounded-full bg-staff-line2 overflow-hidden" title={`${c.open} open of a ${capacity} course capacity`}>
-                  <i className={`block h-full rounded-full ${loadPct >= 90 ? 'bg-red-600' : loadPct >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.max(c.open ? 3 : 0, loadPct)}%` }} />
-                </div>
-                <dl className="grid grid-cols-2 gap-2.5 mt-4">
-                  <Stat label="Applications" value={c.open_applications} />
-                  <Stat label="Upcoming" value={c.upcoming} hint="Queued behind another evaluator" />
-                  <Stat label="Approved" value={c.approved} />
-                  <Stat label="Rejected" value={c.rejected} />
-                </dl>
-              </section>
-
-              {/* Expertise */}
-              <section className="staff-card p-5">
-                <h2 className="text-[15px] font-semibold text-staff-ink mb-3 flex items-center gap-2"><BookOpen className="w-4 h-4 text-staff-muted" />Your expertise</h2>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {(profile?.expertise_subjects || []).map(s => (
-                    <span key={s} className="text-xs font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-100">{s === 'GEN' ? 'General credit evaluation' : s}</span>
-                  ))}
-                  {(profile?.specializations || []).slice(0, 4).map(s => (
-                    <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-staff-sunk text-staff-ink2">{s}</span>
-                  ))}
-                </div>
-                {profile?.expertise_courses?.length > 0 ? (
-                  <p className="text-xs text-staff-ink2 leading-relaxed">
-                    <span className="text-staff-muted">BU courses: </span>
-                    {profile.expertise_courses.map(code => code.replace(/^CAS /, '')).join(', ')}
-                  </p>
-                ) : (
-                  <p className="text-xs text-staff-muted">Courses are routed to you by subject and department.</p>
-                )}
-              </section>
-            </div>
-          </div>
-
-          {/* Recent decisions */}
-          <section className="staff-card overflow-hidden">
-            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-              <h2 className="text-[15px] font-semibold text-staff-ink">Recent decisions</h2>
-              <Link to="/evaluator/my-evaluations?status=completed" className="text-xs font-semibold text-primary-600 hover:text-primary-700">All completed</Link>
-            </div>
-            {d.recent_decisions.length === 0 ? (
-              <p className="text-sm text-staff-muted px-5 pb-6">Courses you approve or reject appear here.</p>
-            ) : (
-              <ul className="divide-y divide-staff-line2 border-t border-staff-line2">
-                {d.recent_decisions.map(r => <ReviewRow key={r.id} r={r} decided onOpen={() => navigate(`/evaluator/applications/${r.application_id}`)} />)}
-              </ul>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-6 items-start">
+        <section className="staff-card">
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <h2 className="text-[17px] font-semibold text-staff-ink">Needs your attention</h2>
+            {c.open > attention.length && (
+              <Link to="/evaluator/my-evaluations" className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">View all {c.open}</Link>
             )}
-          </section>
-        </>
-      )}
+          </div>
+          {attention.length === 0 ? (
+            <div className="flex items-center gap-3 px-6 pb-6 text-[15px] text-staff-ink2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              Nothing is waiting for you. New assignments appear here.
+            </div>
+          ) : (
+            <ul className="divide-y divide-staff-line2 border-t border-staff-line2">
+              {attention.map(r => <AttentionRow key={r.id} r={r} />)}
+            </ul>
+          )}
+          {attention.length > 0 && (
+            <div className="px-6 py-4 border-t border-staff-line2">
+              <Link to={`/evaluator/reviews/${attention[0].id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800">
+                Start with the first one<ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+        </section>
+
+        <section className="staff-card">
+          <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Recent activity</h2>
+          {activity.length === 0 ? (
+            <p className="px-6 pb-6 text-sm text-staff-muted">Your assignments and decisions will appear here.</p>
+          ) : (
+            <ul className="border-t border-staff-line2">
+              {activity.map((a, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 px-6 py-3 text-[14px]">
+                  <span className="min-w-0">
+                    <span className="block text-staff-ink truncate">{activityLabel(a.kind)}</span>
+                    {a.reference_number && <span className="block text-[12.5px] text-staff-muted">{a.reference_number}</span>}
+                  </span>
+                  <span className="text-[12.5px] text-staff-muted whitespace-nowrap">{timeAgo(a.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
 
-function Stat({ label, value, hint }) {
-  return (
-    <div className="rounded-[9px] bg-staff-sunk px-3 py-2" title={hint}>
-      <dt className="text-[11.5px] font-medium text-staff-muted">{label}</dt>
-      <dd className="text-lg font-bold text-staff-ink tabular-nums">{value}</dd>
-    </div>
-  )
-}
-
-function ReviewRow({ r, onOpen, decided = false }) {
+// One piece of work: who, which course mapping, and why it's here
+function AttentionRow({ r }) {
   const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
+  const tag = r.info_status === 'responded' ? 'Student replied'
+    : r.transferred_from ? `Handed over by ${r.transferred_from}`
+    : r.priority === 'high' ? 'High priority' : null
   return (
     <li>
-      <button type="button" onClick={onOpen} className="w-full grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-3 text-left hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg">
-        <span className={`w-8 h-8 rounded-full grid place-items-center text-[11px] font-bold ${avatarTint(r.student_name)}`}>{initials(r.student_name)}</span>
-        <span className="min-w-0">
-          <span className="block text-[13.5px] font-semibold text-staff-ink truncate">{r.student_name}</span>
-          <span className="block text-xs text-staff-muted truncate">{r.reference_number} · {r.institution}</span>
+      <Link to={`/evaluator/reviews/${r.id}`} className="flex items-center gap-4 px-6 py-4 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg">
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-[15px] font-medium text-staff-ink">
+            <span className="truncate">{r.student_name}</span>
+            {tag && <span className="flex-shrink-0 text-[11.5px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{tag}</span>}
+          </span>
+          <span className="block text-[13px] text-staff-muted mt-0.5">
+            <span className="font-mono">{r.course_code}</span>
+            <span> → </span>
+            <span className="font-mono text-staff-ink2">{r.target_bu_course || 'to be determined'}</span>
+            <span className="hidden sm:inline"> · {r.reference_number}</span>
+          </span>
         </span>
-        <span className="hidden sm:block min-w-0 text-[13px]">
-          <span className="font-mono text-[12.5px] text-staff-ink">{r.course_code}</span>
-          <span className="text-staff-muted"> → </span>
-          {r.target_bu_course
-            ? <span className="font-mono text-[12.5px] font-semibold text-primary-800">{r.target_bu_course}</span>
-            : <span className="text-xs italic text-staff-muted">target to be determined</span>}
-          <span className="block text-xs text-staff-muted truncate">{matchBasisLabel(r)}</span>
-        </span>
-        <span className="hidden sm:block">{decided ? <span className="text-xs text-staff-muted whitespace-nowrap">{formatDate(r.completed_at)}</span> : <ScoreMeter score={r.match_score} />}</span>
-        <span className="flex items-center gap-2">
-          <StatusPill tone={status.tone}>{status.label}</StatusPill>
-          <ChevronRight className="w-4 h-4 text-staff-muted" />
-        </span>
-      </button>
+        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        <ChevronRight className="w-4 h-4 text-staff-muted flex-shrink-0" />
+      </Link>
     </li>
   )
 }

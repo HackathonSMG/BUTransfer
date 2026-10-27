@@ -22,6 +22,8 @@ import UserManagement from './pages/admin/UserManagement'
 import MyDashboard from './pages/evaluator/MyDashboard'
 import MyEvaluations from './pages/evaluator/MyEvaluations'
 import MyProfile from './pages/evaluator/MyProfile'
+import ReviewDetail from './pages/evaluator/ReviewDetail'
+import Reports from './pages/admin/Reports'
 import NotFound from './pages/NotFound'
 
 // /evaluator is the evaluator's dashboard; older links that sent admins here now go to the applications list
@@ -59,6 +61,16 @@ export default function App() {
             <ProtectedRoute allowedRoles={['evaluator']}>
               <Layout>
                 <MyEvaluations />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluator/reviews/:id"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator']}>
+              <Layout>
+                <ReviewDetail />
               </Layout>
             </ProtectedRoute>
           }
@@ -105,6 +117,16 @@ export default function App() {
         />
 
         {/* Admin protected routes */}
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Layout>
+                <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/applications"
           element={

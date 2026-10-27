@@ -30,6 +30,9 @@ export const updateEvaluator = (id, data) =>
 export const getOverview = () =>
   client.get('/admin/overview').then(r => r.data)
 
+export const assignPendingApplications = () =>
+  client.post('/evaluators/assign-pending').then(r => r.data)
+
 export const importStaffRoster = (initialPassword) =>
   client.post('/evaluators/import', { initial_password: initialPassword }).then(r => r.data)
 
