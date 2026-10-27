@@ -118,7 +118,7 @@ export default function Equivalencies() {
                 'Transcript course',
                 'Match on institution + course code',
                 'Approved equivalency applies',
-                'Otherwise: precedents inform the AI recommendation',
+                'Otherwise: past decisions inform the recommendation',
                 'Evaluator decides',
                 'Decision stored as a precedent',
                 `${stats.promotion_min_evaluators || 2} evaluators agree → new equivalency`

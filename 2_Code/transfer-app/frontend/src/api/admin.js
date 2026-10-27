@@ -27,5 +27,11 @@ export const createEvaluator = (data) =>
 export const updateEvaluator = (id, data) =>
   client.put(`/evaluators/${id}`, data).then(r => r.data)
 
+export const getOverview = () =>
+  client.get('/admin/overview').then(r => r.data)
+
+export const importStaffRoster = (initialPassword) =>
+  client.post('/evaluators/import', { initial_password: initialPassword }).then(r => r.data)
+
 export const getStats = () =>
   client.get('/admin/stats').then(r => r.data)

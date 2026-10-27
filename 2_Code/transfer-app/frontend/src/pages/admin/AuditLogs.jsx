@@ -12,7 +12,7 @@ import Button from '../../components/ui/Button'
 const ACTION_TYPES = [
   { value: 'status_change', label: 'Status Change' },
   { value: 'decision', label: 'Decision Submitted' },
-  { value: 'evaluation', label: 'AI Evaluation' },
+  { value: 'evaluation', label: 'Evaluation' },
   { value: 'info_request', label: 'Info Request' },
   { value: 'document_upload', label: 'Document Upload' },
   { value: 'note', label: 'Note Added' },

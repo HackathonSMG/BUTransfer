@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Bell, LogOut, ChevronDown, ChevronRight, Menu, Search } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { getNotifications, markAllRead } from '../../api/notifications'
+import { initials } from '../../lib/reviews'
 
 const ROLE_LABELS = {
   evaluator: 'Evaluator',
@@ -11,10 +12,15 @@ const ROLE_LABELS = {
 
 // Breadcrumb trail for each staff route
 function crumbsFor(pathname, role) {
-  if (pathname === '/evaluator') return ['Transfer Management', role === 'admin' ? 'Applications' : 'Dashboard']
-  if (pathname === '/evaluator/applications/new') return ['Transfer Management', 'New Application']
-  if (pathname.startsWith('/evaluator/applications/')) return ['Transfer Management', 'Applications', 'Application Review']
-  if (pathname === '/evaluator/equivalencies') return ['Knowledge Base', 'Course Equivalencies']
+  if (pathname === '/evaluator') return ['My Workspace', 'Dashboard']
+  if (pathname === '/evaluator/my-evaluations') return ['My Workspace', 'My Evaluations']
+  if (pathname === '/evaluator/profile') return ['My Workspace', 'My Profile']
+  if (pathname === '/admin/applications') return ['Administration', 'Applications']
+  if (pathname === '/evaluator/applications/new') return ['Administration', 'Applications', 'New Application']
+  if (pathname.startsWith('/evaluator/applications/')) {
+    return role === 'admin' ? ['Administration', 'Applications', 'Application Review'] : ['My Workspace', 'My Evaluations', 'Application Review']
+  }
+  if (pathname === '/evaluator/equivalencies') return ['Course Mapping', 'Course Equivalencies']
   if (pathname === '/admin') return ['Administration', 'Dashboard']
   if (pathname === '/admin/users') return ['Administration', 'Evaluators']
   if (pathname === '/admin/criteria') return ['Administration', 'Eligibility Criteria']
@@ -22,9 +28,6 @@ function crumbsFor(pathname, role) {
   return ['BU Transfer Portal']
 }
 
-function initials(name = '') {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?'
-}
 
 export default function StaffTopbar({ onOpenNav }) {
   const { user, logout } = useAuth()
@@ -80,11 +83,12 @@ export default function StaffTopbar({ onOpenNav }) {
     navigate('/login')
   }
 
-  // The applications list reads ?search= and filters on student, email, reference or institution
+  // Admins search all applications; evaluators search their own evaluations. Both pages read ?search=
+  const searchPage = user?.role === 'admin' ? '/admin/applications' : '/evaluator/my-evaluations'
   const handleSearch = (e) => {
     e.preventDefault()
     const q = search.trim()
-    navigate(q ? `/evaluator?search=${encodeURIComponent(q)}` : '/evaluator')
+    navigate(q ? `${searchPage}?search=${encodeURIComponent(q)}` : searchPage)
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length
@@ -117,7 +121,7 @@ export default function StaffTopbar({ onOpenNav }) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search students, references, institutions"
+          placeholder={user?.role === 'admin' ? 'Search students, references, institutions' : 'Search my evaluations'}
           className="w-full pl-9 pr-3 py-2 text-sm bg-staff-sunk border border-transparent rounded-lg placeholder:text-staff-muted focus:outline-none focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
         />
       </form>

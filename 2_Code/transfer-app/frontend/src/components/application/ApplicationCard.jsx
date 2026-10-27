@@ -74,7 +74,7 @@ export default function ApplicationCard({ application }) {
                   ? 'bg-yellow-100 text-yellow-700'
                   : 'bg-red-100 text-red-700'
               }`}>
-                AI: {Math.round(application.ai_confidence_score * 100)}%
+                Eligibility: {Math.round(application.ai_confidence_score * 100)}%
               </span>
             )}
           </div>

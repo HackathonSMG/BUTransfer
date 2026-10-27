@@ -1,0 +1,80 @@
+{
+  "description": "Development staff roster: one administrator and the evaluator master data. data_source 'sponsor' means the evaluator's program and BU courses come from the sponsor workbook (3_Data/sponsor, BU Courses sheet); the people are fictional. 'synthetic' evaluators exist to test routing edge cases. Passwords are not stored here; the importer sets one initial password for new accounts.",
+  "admins": [
+    { "email": "admin@bu-transfer.local", "full_name": "Avery Collins" }
+  ],
+  "evaluators": [
+    {
+      "email": "evaluator.cs@bu-transfer.local", "full_name": "Dr. Michael Smith", "title": "Associate Professor",
+      "department": "Computer Science", "specializations": ["Computer Science", "Programming", "Data Structures", "Algorithms"],
+      "expertise_subjects": ["CS"], "expertise_courses": ["CAS CS 111", "CAS CS 112", "CAS CS 131", "CAS CS 210", "CAS CS 330"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.cs-theory@bu-transfer.local", "full_name": "Dr. Priya Raman", "title": "Assistant Professor",
+      "department": "Computer Science", "specializations": ["Computer Science", "Theory of Computation", "Programming Languages", "Systems"],
+      "expertise_subjects": ["CS"], "expertise_courses": ["CAS CS 132", "CAS CS 235", "CAS CS 237", "CAS CS 320", "CAS CS 332", "CAS CS 350"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.math@bu-transfer.local", "full_name": "Dr. Anita Rao", "title": "Senior Lecturer",
+      "department": "Mathematics & Statistics", "specializations": ["Mathematics", "Calculus", "Linear Algebra", "Probability"],
+      "expertise_subjects": ["MA"], "expertise_courses": ["CAS MA 123", "CAS MA 124", "CAS MA 225", "CAS MA 226", "CAS MA 242", "CAS MA 293", "CAS MA 581"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.econ@bu-transfer.local", "full_name": "Prof. David Okafor", "title": "Professor",
+      "department": "Economics", "specializations": ["Economics", "Microeconomics", "Macroeconomics", "Econometrics"],
+      "expertise_subjects": ["EC"], "expertise_courses": ["CAS EC 101", "CAS EC 102", "CAS EC 201", "CAS EC 202", "CAS EC 203", "CAS EC 204"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.psych@bu-transfer.local", "full_name": "Dr. Laura Bennett", "title": "Associate Professor",
+      "department": "Psychological & Brain Sciences", "specializations": ["Psychology", "Cognitive Psychology", "Developmental Psychology", "Research Methods"],
+      "expertise_subjects": ["PS"], "expertise_courses": ["CAS PS 101", "CAS PS 211", "CAS PS 222", "CAS PS 231", "CAS PS 241", "CAS PS 251", "CAS PS 261", "CAS PS 336", "CAS PS 371"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.bio@bu-transfer.local", "full_name": "Dr. Rachel Adams", "title": "Professor",
+      "department": "Biology", "specializations": ["Biology", "Cell Biology", "Genetics"],
+      "expertise_subjects": ["BI"], "expertise_courses": ["CAS BI 107", "CAS BI 108", "CAS BI 203", "CAS BI 206"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.chem@bu-transfer.local", "full_name": "Dr. Thomas Reyes", "title": "Senior Lecturer",
+      "department": "Chemistry", "specializations": ["Chemistry", "General Chemistry", "Organic Chemistry"],
+      "expertise_subjects": ["CH"], "expertise_courses": ["CAS CH 101", "CAS CH 102", "CAS CH 203", "CAS CH 204"],
+      "data_source": "sponsor", "is_active": true
+    },
+    {
+      "email": "evaluator.general@bu-transfer.local", "full_name": "Maria Santos", "title": "Transfer Credit Specialist",
+      "department": "Credit Evaluation Department", "specializations": ["General Education", "Cross-disciplinary"],
+      "expertise_subjects": ["GEN"], "expertise_courses": [],
+      "data_source": "synthetic", "is_active": true
+    },
+    {
+      "email": "evaluator.cs2@bu-transfer.local", "full_name": "Dr. Kevin Liu", "title": "Lecturer",
+      "department": "Computer Science", "specializations": ["Computer Science", "Software Engineering"],
+      "expertise_subjects": ["CS"], "expertise_courses": [],
+      "data_source": "synthetic", "is_active": true
+    },
+    {
+      "email": "evaluator.business@bu-transfer.local", "full_name": "Dr. Hannah Brooks", "title": "Clinical Associate Professor",
+      "department": "Business Administration", "specializations": ["Business Administration", "Accounting", "Finance"],
+      "expertise_subjects": ["QST"], "expertise_courses": [],
+      "data_source": "synthetic", "is_active": true
+    },
+    {
+      "email": "evaluator.writing@bu-transfer.local", "full_name": "Dr. James O'Connor", "title": "Senior Lecturer",
+      "department": "Writing Program", "specializations": ["Writing", "Humanities"],
+      "expertise_subjects": ["WR"], "expertise_courses": [],
+      "data_source": "synthetic", "is_active": true
+    },
+    {
+      "email": "evaluator.inactive@bu-transfer.local", "full_name": "Dr. Olivia Grant", "title": "Professor Emerita",
+      "department": "Mathematics & Statistics", "specializations": ["Mathematics"],
+      "expertise_subjects": ["MA"], "expertise_courses": [],
+      "data_source": "synthetic", "is_active": false
+    }
+  ]
+}

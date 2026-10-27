@@ -98,13 +98,13 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
     return (
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
         <Brain className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <h4 className="font-semibold text-gray-700 mb-1">AI Evaluation Not Started</h4>
+        <h4 className="font-semibold text-gray-700 mb-1">Evaluation Not Started</h4>
         <p className="text-sm text-gray-500 mb-4">
-          Trigger the AI evaluation to analyze this application against eligibility criteria.
+          Run the evaluation to check this application against the eligibility criteria and compare its courses.
         </p>
         <Button onClick={onTrigger} loading={triggering} size="sm">
           <RefreshCw className="w-4 h-4" />
-          Trigger AI Evaluation
+          Run Evaluation
         </Button>
       </div>
     )
@@ -115,10 +115,10 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
       <div className="bg-blue-50 rounded-xl border border-blue-200 p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-          <span className="font-semibold text-blue-900">AI Evaluation In Progress</span>
+          <span className="font-semibold text-blue-900">Evaluation In Progress</span>
         </div>
         <p className="text-sm text-blue-700">
-          The AI is analyzing this application. This typically takes 30–60 seconds.
+          This application is being evaluated. This typically takes 30–60 seconds.
         </p>
       </div>
     )
@@ -203,7 +203,7 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
       {/* Recommendations */}
       {recommendations.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h5 className="text-sm font-semibold text-blue-900 mb-2">AI Recommendations</h5>
+          <h5 className="text-sm font-semibold text-blue-900 mb-2">Recommendations</h5>
           <ul className="space-y-1">
             {recommendations.map((rec, i) => (
               <li key={i} className="text-sm text-blue-800 flex items-start gap-2">

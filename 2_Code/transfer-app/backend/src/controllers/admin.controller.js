@@ -38,6 +38,48 @@ export async function getReports(req, res, next) {
   } catch (err) { return next(err); }
 }
 
+/** Admin dashboard: headline counts, applications by status and program, evaluator workload, recent activity. */
+export async function getOverview(req, res, next) {
+  try {
+    const [counts, byStatus, byProgram, reviews, workload, activity] = await Promise.all([
+      query(`SELECT (SELECT COUNT(*) FROM evaluators e JOIN profiles p ON p.id = e.id WHERE e.is_active AND p.is_active)::int AS active_evaluators,
+                    (SELECT COUNT(*) FROM evaluators)::int AS evaluators,
+                    (SELECT COUNT(DISTINCT LOWER(student_email)) FROM applications)::int AS students,
+                    (SELECT COUNT(*) FROM applications)::int AS applications,
+                    (SELECT COUNT(*) FROM applications WHERE status NOT IN ('approved', 'rejected', 'closed', 'draft'))::int AS open_applications`),
+      query(`SELECT status, COUNT(*)::int AS count FROM applications GROUP BY status`),
+      query(`SELECT COALESCE(NULLIF(transfer_to_program, ''), 'Not specified') AS program, COUNT(*)::int AS count
+             FROM applications GROUP BY 1 ORDER BY count DESC, program LIMIT 8`),
+      query(`SELECT COUNT(*) FILTER (WHERE status IN ('new', 'in_progress', 'info_requested'))::int AS open,
+                    COUNT(*) FILTER (WHERE status = 'queued')::int AS queued,
+                    COUNT(*) FILTER (WHERE status IN ('approved', 'rejected'))::int AS completed,
+                    COUNT(*) FILTER (WHERE evaluator_id IS NULL)::int AS unassigned
+             FROM course_reviews`),
+      query(`SELECT p.full_name, e.department, e.max_concurrent_cases,
+                    COUNT(r.id) FILTER (WHERE r.status IN ('new', 'in_progress', 'info_requested'))::int AS open,
+                    COUNT(r.id) FILTER (WHERE r.status = 'queued')::int AS queued,
+                    COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected'))::int AS completed
+             FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
+             WHERE e.is_active AND p.is_active
+             GROUP BY p.full_name, e.department, e.max_concurrent_cases
+             ORDER BY open DESC, completed DESC, p.full_name`),
+      query(`SELECT al.action, al.created_at, al.details, a.reference_number, a.student_name, COALESCE(p.full_name, al.actor_email) AS actor
+             FROM audit_logs al LEFT JOIN applications a ON a.id = al.application_id LEFT JOIN profiles p ON p.id = al.actor_id
+             ORDER BY al.created_at DESC LIMIT 8`),
+    ]);
+    return res.status(200).json({
+      data: {
+        ...counts.rows[0],
+        by_status: byStatus.rows.reduce((acc, r) => { acc[r.status] = r.count; return acc; }, {}),
+        by_program: byProgram.rows,
+        reviews: reviews.rows[0],
+        evaluator_workload: workload.rows,
+        recent_activity: activity.rows,
+      },
+    });
+  } catch (err) { return next(err); }
+}
+
 export async function getAuditLogs(req, res, next) {
   try {
     const page = parseInt(req.query.page || '1', 10);
@@ -105,4 +147,4 @@ export async function deleteCriterion(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { getReports, getAuditLogs, listCriteria, createCriterion, updateCriterion, deleteCriterion };
+export default { getReports, getOverview, getAuditLogs, listCriteria, createCriterion, updateCriterion, deleteCriterion };

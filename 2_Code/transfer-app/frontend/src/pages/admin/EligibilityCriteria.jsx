@@ -227,7 +227,7 @@ export default function EligibilityCriteria() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Eligibility Criteria</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage transfer eligibility rules used in AI evaluation</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage the transfer eligibility rules used to evaluate applications</p>
         </div>
         <Button onClick={() => setModal({ open: true, criterion: null })}>
           <Plus className="w-4 h-4" />
@@ -240,7 +240,7 @@ export default function EligibilityCriteria() {
           <EmptyState
             icon={Settings}
             title="No criteria configured"
-            description="Add eligibility criteria that will be used in the AI evaluation of transfer applications."
+            description="Add eligibility criteria that will be used to evaluate transfer applications."
             action={() => setModal({ open: true, criterion: null })}
             actionLabel="Add First Criterion"
           />

@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/require-role.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
+import * as rosterService from '../services/staff/roster.service.js';
 
 const PW = ['pass', 'word'].join('');
 
@@ -43,18 +44,35 @@ const EVALUATOR_COLUMNS = `p.*, e.evaluator_code, e.title, e.department, e.speci
 router.get('/', async (req, res, next) => {
   try {
     const result = await query(
-      `SELECT p.id, p.full_name, p.email, p.phone, p.is_active, p.created_at, e.evaluator_code, e.title, e.department, e.specializations,
-              e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
-              COUNT(a.id) FILTER (WHERE a.status NOT IN ('approved', 'rejected', 'closed')) AS current_case_count,
-              COUNT(a.id) AS total_cases,
-              (SELECT COUNT(*) FROM course_reviews r WHERE r.evaluator_id = e.id AND r.status IN ('new', 'in_progress', 'info_requested')) AS open_reviews
-       FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN applications a ON a.assigned_evaluator_id = e.id
-       WHERE e.is_active = true
-       GROUP BY p.id, p.full_name, p.email, p.phone, p.is_active, p.created_at, e.id, e.evaluator_code, e.title, e.department, e.specializations,
-                e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases
-       ORDER BY p.full_name ASC`
+      // Inactive evaluators are listed too, so they can be reactivated; their history stays intact
+      `SELECT p.id, p.full_name, p.email, p.phone, p.created_at, (p.is_active AND e.is_active) AS is_active,
+              e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
+              (SELECT COUNT(*) FROM applications a WHERE a.assigned_evaluator_id = e.id AND a.status NOT IN ('approved', 'rejected', 'closed')) AS current_case_count,
+              (SELECT COUNT(*) FROM applications a WHERE a.assigned_evaluator_id = e.id) AS total_cases,
+              COUNT(r.id) FILTER (WHERE r.status IN ('new', 'in_progress', 'info_requested')) AS open_reviews,
+              COUNT(r.id) FILTER (WHERE r.status = 'queued') AS queued_reviews,
+              COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected')) AS completed_reviews
+       FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
+       GROUP BY p.id, p.full_name, p.email, p.phone, p.created_at, p.is_active, e.id
+       ORDER BY (p.is_active AND e.is_active) DESC, e.department NULLS LAST, p.full_name ASC`
     );
-    return res.status(200).json({ data: result.rows.map((r) => ({ ...r, current_case_count: parseInt(r.current_case_count, 10), total_cases: parseInt(r.total_cases, 10), open_reviews: parseInt(r.open_reviews, 10) })) });
+    const int = (v) => parseInt(v, 10);
+    return res.status(200).json({
+      data: result.rows.map((r) => ({
+        ...r, current_case_count: int(r.current_case_count), total_cases: int(r.total_cases),
+        open_reviews: int(r.open_reviews), queued_reviews: int(r.queued_reviews), completed_reviews: int(r.completed_reviews),
+      })),
+    });
+  } catch (err) { return next(err); }
+});
+
+// Creates or refreshes the staff roster (admin + evaluator master data); new accounts get the given initial password
+router.post('/import', async (req, res, next) => {
+  try {
+    const parsed = z.object({ initial_password: z.string().min(8, 'Initial password must be at least 8 characters') }).safeParse(req.body);
+    if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
+    const result = await rosterService.importRoster({ initialSecret: parsed.data.initial_password, actor: req.user });
+    return res.status(200).json({ data: result });
   } catch (err) { return next(err); }
 });
 
