@@ -1,0 +1,39 @@
+course_code,course_title,program,requirement_type,credits,verified,notes,source_url
+CSCI-UA 101,Intro to Computer Science,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+CSCI-UA 102,Data Structures,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+CSCI-UA 201,Computer Systems Organization,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+CSCI-UA 202,Operating Systems,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+CSCI-UA 310,Basic Algorithms,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+CSCI-UA 453,Theory of Computation,Computer Science,Joint/honors major,4,Yes,,https://math.nyu.edu/media/math/filer_public/f8/eb/f8eb4d2e-81c8-4421-8f62-fc2683e63e64/csma_major_honors_check_sheet.pdf
+MATH-UA 120,Discrete Mathematics,Computer Science,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/computer-science-ba/computer-science-ba.pdf
+ECON-UA 2,Introduction to Microeconomics,Economics,Intro,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+ECON-UA 1,Introduction to Macroeconomics,Economics,Intro,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+ECON-UA 10,Intermediate Microeconomics,Economics,Core (Policy),4,Yes,Theory track: ECON-UA 11,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+ECON-UA 12,Intermediate Macroeconomics,Economics,Core (Policy),4,Yes,Theory track: ECON-UA 13,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+ECON-UA 18,Statistics,Economics,Core (Policy),4,Yes,Theory track: ECON-UA 20,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+ECON-UA 266,Intro to Econometrics,Economics,Core,4,Yes,,https://bulletins.nyu.edu/undergraduate/arts-science/programs/economics-ba/economics-ba.pdf
+PSYCH-UA 1,Intro to Psychology,Psychology,Intro,4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 10,Statistics for the Behavioral Sciences,Psychology,Statistics,4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 11,Statistics and Data Analysis for Research in Psychology,Psychology,Statistics,4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 22,Perception,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 25,Cognitive Neuroscience,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 29,Cognition,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 30,Personality,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 32,Social Psychology,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 34,Developmental Psychology,Psychology,Core (choose),4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+PSYCH-UA 51,Abnormal Psychology,Psychology,Elective,4,Yes,,https://bulletins.nyu.edu/courses/psych_ua/psych_ua.pdf
+BIOL-UA 11,Principles of Biology I,Biology,Required,4,Yes,,https://courses.bio.nyu.edu/requirement/major-standard-track/required
+BIOL-UA 12,Principles of Biology II,Biology,Required,4,Yes,,https://courses.bio.nyu.edu/requirement/major-standard-track/required
+BIOL-UA 21,Molecular and Cell Biology I,Biology,Required,4,Yes,,https://courses.bio.nyu.edu/requirement/major-standard-track/required
+BIOL-UA 30,Genetics,Biology,Elective / minor,4,Yes,,https://courses.bio.nyu.edu/requirement/minor-genetics
+CHEM-UA 125,General Chemistry I,Biology,Supporting (Chemistry),5,Check,Code verified; title and credits from memory,https://www.tmdsas.com/course-listings/Schools/NYU_SU11-SU12.html
+CHEM-UA 126,General Chemistry II,Biology,Supporting (Chemistry),5,Check,Code verified; title and credits from memory,https://www.tmdsas.com/course-listings/Schools/NYU_SU11-SU12.html
+CHEM-UA 225,Organic Chemistry I,Biology,Supporting (Chemistry),5,Check,Code verified; title and credits from memory,https://www.tmdsas.com/course-listings/Schools/NYU_SU11-SU12.html
+CHEM-UA 226,Organic Chemistry II,Biology,Supporting (Chemistry),5,Check,Code verified; title and credits from memory,https://www.tmdsas.com/course-listings/Schools/NYU_SU11-SU12.html
+MATH-UA 121,Calculus I,Mathematics,Core,4,Yes,,https://math.nyu.edu/media/math/filer_public/f8/eb/f8eb4d2e-81c8-4421-8f62-fc2683e63e64/csma_major_honors_check_sheet.pdf
+MATH-UA 122,Calculus II,Mathematics,Core,4,Yes,,https://math.nyu.edu/media/math/filer_public/f8/eb/f8eb4d2e-81c8-4421-8f62-fc2683e63e64/csma_major_honors_check_sheet.pdf
+MATH-UA 123,Calculus III,Mathematics,Core,4,Yes,,https://math.nyu.edu/media/math/filer_public/f8/eb/f8eb4d2e-81c8-4421-8f62-fc2683e63e64/csma_major_honors_check_sheet.pdf
+MATH-UA 140,Linear Algebra,Mathematics,Core,4,Yes,,https://math.nyu.edu/media/math/filer_public/f8/eb/f8eb4d2e-81c8-4421-8f62-fc2683e63e64/csma_major_honors_check_sheet.pdf
+MATH-UA 262,Ordinary Differential Equations,Mathematics,Elective,4,Yes,,https://math.nyu.edu/media/math/filer_public/32/54/32545937-adf4-4d3e-9592-b41a155c83fc/ecma_major_check_sheet_as_of_2014.pdf
+MATH-UA 233,Theory of Probability,Mathematics,Elective,4,Yes,,https://math.nyu.edu/media/math/filer_public/32/54/32545937-adf4-4d3e-9592-b41a155c83fc/ecma_major_check_sheet_as_of_2014.pdf
+MATH-UA 235,Probability & Statistics,Mathematics,Elective,4,Yes,,https://math.nyu.edu/media/math/filer_public/32/54/32545937-adf4-4d3e-9592-b41a155c83fc/ecma_major_check_sheet_as_of_2014.pdf

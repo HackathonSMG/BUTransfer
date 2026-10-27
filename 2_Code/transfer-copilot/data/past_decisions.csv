@@ -1,0 +1,34 @@
+decision_id,institution,course,proposed_bu,decision,bu_awarded,reason,credit_system,decided,evaluator,days_to_decision
+PD-001,Northeastern University,CS 2100,CAS CS 112,Partial / elective,CS elective (CAS CS 1XX),Covers OOP design but not data structures; full CS 112 credit only if CS 2700 also completed.,Semester,2024-01-03,EVAL-10,9
+PD-002,Northeastern University,CS 2100+CS 2700,CAS CS 112,BU equivalent,CAS CS 112,"Combined, the two courses cover CS 112 content.",Semester,2025-06-10,EVAL-11,14
+PD-003,Northeastern University,MATH 2331,CAS CS 132,BU equivalent,CAS MA 242,"Awarded as MA 242, which substitutes for CS 132 in the CS major.",Semester,2024-11-17,EVAL-12,21
+PD-004,New York University,MATH-UA 140,CAS CS 132,BU equivalent,CAS MA 242,Awarded as MA 242; student may use it for CS 132 requirement.,Semester,2025-04-24,EVAL-13,31
+PD-005,Northeastern University,MATH 3081,CAS CS 237,Partial / elective,Math elective (CAS MA 1XX),Probability coverage too light for MA 581/CS 237; half the course is statistics.,Semester,2024-09-06,EVAL-14,12
+PD-006,New York University,MATH-UA 233,CAS CS 237,BU equivalent,CAS MA 581,"Full probability theory course; counts as MA 581, substitutes for CS 237.",Semester,2025-02-13,EVAL-15,45
+PD-007,Northeastern University,CS 4400,CAS CS 320,Elective credit,CS elective (CAS CS 3XX),Group C course must be taken at BU; elective credit only.,Semester,2024-07-20,EVAL-10,18
+PD-008,Northeastern University,CS 3800,CAS CS 332,Elective credit,CS elective (CAS CS 3XX),Group C course must be taken at BU; elective credit only.,Semester,2025-12-27,EVAL-11,27
+PD-009,New York University,CSCI-UA 202,CAS CS 350,Elective credit,CS elective (CAS CS 3XX),Group C course must be taken at BU; elective credit only.,Semester,2024-05-09,EVAL-12,8
+PD-010,Northeastern University,ECON 2560,CAS EC 204,Partial / elective,Econ elective (CAS EC 3XX),Lacks instrumental variables and panel-data methods covered in EC 204.,Semester,2025-10-16,EVAL-13,38
+PD-011,New York University,ECON-UA 266,CAS EC 204,BU equivalent,CAS EC 204,Syllabus showed IV and diff-in-diff units; approved.,Semester,2024-03-23,EVAL-14,9
+PD-012,Northeastern University,PSYC 2320,CAS PS 211,Partial / elective,Psych elective (CAS PS 2XX),Statistics only; no experiment design or lab component.,Semester,2025-08-05,EVAL-15,14
+PD-013,New York University,PSYCH-UA 10,CAS PS 211,Partial / elective,Psych elective (CAS PS 2XX),Statistics only; no lab.,Semester,2024-01-12,EVAL-10,21
+PD-014,New York University,PSYCH-UA 11,CAS PS 211,BU equivalent,CAS PS 211,Includes design and lab report; approved.,Semester,2025-06-19,EVAL-11,31
+PD-015,New York University,PSYCH-UA 25,CAS PS 231,Partial / elective,Psych elective (CAS PS 2XX),Cognitive neuroscience focus; insufficient physiological content.,Semester,2024-11-26,EVAL-12,12
+PD-016,New York University,BIOL-UA 21,CAS BI 203,BU equivalent,CAS BI 203,Cell biology content sufficient.,Semester,2025-04-08,EVAL-13,45
+PD-017,Northeastern University,BIOL 2301,CAS BI 206,BU equivalent,CAS BI 206,Genetics content sufficient; lab included.,Semester,2024-09-15,EVAL-14,18
+PD-018,Northeastern University,CHEM 1161,CAS CH 101,BU equivalent,CAS CH 101,"Awarded CH 101 only; CH 102 content (electrochemistry, thermodynamics) incomplete.",Semester,2025-02-22,EVAL-15,27
+PD-019,Northeastern University,MATH 2341,CAS MA 226,BU equivalent,CAS MA 226,ODE content sufficient.,Semester,2024-07-04,EVAL-10,8
+PD-020,Northeastern University,MATH 1365,CAS MA 293,Partial / elective,Math elective (CAS MA 1XX),Proof course without combinatorics or graph theory.,Semester,2025-12-11,EVAL-11,38
+PD-021,Northeastern University,MATH 3081,CAS MA 581,Partial / elective,Math elective (CAS MA 1XX),Combined prob/stats; not equivalent to MA 581.,Semester,2024-05-18,EVAL-12,9
+PD-022,Northeastern University,PSYC 3464,—,Elective credit,Psych elective (CAS PS 2XX),No BU core equivalent; counts as psychology elective.,Semester,2025-10-25,EVAL-13,14
+PD-023,Northeastern University,DS 3000,—,Elective credit,CS elective (CAS CS 2XX),No direct equivalent.,Semester,2024-03-07,EVAL-14,21
+PD-024,Northeastern University,CS 2800,—,Elective credit,CS elective (CAS CS 2XX),No direct equivalent.,Semester,2025-08-14,EVAL-15,31
+PD-025,Northeastern University,BIOL 2299,—,Elective credit,Bio elective (CAS BI 1XX),No direct equivalent.,Semester,2024-01-21,EVAL-10,12
+PD-026,Riverside Community College,CSC 150,CAS CS 131,Partial / elective,CS elective (CAS CS 1XX),Proof and probability coverage too light for CS 131.,Semester,2025-06-03,EVAL-11,45
+PD-027,Riverside Community College,MAT 210,CAS EC 203,Elective credit,Math elective (CAS MA 1XX),Non-calculus statistics; not accepted for EC 203.,Semester,2024-11-10,EVAL-12,18
+PD-028,Riverside Community College,KIN 105,—,No credit,—,Activity course; not transferable for academic credit.,Semester,2025-04-17,EVAL-13,27
+PD-029,Pacific Coast State University,CSE 30,CAS CS 111,BU equivalent,CAS CS 111,Approved; quarter units converted at 2/3.,Quarter,2024-09-24,EVAL-14,8
+PD-030,Pacific Coast State University,ECON 136,—,Elective credit,Econ elective (CAS EC 3XX),No BU core equivalent.,Quarter,2025-02-06,EVAL-15,38
+PD-031,Northeastern University,CHEM 1161,CAS CH 101,BU equivalent,CAS CH 101 + CAS CH 102,Accelerated course judged to cover both semesters of general chemistry.,Semester,2025-11-04,EVAL-14,6
+PD-032,Northeastern University,ECON 2560,CAS EC 204,BU equivalent,CAS EC 204,Applied project judged equivalent to EC 204 research component.,Semester,2025-10-15,EVAL-12,16
+PD-033,Northeastern University,MATH 1365,CAS MA 293,BU equivalent,CAS MA 293,Proof techniques accepted as discrete mathematics.,Semester,2025-12-01,EVAL-15,11

@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .step-indicator {
+    @apply flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold;
+  }
+  .step-active {
+    @apply bg-primary-600 text-white;
+  }
+  .step-completed {
+    @apply bg-green-500 text-white;
+  }
+  .step-pending {
+    @apply bg-gray-200 text-gray-500;
+  }
+}

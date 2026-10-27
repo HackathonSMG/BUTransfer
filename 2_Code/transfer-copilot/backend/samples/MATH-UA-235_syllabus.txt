@@ -1,0 +1,11 @@
+SAMPLE SYLLABUS - SYNTHETIC TEST DOCUMENT (not issued by any institution)
+MATH-UA 235 Probability & Statistics
+
+Course description:
+Probability and statistics: probability models, estimation and hypothesis testing.
+
+Learning outcomes:
+Perform estimation and testing.
+
+Weekly schedule:
+Week 1-2 Probability axioms, counting, conditional probability. Week 3-4 Discrete and continuous random variables. Week 5 Expectation and variance. Week 6 Midterm. Week 7 Sampling distributions and the central limit theorem. Week 8-9 Point estimation and confidence intervals. Week 10-11 Hypothesis testing. Week 12-13 Simple linear regression. Week 14 Review. Assessment: problem sets 30%, midterm 30%, final 40%.

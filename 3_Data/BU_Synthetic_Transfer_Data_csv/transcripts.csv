@@ -1,0 +1,77 @@
+row_id,student_id,institution,course,title,term,credit_system,source_credits,grade,in_equivalency_db,expected_path,expected_bu,explanation
+TR-001,STU-001,Riverside Community College,CSC 110,Programming Fundamentals with Python,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS CS 111,Auto-apply from equivalency DB.
+TR-002,STU-001,Riverside Community College,MAT 151,Calculus I,Fall 2024,Semester,4,B+,Yes,Existing equivalency,CAS MA 123,Auto-apply from equivalency DB.
+TR-003,STU-001,Riverside Community College,ECO 201,Principles of Microeconomics,Spring 2025,Semester,3,A-,Yes,Existing equivalency,CAS EC 101,Auto-apply from equivalency DB.
+TR-004,STU-001,Riverside Community College,CSC 220,Data Structures in Java,Spring 2025,Semester,4,B,No,Maybe → dept review,CAS CS 112 (suggested),No DB entry; description closely matches CS 112 (Java data structures). Evaluator decides.
+TR-005,STU-001,Riverside Community College,PSY 210,Research Methods in the Behavioral Sciences,Fall 2025,Semester,4,B+,No,Maybe → dept review,CAS PS 211 (suggested),"No DB entry; includes design + lab like PS 211, but introductory level. Evaluator decides."
+TR-006,STU-001,Pacific Coast State University,MATH 22,Linear Algebra,Summer 2025,Quarter,4,A-,No,Maybe → dept review (quarter),CAS MA 242 (suggested),Quarter course: 4 units × 2/3 = 2.66 BU credits. Content matches MA 242; may count for CS 132 via substitution.
+TR-007,STU-002,Northeastern University,CS 2000,Introduction to Program Design and Implementation,Fall 2024,Semester,5,A,Yes,Existing equivalency,CAS CS 111,
+TR-008,STU-002,Northeastern University,CS 1800,Discrete Structures,Fall 2024,Semester,4,B,Yes,Existing equivalency,CAS CS 131,
+TR-009,STU-002,Northeastern University,CS 2100,Program Design and Implementation 1,Spring 2025,Semester,5,B+,No,Maybe → dept review,CAS CS 112 (with CS 2700),Past decision PD-002: CS 2100 + CS 2700 together = CS 112.
+TR-010,STU-002,Northeastern University,CS 2700,Data Structures and Analysis,Fall 2025,Semester,5,B,No,Maybe → dept review,CAS CS 112 (with CS 2100),Paired with CS 2100.
+TR-011,STU-002,Northeastern University,CS 3800,Theory of Computation,Fall 2025,Semester,4,A-,No,Rule: BU-only course,CS elective (CAS CS 3XX),CS 332 is Group C (must be taken at BU); elective credit only — see PD-008.
+TR-012,STU-002,Northeastern University,MATH 1341,Calculus 1 for Science and Engineering,Fall 2024,Semester,4,C-,Yes,Rule: grade below C,No credit,Grade C- is below the C minimum.
+TR-013,STU-002,Northeastern University,ECON 1116,Principles of Microeconomics,Spring 2025,Semester,4,B,Yes,Existing equivalency,CAS EC 101,
+TR-014,STU-002,Northeastern University,DS 3000,Mathematical Foundations of Artificial Intelligence,Spring 2026,Semester,4,A,No,Elective (past decision),CS elective (CAS CS 2XX),PD-023.
+TR-015,STU-003,New York University,PSYCH-UA 1,Intro to Psychology,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS PS 101,
+TR-016,STU-003,New York University,PSYCH-UA 10,Statistics for the Behavioral Sciences,Spring 2025,Semester,4,B,No,Maybe → dept review,Psych elective (CAS PS 2XX) likely,"Past decision PD-013: statistics only, no lab."
+TR-017,STU-003,New York University,PSYCH-UA 25,Cognitive Neuroscience,Spring 2025,Semester,4,B+,No,Maybe → dept review,Psych elective (CAS PS 2XX) likely,Past decision PD-015.
+TR-018,STU-003,New York University,PSYCH-UA 32,Social Psychology,Fall 2025,Semester,4,A-,Yes,Existing equivalency,CAS PS 261,
+TR-019,STU-003,New York University,PSYCH-UA 30,Personality,Fall 2025,Semester,4,C,Yes,Existing equivalency,CAS PS 251,Grade C meets the minimum.
+TR-020,STU-003,New York University,BIOL-UA 11,Principles of Biology I,Fall 2024,Semester,4,D,Yes,Rule: grade below C,No credit,Grade D.
+TR-021,STU-003,New York University,MATH-UA 121,Calculus I,Fall 2024,Semester,4,B,Yes,Existing equivalency,CAS MA 123,
+TR-022,STU-004,Pacific Coast State University,PSYC 1,Introduction to Psychology,Fall 2024,Quarter,5,B,Yes,Existing equivalency (quarter),CAS PS 101,5 quarter units → 3.33 BU credits.
+TR-023,STU-004,Pacific Coast State University,MATH 19A,Calculus for Science I,Fall 2024,Quarter,5,B+,Yes,Existing equivalency (quarter),CAS MA 123,5 → 3.33.
+TR-024,STU-004,Pacific Coast State University,ECON 100A,Intermediate Microeconomics,Winter 2025,Quarter,5,A-,No,Maybe → dept review (quarter),CAS EC 201 (suggested),200+ level econ #1 of max 4.
+TR-025,STU-004,Pacific Coast State University,ECON 100B,Intermediate Macroeconomics,Spring 2025,Quarter,5,B+,No,Maybe → dept review (quarter),CAS EC 202 (suggested),200+ level econ #2.
+TR-026,STU-004,Pacific Coast State University,ECON 113,Introduction to Econometrics,Fall 2025,Quarter,5,A,No,Maybe → dept review (quarter),CAS EC 204 (suggested),200+ level econ #3. Check IV/panel coverage (see PD-010/011).
+TR-027,STU-004,Pacific Coast State University,ECON 136,Behavioral Economics,Winter 2026,Quarter,5,A,No,Elective (past decision),Econ elective (CAS EC 3XX),200+ level econ #4 — reaches the cap. Any further 200+ econ course would not count.
+TR-028,STU-004,Pacific Coast State University,CSE 101,Algorithms and Abstract Data Types,Spring 2026,Quarter,5,B,No,Maybe → dept review (quarter),CAS CS 330 (suggested),Non-major course; counts toward degree units.
+TR-029,STU-004,Riverside Community College,ECO 202,Principles of Macroeconomics,Summer 2024,Semester,3,A,Yes,Existing equivalency,CAS EC 102,
+TR-030,STU-004,Riverside Community College,KIN 105,Fitness and Wellness,Summer 2024,Semester,1,A,No,No credit (past decision),No credit,PD-028: activity course.
+TR-031,STU-005,Riverside Community College,ENG 101,English Composition I,Spring 2024,Semester,3,A,Yes,Existing equivalency,Elective credit,R3: counts as 3 elective credits but earns no BU Hub units (Writing).
+TR-032,STU-005,Riverside Community College,MAT 210,Elementary Statistics,Spring 2024,Semester,3,W,No,Rule: withdrawn,Skipped,"W: withdrew, 0 credits earned. Dropped while reading the transcript."
+TR-033,STU-005,Northeastern University,CS 1800,Discrete Structures,Fall 2024,Semester,4,C-,Yes,Rule: grade below C,No credit,"R1: C- is below the C minimum, even though an equivalency exists (CS 131)."
+TR-034,STU-005,Pacific Coast State University,CSE 30,Programming Abstractions in Python,Fall 2024,Quarter,5,A,No,"Maybe → dept review (precedent, quarter)",CAS CS 111,R2: 5 quarter units → 3.33 BU credits. Precedent PD-029.
+TR-035,STU-005,Northeastern University,MATH 2331,Linear Algebra,Spring 2025,Semester,4,B+,Yes,Existing equivalency,CAS MA 242,R9: MA 242 also counts toward CS 132 (Group B).
+TR-036,STU-005,Northeastern University,CS 3800,Theory of Computation,Fall 2025,Semester,4,A-,No,Rule: BU-only course,CS elective (CAS CS 3XX),R6: CS 332 is Group C; elective credit only.
+TR-037,STU-005,Northeastern University,ECON 2316,Microeconomic Theory,Spring 2025,Semester,4,B,Yes,Existing equivalency,CAS EC 201,R7: upper-level Economics course 1 of 4.
+TR-038,STU-005,Northeastern University,ECON 2315,Macroeconomic Theory,Fall 2025,Semester,4,B+,Yes,Existing equivalency,CAS EC 202,R7: course 2 of 4.
+TR-039,STU-005,Northeastern University,ECON 2350,Statistics for Economists,Fall 2025,Semester,4,A-,Yes,Existing equivalency,CAS EC 203,R7: course 3 of 4.
+TR-040,STU-005,Pacific Coast State University,ECON 113,Introduction to Econometrics,Summer 2025,Quarter,5,B,No,Maybe → dept review (quarter),CAS EC 204 (suggested),R7: course 4 of 4. R2: 5 quarter units → 3.33.
+TR-041,STU-005,Pacific Coast State University,ECON 136,Behavioral Economics,Summer 2025,Quarter,5,A,No,Rule: Econ cap,No credit,"R7: 5th upper-level Economics course, over the cap of 4."
+TR-042,STU-006,New York University,BIOL-UA 11,Principles of Biology I,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS BI 107,
+TR-043,STU-006,New York University,BIOL-UA 12,Principles of Biology II,Spring 2025,Semester,4,B+,Yes,Existing equivalency,CAS BI 108,
+TR-044,STU-006,New York University,BIOL-UA 21,Molecular and Cell Biology I,Fall 2025,Semester,4,B,No,Maybe → dept review (precedent),CAS BI 203,R8: counts toward the major; residency still requires 5 upper-level BI courses at BU. Precedent PD-016.
+TR-045,STU-006,New York University,BIOL-UA 30,Genetics,Spring 2026,Semester,4,A-,Yes,Existing equivalency,CAS BI 206,R8: as above.
+TR-046,STU-006,New York University,CHEM-UA 125,General Chemistry I,Fall 2024,Semester,5,B,Yes,Existing equivalency,CAS CH 101,
+TR-047,STU-006,New York University,CHEM-UA 126,General Chemistry II,Spring 2025,Semester,5,C+,Yes,Existing equivalency,CAS CH 102,R1: C+ passes.
+TR-048,STU-006,New York University,PSYCH-UA 1,Intro to Psychology,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS PS 101,
+TR-049,STU-007,New York University,ECON-UA 2,Introduction to Microeconomics,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS EC 101,
+TR-050,STU-007,New York University,ECON-UA 1,Introduction to Macroeconomics,Spring 2025,Semester,4,A-,Yes,Existing equivalency,CAS EC 102,
+TR-051,STU-007,New York University,ECON-UA 10,Intermediate Microeconomics,Fall 2025,Semester,4,B+,Yes,Existing equivalency,CAS EC 201,Upper-level Economics 1 of 4.
+TR-052,STU-007,New York University,ECON-UA 12,Intermediate Macroeconomics,Fall 2025,Semester,4,B,Yes,Existing equivalency,CAS EC 202,Upper-level Economics 2 of 4.
+TR-053,STU-007,New York University,ECON-UA 18,Statistics,Spring 2026,Semester,4,A,Yes,Existing equivalency,CAS EC 203,Upper-level Economics 3 of 4.
+TR-054,STU-007,New York University,MATH-UA 121,Calculus I,Fall 2024,Semester,4,B+,Yes,Existing equivalency,CAS MA 123,
+TR-055,STU-008,Northeastern University,BIOL 1107,Foundations of Biology,Fall 2024,Semester,5,A-,Yes,Existing equivalency,CAS BI 107,
+TR-056,STU-008,Northeastern University,BIOL 1113,General Biology 2,Spring 2025,Semester,4,B+,Yes,Existing equivalency,CAS BI 108,
+TR-057,STU-008,Northeastern University,CHEM 1161,General Chemistry for Science Majors,Fall 2024,Semester,5,B,No,Maybe → partial credit,CAS CH 101 (partial),Partial credit: 5 SH accelerated course covers CH 101 and only part of CH 102.
+TR-058,STU-008,Northeastern University,CHEM 2311,Organic Chemistry 1,Fall 2025,Semester,5,B,Yes,Existing equivalency,CAS CH 203,
+TR-059,STU-008,Northeastern University,BIOL 2301,Genetics and Molecular Biology,Spring 2026,Semester,5,A-,No,Maybe → dept review (precedent),CAS BI 206,Precedent PD-017.
+TR-060,STU-008,Northeastern University,MATH 1341,Calculus 1 for Science and Engineering,Fall 2024,Semester,4,B,Yes,Existing equivalency,CAS MA 123,
+TR-061,STU-009,New York University,MATH-UA 121,Calculus I,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS MA 123,
+TR-062,STU-009,New York University,MATH-UA 122,Calculus II,Spring 2025,Semester,4,A-,Yes,Existing equivalency,CAS MA 124,
+TR-063,STU-009,New York University,MATH-UA 123,Calculus III,Fall 2025,Semester,4,B+,Yes,Existing equivalency,CAS MA 225,
+TR-064,STU-009,New York University,MATH-UA 140,Linear Algebra,Fall 2025,Semester,4,B,Yes,Existing equivalency,CAS MA 242,
+TR-065,STU-009,New York University,MATH-UA 235,Probability & Statistics,Spring 2026,Semester,4,A-,No,Maybe → needs information,Math elective (CAS MA 1XX),No description or syllabus on file; evaluator requests the syllabus.
+TR-066,STU-010,Northeastern University,ECON 1116,Principles of Microeconomics,Fall 2024,Semester,4,A,Yes,Existing equivalency,CAS EC 101,
+TR-067,STU-010,Northeastern University,ECON 1115,Principles of Macroeconomics,Spring 2025,Semester,4,B+,Yes,Existing equivalency,CAS EC 102,
+TR-068,STU-010,Northeastern University,ECON 2316,Microeconomic Theory,Fall 2025,Semester,4,B,Yes,Existing equivalency,CAS EC 201,
+TR-069,STU-010,Northeastern University,ECON 2315,Macroeconomic Theory,Fall 2025,Semester,4,B+,Yes,Existing equivalency,CAS EC 202,
+TR-070,STU-010,Northeastern University,ECON 2560,Applied Econometrics,Spring 2026,Semester,4,A-,No,Maybe → evaluator override,Econ elective (CAS EC 3XX),System follows latest precedent (EC 204); evaluator overrides to elective.
+TR-071,STU-011,Northeastern University,CS 2000,Introduction to Program Design and Implementation,Fall 2024,Semester,5,A-,Yes,Existing equivalency,CAS CS 111,Live intake demo
+TR-072,STU-011,Northeastern University,CS 1800,Discrete Structures,Fall 2024,Semester,4,B+,Yes,Existing equivalency,CAS CS 131,Live intake demo
+TR-073,STU-011,Northeastern University,MATH 1341,Calculus 1 for Science and Engineering,Fall 2024,Semester,4,B,Yes,Existing equivalency,CAS MA 123,Live intake demo
+TR-074,STU-011,Northeastern University,MATH 1342,Calculus 2 for Science and Engineering,Spring 2025,Semester,4,B+,Yes,Existing equivalency,CAS MA 124,Live intake demo
+TR-075,STU-011,Northeastern University,ECON 1115,Principles of Macroeconomics,Spring 2025,Semester,4,A-,Yes,Existing equivalency,CAS EC 102,Live intake demo
+TR-076,STU-011,Northeastern University,PSYC 1101,Foundations of Psychology,Fall 2025,Semester,4,B,Yes,Existing equivalency,CAS PS 101,Live intake demo

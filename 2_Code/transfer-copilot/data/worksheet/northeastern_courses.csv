@@ -1,0 +1,39 @@
+course_code,course_title,program,requirement_type,credits,verified,notes,source_url
+CS 2000,Introduction to Program Design and Implementation,Computer Science,Fundamental,5,Yes,Includes CS 2001 lab,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 2100,Program Design and Implementation 1,Computer Science,Fundamental,5,Yes,Includes CS 2101 lab,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 3100,Program Design and Implementation 2,Computer Science,Required,5,Yes,Includes CS 3101 lab,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 1800,Discrete Structures,Computer Science,Fundamental,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 2700,Data Structures and Analysis,Computer Science,Required,5,Yes,Includes CS 2701 lab,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 3000,Algorithms and Data,Computer Science,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 3650,Computer Systems,Computer Science,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 3800,Theory of Computation,Computer Science,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 4400,Programming Languages,Computer Science,Concentration,4,Yes,Software concentration,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+CS 2800,Logic and Computation,Computer Science,Concentration,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+DS 3000,Mathematical Foundations of Artificial Intelligence,Computer Science,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+ECON 1116,Principles of Microeconomics,Economics,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+ECON 1115,Principles of Macroeconomics,Economics,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+ECON 2316,Microeconomic Theory,Economics,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+ECON 2315,Macroeconomic Theory,Economics,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+ECON 2350,Statistics for Economists,Economics,Required (most majors),4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+ECON 2560,Applied Econometrics,Economics,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/social-sciences-humanities/economics/economics-mathematics-bs/
+PSYC 1101,Foundations of Psychology,Psychology,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+PSYC 2320,Statistics in Psychological Research,Psychology,Required,4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+PSYC 3458,Biological Psychology,Psychology,Required (choose),4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+PSYC 3402,Social Psychology,Psychology,Required (choose),4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+PSYC 3404,Developmental Psychology,Psychology,Required (choose),4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+PSYC 3464,Psychology of Language,Psychology,Required (choose),4,Yes,,https://catalog.northeastern.edu/undergraduate/science/psychology/psychology-bs
+BIOL 1107,Foundations of Biology,Biology,Core,5,Yes,Includes BIOL 1108 lab,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+BIOL 1113,General Biology 2,Biology,Core (some majors),4,Yes,Continues BIOL 1111,https://catalog.northeastern.edu/course-descriptions/biol
+BIOL 2299,Inquiries in Biological Sciences,Biology,Core,4,Yes,,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+BIOL 2301,Genetics and Molecular Biology,Biology,Core,5,Yes,Includes BIOL 2302 lab,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+BIOL 3611,Biochemistry,Biology,Core,5,Yes,Includes BIOL 3612 lab,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+CHEM 1161,General Chemistry for Science Majors,Biology,Supporting (Chemistry),5,Yes,One-semester course with lab and recitation,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+CHEM 2311,Organic Chemistry 1,Biology,Supporting (Chemistry),5,Yes,Includes CHEM 2312 lab,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+CHEM 2313,Organic Chemistry 2,Biology,Supporting (Chemistry),5,Yes,Includes CHEM 2314 lab,https://catalog.northeastern.edu/undergraduate/science/biology/biology-bs/
+MATH 1341,Calculus 1 for Science and Engineering,Mathematics,Supporting,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+MATH 1342,Calculus 2 for Science and Engineering,Mathematics,Supporting,4,Yes,,https://catalog.northeastern.edu/undergraduate/science/biology/biology-mathematics-bs
+MATH 2321,Calculus 3 for Science and Engineering,Mathematics,Core,4,Check,Code verified; title from memory,https://catalog.northeastern.edu/undergraduate/science/biology/biology-mathematics-bs
+MATH 2331,Linear Algebra,Mathematics,Core,4,Check,Code and title from memory; confirm in catalog,https://catalog.northeastern.edu/undergraduate/science/biology/biology-mathematics-bs
+MATH 2341,Differential Equations and Linear Algebra for Engineering,Mathematics,Core,4,Check,Code verified; title from memory,https://catalog.northeastern.edu/undergraduate/science/biology/biology-mathematics-bs
+MATH 1365,Introduction to Mathematical Reasoning,Mathematics,Core,4,Yes,,https://catalog.northeastern.edu/undergraduate/computer-information-science/computer-science/bscs/
+MATH 3081,Probability and Statistics,Mathematics,Core,4,Yes,,https://catalog.northeastern.edu/undergraduate/science/biology/biology-mathematics-bs

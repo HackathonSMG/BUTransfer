@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transfer Credit Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,650&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/production.css">
+<link rel="stylesheet" href="css/kb.css">
+<script src="config.js"></script>
+</head>
+<body>
+<!-- sign-in: one entry point, role first -->
+<div class="login" id="login" hidden>
+  <div class="lshell">
+    <section class="lstory" aria-hidden="false">
+      <div class="lbrand"><span class="crest" aria-hidden="true"><svg viewBox="0 0 32 36"><path d="M16 1.5 30 6v11c0 8.5-6 14.5-14 17.5C8 31.5 2 25.5 2 17V6z" fill="#fff"/><path d="M9 12h14M9 17h14M9 22h9" stroke="#2453b8" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <div><b>Transfer Credit Intelligence</b><span>Office of the University Registrar</span></div></div>
+      <h2 class="lhead">AI-powered transfer credit evaluation.</h2>
+      <p class="lsub">Every transcript makes the next transcript faster.</p>
+      <ol class="lflow" aria-label="How a transcript is evaluated">
+        <li><i>1</i><div><b>Transcript received</b><span>Portal, email, mail room or institution feed</span></div></li>
+        <li><i>2</i><div><b>AI reads and extracts</b><span>Courses, credits and grades, each with a confidence</span></div></li>
+        <li class="kb"><i>3</i><div><b>Institutional knowledge</b><span>Previously approved equivalencies are reused</span></div></li>
+        <li><i>4</i><div><b>Evaluator decides</b><span>Only new or uncertain courses need a person</span></div></li>
+        <li class="loop"><i>&#8634;</i><div><b>The knowledge base learns</b><span>Each decision helps the next student</span></div></li>
+      </ol>
+      <p class="lfoot">AI-assisted evaluation, human-controlled decisions.</p>
+    </section>
+    <section class="lpanel">
+      <div id="lrole">
+        <h1>Welcome</h1>
+        <p class="xmuted">Select your role to continue.</p>
+        <div class="lroles" role="group" aria-label="Role">
+          <button class="lrc" data-role="student"><span class="lri"><svg viewBox="0 0 20 20"><path d="M10 4 2 8l8 4 8-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5.5 9.8V14c1.2 1.2 2.8 1.8 4.5 1.8s3.3-.6 4.5-1.8V9.8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span><b>Student</b><small>Upload a transcript and follow your transfer credit</small></button>
+          <button class="lrc" data-role="evaluator"><span class="lri"><svg viewBox="0 0 20 20"><path d="M4 3.5h9.5a2 2 0 0 1 2 2V17H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m7.5 9.5 1.8 1.8 3.4-3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Evaluator</b><small>Review AI recommendations and decide courses</small></button>
+          <button class="lrc" data-role="admin"><span class="lri"><svg viewBox="0 0 20 20"><path d="M10 2.5 16.5 5v5c0 4-2.8 6.6-6.5 7.8C6.3 16.6 3.5 14 3.5 10V5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="9" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.8 13.8a3.6 3.6 0 0 1 6.4 0" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><b>Admin</b><small>Knowledge base, policy, routing and reports</small></button>
+        </div>
+      </div>
+      <div id="lformwrap" hidden>
+        <button class="xlink lback" id="lback">&larr; Choose a different role</button>
+        <div class="lrolechip" id="lrolechip"></div>
+        <h1 id="lformtitle">Sign in</h1>
+        <p class="xmuted" id="lformsub"></p>
+        <form id="loginform" novalidate>
+          <label for="lemail">Email</label><input id="lemail" type="email" autocomplete="username" required>
+          <label for="lpass">Password</label><input id="lpass" type="password" autocomplete="current-password" required>
+          <p class="err" id="lerr" hidden></p>
+          <button class="xbtn pri" type="submit" id="lsubmit">Sign in</button>
+        </form>
+        <div class="ldemo" id="ldemo" hidden></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+<aside class="sb" aria-label="Main navigation">
+  <div class="sbbrand"><span class="crest" aria-hidden="true"><svg viewBox="0 0 32 36"><path d="M16 1.5 30 6v11c0 8.5-6 14.5-14 17.5C8 31.5 2 25.5 2 17V6z" fill="#9b1c31"/><path d="M9 12h14M9 17h14M9 22h9" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>
+    <div class="sbname"><b>Transfer Credit</b><span>Office of the University Registrar</span></div>
+    <button class="xicon" id="sbcol" aria-label="Collapse sidebar"><svg viewBox="0 0 20 20"><rect x="3" y="3.5" width="14" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 3.5v13" stroke="currentColor" stroke-width="1.6"/></svg></button></div>
+  <nav id="sbnav"></nav>
+  <div id="sbfoot"></div>
+</aside>
+<div class="main">
+  <header class="tb">
+    <button class="xicon" id="tbmenu" aria-label="Open navigation"><svg viewBox="0 0 20 20"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    <div class="tbtitle"><nav id="crumb" aria-label="Breadcrumb"></nav><h1 id="ptitle"></h1></div>
+    <div class="tbsearch" id="tbsearchwrap"><div class="xsearch"><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13.2 13.2 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><label class="sr-only" for="gsearch">Search students, courses and evaluators</label><input id="gsearch" type="search" placeholder="Search students, courses, evaluators" autocomplete="off"></div><kbd>/</kbd><div id="gres" hidden></div></div>
+    <button class="tbbtn" id="demobtn" hidden><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 7v6l5-3z" fill="currentColor"/></svg><span class="tbl">Guided demo</span></button>
+    <button class="xicon" id="bell" aria-label="Notifications"><svg viewBox="0 0 20 20"><path d="M5 13.5V9a5 5 0 0 1 10 0v4.5l1.5 1.5h-13z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.2 17a1.9 1.9 0 0 0 3.6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span id="belldot" hidden></span></button>
+    <div class="prof">
+      <button id="profbtn" aria-haspopup="true" aria-expanded="false"><span id="profav"></span><span class="pt"><b id="profname"></b><small id="profrole"></small></span><svg viewBox="0 0 20 20"><path d="m7.5 5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div id="pmenu" hidden>
+        <div class="pmh">Signed in as</div>
+        <div class="pmwho" id="pmwho"></div>
+        <div class="pmf" id="switchwrap" hidden><label for="switchacct">Switch demo account</label><select id="switchacct"></select></div>
+        <div class="pmrow"><button id="srcbtn" aria-pressed="false"><span>Show data sources</span></button><button id="logout">Sign out</button></div>
+      </div>
+    </div>
+  </header>
+  <main class="content"><div id="view" class="page"></div>
+    <footer class="foot"><span>Department evaluators make the final decision on every course. The AI only prepares evidence and recommendations.</span><span>Students, grades, descriptions and evaluators are Synthetic Data; course codes, credits, programs and match levels come from the sponsor worksheet.</span>
+    <div class="srclegend" id="srclegend" hidden><span>Data sources:</span><span class="srct s-ws">Worksheet</span> sponsor's course-match workbook <span class="srct s-syn">Synthetic</span> written for the demo <span class="srct s-sys">System</span> computed by the engine</div></footer>
+  </main>
+</div>
+</div>
+<aside class="drawer" id="notifs" hidden aria-label="Notifications"></aside>
+<aside class="drawer" id="demo" hidden aria-label="Guided demo"></aside>
+<div id="scrim" hidden></div>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+<div class="modal" id="txmodal" hidden role="dialog" aria-modal="true" aria-label="Transcript"><div class="mbox"><button class="btn sm" id="txclose">Close</button><div id="txbody"></div></div></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+eq_id,institution,course,title,bu_course,outcome,dept,approved,evaluator
+EQ-001,Northeastern University,CS 2000,Introduction to Program Design and Implementation,CAS CS 111,BU equivalent,CAS CS,2023-01-05,EVAL-10
+EQ-002,New York University,CSCI-UA 101,Intro to Computer Science,CAS CS 111,BU equivalent,CAS CS,2024-02-06,EVAL-11
+EQ-003,New York University,CSCI-UA 102,Data Structures,CAS CS 112,BU equivalent,CAS CS,2025-03-07,EVAL-12
+EQ-004,Northeastern University,CS 1800,Discrete Structures,CAS CS 131,BU equivalent,CAS CS,2023-04-08,EVAL-13
+EQ-005,New York University,MATH-UA 120,Discrete Mathematics,CAS CS 131,BU equivalent,CAS CS,2024-05-09,EVAL-14
+EQ-006,Northeastern University,CS 3650,Computer Systems,CAS CS 210,BU equivalent,CAS CS,2025-06-10,EVAL-15
+EQ-007,New York University,CSCI-UA 201,Computer Systems Organization,CAS CS 210,BU equivalent,CAS CS,2023-07-11,EVAL-10
+EQ-008,Northeastern University,CS 3000,Algorithms and Data,CAS CS 330,BU equivalent,CAS CS,2024-08-12,EVAL-11
+EQ-009,New York University,CSCI-UA 310,Basic Algorithms,CAS CS 330,BU equivalent,CAS CS,2025-09-13,EVAL-12
+EQ-010,Northeastern University,ECON 1116,Principles of Microeconomics,CAS EC 101,BU equivalent,CAS EC,2023-10-14,EVAL-13
+EQ-011,New York University,ECON-UA 2,Introduction to Microeconomics,CAS EC 101,BU equivalent,CAS EC,2024-11-15,EVAL-14
+EQ-012,Northeastern University,ECON 1115,Principles of Macroeconomics,CAS EC 102,BU equivalent,CAS EC,2025-12-16,EVAL-15
+EQ-013,New York University,ECON-UA 1,Introduction to Macroeconomics,CAS EC 102,BU equivalent,CAS EC,2023-01-17,EVAL-10
+EQ-014,Northeastern University,ECON 2316,Microeconomic Theory,CAS EC 201,BU equivalent,CAS EC,2024-02-18,EVAL-11
+EQ-015,New York University,ECON-UA 10,Intermediate Microeconomics,CAS EC 201,BU equivalent,CAS EC,2025-03-19,EVAL-12
+EQ-016,Northeastern University,ECON 2315,Macroeconomic Theory,CAS EC 202,BU equivalent,CAS EC,2023-04-20,EVAL-13
+EQ-017,New York University,ECON-UA 12,Intermediate Macroeconomics,CAS EC 202,BU equivalent,CAS EC,2024-05-21,EVAL-14
+EQ-018,Northeastern University,ECON 2350,Statistics for Economists,CAS EC 203,BU equivalent,CAS EC,2025-06-22,EVAL-15
+EQ-019,New York University,ECON-UA 18,Statistics,CAS EC 203,BU equivalent,CAS EC,2023-07-23,EVAL-10
+EQ-020,Northeastern University,PSYC 1101,Foundations of Psychology,CAS PS 101,BU equivalent,CAS PS,2024-08-24,EVAL-11
+EQ-021,New York University,PSYCH-UA 1,Intro to Psychology,CAS PS 101,BU equivalent,CAS PS,2025-09-05,EVAL-12
+EQ-022,Northeastern University,PSYC 3458,Biological Psychology,CAS PS 231,BU equivalent,CAS PS,2023-10-06,EVAL-13
+EQ-023,New York University,PSYCH-UA 22,Perception,CAS PS 222,BU equivalent,CAS PS,2024-11-07,EVAL-14
+EQ-024,New York University,PSYCH-UA 29,Cognition,CAS PS 336,BU equivalent,CAS PS,2025-12-08,EVAL-15
+EQ-025,Northeastern University,PSYC 3404,Developmental Psychology,CAS PS 241,BU equivalent,CAS PS,2023-01-09,EVAL-10
+EQ-026,New York University,PSYCH-UA 34,Developmental Psychology,CAS PS 241,BU equivalent,CAS PS,2024-02-10,EVAL-11
+EQ-027,New York University,PSYCH-UA 30,Personality,CAS PS 251,BU equivalent,CAS PS,2025-03-11,EVAL-12
+EQ-028,Northeastern University,PSYC 3402,Social Psychology,CAS PS 261,BU equivalent,CAS PS,2023-04-12,EVAL-13
+EQ-029,New York University,PSYCH-UA 32,Social Psychology,CAS PS 261,BU equivalent,CAS PS,2024-05-13,EVAL-14
+EQ-030,New York University,PSYCH-UA 51,Abnormal Psychology,CAS PS 371,BU equivalent,CAS PS,2025-06-14,EVAL-15
+EQ-031,Northeastern University,BIOL 1107,Foundations of Biology,CAS BI 107,BU equivalent,CAS BI,2023-07-15,EVAL-10
+EQ-032,New York University,BIOL-UA 11,Principles of Biology I,CAS BI 107,BU equivalent,CAS BI,2024-08-16,EVAL-11
+EQ-033,Northeastern University,BIOL 1113,General Biology 2,CAS BI 108,BU equivalent,CAS BI,2025-09-17,EVAL-12
+EQ-034,New York University,BIOL-UA 12,Principles of Biology II,CAS BI 108,BU equivalent,CAS BI,2023-10-18,EVAL-13
+EQ-035,New York University,BIOL-UA 30,Genetics,CAS BI 206,BU equivalent,CAS BI,2024-11-19,EVAL-14
+EQ-036,New York University,CHEM-UA 125,General Chemistry I,CAS CH 101,BU equivalent,CAS CH,2025-12-20,EVAL-15
+EQ-037,New York University,CHEM-UA 126,General Chemistry II,CAS CH 102,BU equivalent,CAS CH,2023-01-21,EVAL-10
+EQ-038,Northeastern University,CHEM 2311,Organic Chemistry 1,CAS CH 203,BU equivalent,CAS CH,2024-02-22,EVAL-11
+EQ-039,New York University,CHEM-UA 225,Organic Chemistry I,CAS CH 203,BU equivalent,CAS CH,2025-03-23,EVAL-12
+EQ-040,Northeastern University,CHEM 2313,Organic Chemistry 2,CAS CH 204,BU equivalent,CAS CH,2023-04-24,EVAL-13
+EQ-041,New York University,CHEM-UA 226,Organic Chemistry II,CAS CH 204,BU equivalent,CAS CH,2024-05-05,EVAL-14
+EQ-042,Northeastern University,MATH 1341,Calculus 1 for Science and Engineering,CAS MA 123,BU equivalent,CAS MA,2025-06-06,EVAL-15
+EQ-043,New York University,MATH-UA 121,Calculus I,CAS MA 123,BU equivalent,CAS MA,2023-07-07,EVAL-10
+EQ-044,Northeastern University,MATH 1342,Calculus 2 for Science and Engineering,CAS MA 124,BU equivalent,CAS MA,2024-08-08,EVAL-11
+EQ-045,New York University,MATH-UA 122,Calculus II,CAS MA 124,BU equivalent,CAS MA,2025-09-09,EVAL-12
+EQ-046,Northeastern University,MATH 2321,Calculus 3 for Science and Engineering,CAS MA 225,BU equivalent,CAS MA,2023-10-10,EVAL-13
+EQ-047,New York University,MATH-UA 123,Calculus III,CAS MA 225,BU equivalent,CAS MA,2024-11-11,EVAL-14
+EQ-048,Northeastern University,MATH 2331,Linear Algebra,CAS MA 242,BU equivalent,CAS MA,2025-12-12,EVAL-15
+EQ-049,New York University,MATH-UA 140,Linear Algebra,CAS MA 242,BU equivalent,CAS MA,2023-01-13,EVAL-10
+EQ-050,New York University,MATH-UA 262,Ordinary Differential Equations,CAS MA 226,BU equivalent,CAS MA,2024-02-14,EVAL-11
+EQ-051,New York University,MATH-UA 233,Theory of Probability,CAS MA 581,BU equivalent,CAS MA,2023-04-16,EVAL-13
+EQ-052,Riverside Community College,CSC 110,Programming Fundamentals with Python,CAS CS 111,BU equivalent,CAS CS,2024-05-17,EVAL-14
+EQ-053,Riverside Community College,MAT 151,Calculus I,CAS MA 123,BU equivalent,CAS MA,2025-06-18,EVAL-15
+EQ-054,Riverside Community College,MAT 152,Calculus II,CAS MA 124,BU equivalent,CAS MA,2023-07-19,EVAL-10
+EQ-055,Riverside Community College,ECO 201,Principles of Microeconomics,CAS EC 101,BU equivalent,CAS EC,2024-08-20,EVAL-11
+EQ-056,Riverside Community College,ECO 202,Principles of Macroeconomics,CAS EC 102,BU equivalent,CAS EC,2025-09-21,EVAL-12
+EQ-057,Riverside Community College,PSY 101,Introduction to Psychology,CAS PS 101,BU equivalent,CAS PS,2023-10-22,EVAL-13
+EQ-058,Riverside Community College,BIO 121,General Biology I,CAS BI 107,BU equivalent,CAS BI,2024-11-23,EVAL-14
+EQ-059,Riverside Community College,CHM 111,General Chemistry I with Lab,CAS CH 101,BU equivalent,CAS CH,2025-12-24,EVAL-15
+EQ-060,Riverside Community College,ENG 101,English Composition I,,Elective credit,CAS WR,2023-01-05,EVAL-10
+EQ-061,Pacific Coast State University,MATH 19A,Calculus for Science I,CAS MA 123,BU equivalent,CAS MA,2024-02-06,EVAL-11
+EQ-062,Pacific Coast State University,PSYC 1,Introduction to Psychology,CAS PS 101,BU equivalent,CAS PS,2025-03-07,EVAL-12

@@ -1,0 +1,12 @@
+student_id,name,intended_major,bu_start_term,bu_start_date,prior_institutions,scenario
+STU-001,Maya Ortiz (synthetic),Computer Science,Fall 2026,2026-09-02,Riverside Community College; Pacific Coast State University,"Hackathon demo scenario: 6 courses — 3 existing equivalencies, 2 ""maybe"", 1 quarter-system"
+STU-002,Daniel Kim (synthetic),Computer Science,Fall 2026,2026-09-02,Northeastern University,"5-credit courses, split course (CS 2100+CS 2700), Group C BU-only course, grade below C"
+STU-003,Priya Shah (synthetic),Psychology,Spring 2026,2026-01-20,New York University,"Mostly direct matches, stats-vs-design ""maybe"", one D grade, start date near the one-year deadline"
+STU-004,Jordan Lee (synthetic),Economics,Fall 2026,2026-09-02,Pacific Coast State University; Riverside Community College,"Mostly quarter-system, econ 200+ level cap (max 4), non-transferable activity course"
+STU-005,Alex Rivera (synthetic),Computer Science,Spring 2026,2026-01-20,Riverside Community College; Northeastern University; Pacific Coast State University,"Rules showcase: one student whose transcripts trigger every course rule except Biology residency (W, C-, quarter, Group C, substitution, no Hub units, Economics cap) plus the one-year deadline"
+STU-006,Leah Chen (synthetic),Biology,Fall 2026,2026-09-02,New York University,"Biology residency: upper-level BI courses transfer, but 5 BI courses beyond BI 107/108 must still be taken at BU"
+STU-007,Ethan Brooks (synthetic),Economics,Fall 2026,2026-09-02,New York University,Test case TC-01: fully successful transfer. Every course is an approved worksheet equivalency.
+STU-008,Sofia Martinez (synthetic),Biology,Fall 2026,2026-09-02,Northeastern University,Test case TC-04: partial credit. Accelerated 5-credit chemistry course only partly matches the BU 2-course sequence.
+STU-009,Omar Haddad (synthetic),Mathematics,Fall 2026,2026-09-02,New York University,"Test case TC-05: missing information. One course has no description or syllabus, so the evaluator requests it."
+STU-010,Grace Liu (synthetic),Economics,Fall 2026,2026-09-02,Northeastern University,Test case TC-06: evaluator override. The system recommends EC 204; the evaluator awards elective credit instead.
+STU-011,Noah Patel (synthetic),Computer Science,Spring 2027,2027-01-19,Northeastern University,"Live intake demo: paper transcript arrives by mail, is scanned, and the agent reads it in front of the evaluator."

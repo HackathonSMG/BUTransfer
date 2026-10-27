@@ -1,0 +1,12 @@
+rule_id,rule,detail,applies_to,source
+R1,Grade minimum,Course must have grade C or higher (C- and below → no credit).,All,Problem brief
+R2,Quarter conversion,Quarter credits × 2/3 = BU semester credits (4 → 2.66).,All,Problem brief
+R3,No Hub units,Transfer courses do not earn BU Hub general-education units.,All,Problem brief
+R4,Deadline,All credits must be transferred within one year of starting at BU.,All,Problem brief
+R5,External GPA,External grades do not count toward the BU GPA.,All,Problem brief
+R6,Group C BU-only,"CAS CS 320, 332, 350 cannot be transferred; elective credit at most.",Computer Science,Programs sheet
+R7,Econ 200+ cap,Max 4 Economics courses at 200+ level transferred after matriculation.,Economics,Programs sheet
+R8,Biology residency,At least 5 BI courses beyond BI 107/108 must be taken at BU.,Biology,Programs sheet
+R9,Substitutions,MA 242 may substitute for CS 132; MA 294 for CS 235; MA 581 for CS 237; MA 115/MA 213/QM 221 for EC 203.,CS / Economics,BU Courses sheet
+R10,Final decision,Academic department evaluators make the final decision; the tool only suggests.,All,Problem brief
+R11,Pending display,Pending credit shows as 0 units in MyBU Student until evaluated.,All,Problem brief
