@@ -13,6 +13,7 @@ import Login from './pages/auth/Login'
 import EvaluatorDashboard from './pages/evaluator/Dashboard'
 import ApplicationDetail from './pages/evaluator/ApplicationDetail'
 import NewApplication from './pages/evaluator/NewApplication'
+import Equivalencies from './pages/evaluator/Equivalencies'
 import AdminDashboard from './pages/admin/Dashboard'
 import EligibilityCriteria from './pages/admin/EligibilityCriteria'
 import AuditLogs from './pages/admin/AuditLogs'
@@ -48,6 +49,16 @@ export default function App() {
             <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
               <Layout>
                 <NewApplication />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluator/equivalencies"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+              <Layout>
+                <Equivalencies />
               </Layout>
             </ProtectedRoute>
           }

@@ -78,7 +78,7 @@ export async function getApplicationById(id) {
   return application;
 }
 
-export async function listApplications({ status, source, search, assignedEvaluatorId, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
+export async function listApplications({ status, source, search, assignedEvaluatorId, dateFrom, dateTo, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
   const conditions = [];
   const params = [];
   let idx = 1;
@@ -86,6 +86,9 @@ export async function listApplications({ status, source, search, assignedEvaluat
   if (status) { conditions.push(`a.status = $${idx++}`); params.push(status); }
   if (source) { conditions.push(`a.source = $${idx++}`); params.push(source); }
   if (assignedEvaluatorId) { conditions.push(`a.assigned_evaluator_id = $${idx++}`); params.push(assignedEvaluatorId); }
+  // Date range is inclusive and matches the "Submitted" date the dashboard shows
+  if (dateFrom) { conditions.push(`COALESCE(a.submitted_at, a.created_at) >= $${idx++}::date`); params.push(dateFrom); }
+  if (dateTo) { conditions.push(`COALESCE(a.submitted_at, a.created_at) < $${idx++}::date + 1`); params.push(dateTo); }
   if (search) {
     conditions.push(`(a.student_name ILIKE $${idx} OR a.student_email ILIKE $${idx} OR a.reference_number ILIKE $${idx} OR a.transfer_from_institution ILIKE $${idx})`);
     params.push(`%${search}%`); idx++;
@@ -119,6 +122,24 @@ export async function listApplications({ status, source, search, assignedEvaluat
 
   const total = parseInt(countResult.rows[0].total, 10);
   return { applications: dataResult.rows, total, page, limit, pages: Math.ceil(total / limit) };
+}
+
+/** Queue-wide counts for the staff dashboard; independent of the list's filters and paging. */
+export async function getApplicationStats() {
+  const result = await query(
+    `SELECT status, COUNT(*)::int AS count,
+            COUNT(*) FILTER (WHERE decision_date >= DATE_TRUNC('month', NOW()))::int AS decided_this_month
+     FROM applications GROUP BY status`
+  );
+  const byStatus = {};
+  let total = 0;
+  let decidedThisMonth = 0;
+  for (const row of result.rows) {
+    byStatus[row.status] = row.count;
+    total += row.count;
+    decidedThisMonth += row.decided_this_month;
+  }
+  return { total, by_status: byStatus, decided_this_month: decidedThisMonth };
 }
 
 export async function triggerEvaluation(applicationId, triggeredBy) {
@@ -363,4 +384,4 @@ export async function assignEvaluator(applicationId, evaluatorId, assignedBy) {
   await auditLog({ applicationId, action: 'evaluator_assigned', actorId: assignedBy, newValue: { assigned_evaluator_id: evaluatorId } });
 }
 
-export default { createApplication, getApplicationById, listApplications, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };
+export default { createApplication, getApplicationById, listApplications, getApplicationStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };
