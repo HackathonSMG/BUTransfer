@@ -7,6 +7,7 @@ import * as eligibilityService from './eligibility.service.js';
 import * as creditService from './credit/credit.service.js';
 import { ENGINE_VERSION } from './credit/engine.js';
 import { recommendationOf } from './credit/memory.service.js';
+import * as assignmentService from './workflow/assignment.service.js';
 import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
@@ -305,6 +306,15 @@ export async function runEvaluation(evaluationId) {
 
     await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'AI evaluation completed');
     await notificationService.evaluationComplete(application, evaluationId);
+
+    // Route the courses to evaluators; a routing problem must not fail the evaluation itself
+    if (credit) {
+      try {
+        await assignmentService.assignApplication(applicationId);
+      } catch (err) {
+        console.error(`[Assignment] Could not assign ${application.reference_number}:`, err.message);
+      }
+    }
     console.log(`[AI] Evaluation ${evaluationId} completed successfully`);
   } catch (err) {
     console.error(`[AI] Evaluation ${evaluationId} failed:`, err.message);

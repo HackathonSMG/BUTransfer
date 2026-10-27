@@ -12,17 +12,22 @@ import EmptyState from '../../components/ui/EmptyState'
 const INITIAL_FORM = {
   full_name: '',
   email: '',
+  title: '',
   department: '',
   specializations: [],
+  expertise_subjects: [],
+  expertise_courses: [],
   password: '',
   is_active: true
 }
 
-function TagInput({ value, onChange, placeholder }) {
+const toCode = (s) => s.toUpperCase().replace(/\s+/g, ' ')
+
+function TagInput({ value, onChange, placeholder, format = (s) => s }) {
   const [input, setInput] = useState('')
 
   const addTag = () => {
-    const tag = input.trim()
+    const tag = format(input.trim())
     if (tag && !value.includes(tag)) {
       onChange([...value, tag])
     }
@@ -80,8 +85,11 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
         ? {
             full_name: evaluator.full_name || '',
             email: evaluator.email || '',
+            title: evaluator.title || '',
             department: evaluator.department || '',
             specializations: evaluator.specializations || [],
+            expertise_subjects: evaluator.expertise_subjects || [],
+            expertise_courses: evaluator.expertise_courses || [],
             password: '',
             is_active: evaluator.is_active ?? true
           }
@@ -104,6 +112,10 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
     }
     if (!isEdit && !form.password) errs.password = 'Password is required for new accounts'
     if (form.password && form.password.length < 8) errs.password = 'Password must be at least 8 characters'
+    const badSubject = form.expertise_subjects.find(s => !/^[A-Z]{2,4}$/.test(s))
+    if (badSubject) errs.expertise_subjects = `"${badSubject}" is not a subject code (use codes such as CS or MA)`
+    const badCourse = form.expertise_courses.find(c => !/^[A-Z]{2,4} [A-Z]{2} \d{3}$/.test(c))
+    if (badCourse) errs.expertise_courses = `"${badCourse}" is not a BU course code (use codes such as CAS CS 111)`
     return errs
   }
 
@@ -165,12 +177,20 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
           placeholder="••••••••"
         />
 
-        <Input
-          label="Department"
-          value={form.department}
-          onChange={e => set('department', e.target.value)}
-          placeholder="e.g., Admissions"
-        />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Input
+            label="Title"
+            value={form.title}
+            onChange={e => set('title', e.target.value)}
+            placeholder="e.g., Associate Professor"
+          />
+          <Input
+            label="Department"
+            value={form.department}
+            onChange={e => set('department', e.target.value)}
+            placeholder="e.g., Computer Science"
+          />
+        </div>
 
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-2">Specializations</label>
@@ -179,6 +199,30 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
             onChange={val => set('specializations', val)}
             placeholder="e.g., Computer Science"
           />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Subject expertise</label>
+          <p className="text-xs text-gray-500 mb-2">BU subject codes this evaluator reviews. Use GEN for a general credit evaluator.</p>
+          <TagInput
+            value={form.expertise_subjects}
+            onChange={val => set('expertise_subjects', val)}
+            placeholder="e.g., CS"
+            format={toCode}
+          />
+          {errors.expertise_subjects && <p className="text-xs text-red-600 mt-1">{errors.expertise_subjects}</p>}
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Course expertise</label>
+          <p className="text-xs text-gray-500 mb-2">BU courses this evaluator is qualified to judge. These are matched first when courses are assigned.</p>
+          <TagInput
+            value={form.expertise_courses}
+            onChange={val => set('expertise_courses', val)}
+            placeholder="e.g., CAS CS 111"
+            format={toCode}
+          />
+          {errors.expertise_courses && <p className="text-xs text-red-600 mt-1">{errors.expertise_courses}</p>}
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -268,8 +312,8 @@ export default function UserManagement() {
                   <th className="text-left px-5 py-3 font-semibold text-gray-600">Name</th>
                   <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden sm:table-cell">Email</th>
                   <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Department</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden lg:table-cell">Specializations</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Open Cases</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden lg:table-cell">Expertise</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Open Reviews</th>
                   <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
                   <th className="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -279,23 +323,32 @@ export default function UserManagement() {
                   <tr key={ev.id} className={`hover:bg-gray-50 transition-colors ${!ev.is_active ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-3">
                       <p className="font-medium text-gray-900">{ev.full_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {[ev.evaluator_code, ev.title].filter(Boolean).join(' · ')}
+                      </p>
                     </td>
                     <td className="px-5 py-3 hidden sm:table-cell text-gray-600">{ev.email}</td>
                     <td className="px-5 py-3 hidden md:table-cell text-gray-600">{ev.department || '—'}</td>
                     <td className="px-5 py-3 hidden lg:table-cell">
-                      {ev.specializations?.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {ev.specializations.slice(0, 3).map(s => (
-                            <Badge key={s} variant="info">{s}</Badge>
-                          ))}
-                          {ev.specializations.length > 3 && (
-                            <span className="text-xs text-gray-400">+{ev.specializations.length - 3}</span>
-                          )}
-                        </div>
-                      ) : <span className="text-gray-400">—</span>}
+                      {(() => {
+                        const tags = ev.expertise_subjects?.length ? ev.expertise_subjects : (ev.specializations || [])
+                        return tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {tags.slice(0, 3).map(s => (
+                              <Badge key={s} variant="info">{s}</Badge>
+                            ))}
+                            {tags.length > 3 && (
+                              <span className="text-xs text-gray-400">+{tags.length - 3}</span>
+                            )}
+                            {ev.expertise_courses?.length > 0 && (
+                              <span className="text-xs text-gray-500 self-center">{ev.expertise_courses.length} courses</span>
+                            )}
+                          </div>
+                        ) : <span className="text-gray-400">—</span>
+                      })()}
                     </td>
                     <td className="px-5 py-3 hidden md:table-cell font-medium text-gray-700">
-                      {ev.active_cases ?? ev.current_case_count ?? '—'}
+                      {ev.open_reviews ?? ev.active_cases ?? ev.current_case_count ?? '—'}
                     </td>
                     <td className="px-5 py-3">
                       {ev.is_active

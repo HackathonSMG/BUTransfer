@@ -62,6 +62,7 @@ async function seed() {
       academic_history: academicHistory(transcripts.filter((t) => t.student_id === st.student_id)),
       additional_info: { sample_student_id: st.student_id, scenario: st.scenario },
     }, 'website', null);
+    await query(`UPDATE applications SET data_source = 'synthetic' WHERE id = $1`, [app.id]);
 
     let courses = 0;
     for (const file of files.filter((f) => f.startsWith(`Transcript_${st.student_id}_`))) {
