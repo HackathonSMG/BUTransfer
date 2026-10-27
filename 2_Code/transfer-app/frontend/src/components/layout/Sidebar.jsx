@@ -6,7 +6,7 @@ import {
   Users,
   Settings,
   ScrollText,
-  FilePlus,
+  BarChart3,
   Library,
   ClipboardCheck,
   UserCircle,
@@ -16,26 +16,17 @@ import {
 import { useAuth } from '../../hooks/useAuth'
 import BUCrest from './BUCrest'
 
-// An application's detail page keeps "Applications" (admin) or "My Evaluations" (evaluator) highlighted
-const isApplicationDetail = (path) => /^\/evaluator\/applications\/(?!new$)[^/]+$/.test(path)
+// Detail pages keep their list highlighted: an application under Applications, a review under My Evaluations
+const isApplicationDetail = (path) => /^\/evaluator\/applications\/[^/]+$/.test(path)
+const isReviewDetail = (path) => path.startsWith('/evaluator/reviews/')
 
+// Evaluators get a short, flat menu; admins a main group plus settings
 const evaluatorSections = [
   {
-    title: 'My workspace',
     links: [
       { to: '/evaluator', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: isApplicationDetail }
-    ]
-  },
-  {
-    title: 'Reference',
-    links: [
-      { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library }
-    ]
-  },
-  {
-    title: 'Account',
-    links: [
+      { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: (p) => isReviewDetail(p) || isApplicationDetail(p) },
+      { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/evaluator/profile', label: 'My Profile', icon: UserCircle }
     ]
   }
@@ -43,32 +34,16 @@ const evaluatorSections = [
 
 const adminSections = [
   {
-    title: 'Overview',
     links: [
-      { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true }
-    ]
-  },
-  {
-    title: 'Applications',
-    links: [
+      { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
-      { to: '/evaluator/applications/new', label: 'New Application', icon: FilePlus }
+      { to: '/admin/users', label: 'Evaluators', icon: Users },
+      { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
+      { to: '/admin/reports', label: 'Reports', icon: BarChart3 }
     ]
   },
   {
-    title: 'People',
-    links: [
-      { to: '/admin/users', label: 'Evaluators', icon: Users }
-    ]
-  },
-  {
-    title: 'Course mapping',
-    links: [
-      { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library }
-    ]
-  },
-  {
-    title: 'System',
+    title: 'Settings',
     links: [
       { to: '/admin/criteria', label: 'Eligibility Criteria', icon: Settings },
       { to: '/admin/audit', label: 'Audit Logs', icon: ScrollText }
@@ -113,8 +88,8 @@ export default function Sidebar({ open = false, onClose }) {
 
         <nav className="flex-1 overflow-y-auto px-2.5 py-3">
           {sections.map(section => (
-            <div key={section.title} className="mb-3">
-              <p className="staff-eyebrow px-2.5 pt-1.5 pb-2">{section.title}</p>
+            <div key={section.title || 'main'} className="mb-5">
+              {section.title && <p className="staff-eyebrow px-2.5 pt-1.5 pb-2">{section.title}</p>}
               {section.links.map(({ to, label, icon: Icon, end, alsoActive }) => (
                 <NavLink
                   key={to}
@@ -122,7 +97,7 @@ export default function Sidebar({ open = false, onClose }) {
                   end={end}
                   className={({ isActive }) => {
                     const active = isActive || Boolean(alsoActive?.(pathname))
-                    return `relative flex items-center gap-2.5 px-2.5 py-2 mb-0.5 rounded-lg text-[13.5px] transition-colors ${
+                    return `relative flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg text-[14.5px] transition-colors ${
                       active
                         ? 'bg-primary-50 text-primary-800 font-semibold before:absolute before:-left-2.5 before:top-2 before:bottom-2 before:w-[3px] before:rounded-r before:bg-primary-600'
                         : 'text-staff-ink2 font-medium hover:bg-staff-sunk hover:text-staff-ink'

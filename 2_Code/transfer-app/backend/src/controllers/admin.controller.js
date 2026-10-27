@@ -41,7 +41,7 @@ export async function getReports(req, res, next) {
 /** Admin dashboard: headline counts, applications by status and program, evaluator workload, recent activity. */
 export async function getOverview(req, res, next) {
   try {
-    const [counts, byStatus, byProgram, reviews, workload, activity] = await Promise.all([
+    const [counts, byStatus, byProgram, reviews, workload, activity, attention] = await Promise.all([
       query(`SELECT (SELECT COUNT(*) FROM evaluators e JOIN profiles p ON p.id = e.id WHERE e.is_active AND p.is_active)::int AS active_evaluators,
                     (SELECT COUNT(*) FROM evaluators)::int AS evaluators,
                     (SELECT COUNT(DISTINCT LOWER(student_email)) FROM applications)::int AS students,
@@ -65,7 +65,21 @@ export async function getOverview(req, res, next) {
              ORDER BY open DESC, completed DESC, p.full_name`),
       query(`SELECT al.action, al.created_at, al.details, a.reference_number, a.student_name, COALESCE(p.full_name, al.actor_email) AS actor
              FROM audit_logs al LEFT JOIN applications a ON a.id = al.application_id LEFT JOIN profiles p ON p.id = al.actor_id
+             WHERE al.action NOT IN ('review_decided', 'review_started')
              ORDER BY al.created_at DESC LIMIT 8`),
+      // Things an administrator should act on
+      query(`SELECT
+               (SELECT COUNT(DISTINCT tc.application_id) FROM transcript_courses tc
+                  WHERE NOT EXISTS (SELECT 1 FROM course_reviews r WHERE r.transcript_course_id = tc.id)
+                    AND NOT EXISTS (SELECT 1 FROM course_decisions cd WHERE cd.transcript_course_id = tc.id)
+                    AND EXISTS (SELECT 1 FROM ai_evaluations ae WHERE ae.application_id = tc.application_id AND ae.status = 'completed'))::int AS unassigned_applications,
+               (SELECT COUNT(*) FROM course_reviews WHERE evaluator_id IS NULL AND status <> 'approved' AND status <> 'rejected')::int AS courses_without_evaluator,
+               (SELECT COUNT(*) FROM transfer_requests WHERE status = 'pending')::int AS pending_transfers,
+               (SELECT COALESCE(json_agg(json_build_object('full_name', x.full_name, 'open', x.open, 'capacity', x.cap) ORDER BY x.open DESC), '[]')
+                  FROM (SELECT p.full_name, e.max_concurrent_cases AS cap,
+                               (SELECT COUNT(*) FROM course_reviews r WHERE r.evaluator_id = e.id AND r.status IN ('new', 'in_progress', 'info_requested'))::int AS open
+                        FROM evaluators e JOIN profiles p ON p.id = e.id WHERE e.is_active AND p.is_active) x
+                  WHERE x.open >= 0.8 * x.cap) AS high_workload`),
     ]);
     return res.status(200).json({
       data: {
@@ -75,6 +89,7 @@ export async function getOverview(req, res, next) {
         reviews: reviews.rows[0],
         evaluator_workload: workload.rows,
         recent_activity: activity.rows,
+        attention: attention.rows[0],
       },
     });
   } catch (err) { return next(err); }

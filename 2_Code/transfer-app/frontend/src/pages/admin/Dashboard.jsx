@@ -1,57 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import {
-  Users, GraduationCap, FileText, ClipboardList, RefreshCw, ArrowRight, Activity, UserPlus
-} from 'lucide-react'
-import { getOverview } from '../../api/admin'
+import { Link } from 'react-router-dom'
+import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3 } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { getOverview, assignPendingApplications } from '../../api/admin'
 import { useAuth } from '../../hooks/useAuth'
-import KpiCard from '../../components/staff/KpiCard'
-import BarList, { SERIES_1, SERIES_2 } from '../../components/staff/BarList'
-import BUCrest from '../../components/layout/BUCrest'
+import PageHeader from '../../components/staff/PageHeader'
+import Metric from '../../components/staff/Metric'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { STATUS_LABELS } from '../../components/application/StatusBadge'
-import { initials, avatarTint } from '../../lib/reviews'
+import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
 
-// Workflow order for the status chart
-const STATUS_ORDER = ['submitted', 'under_evaluation', 'validation_failed', 'information_required', 'evaluation_completed',
-  'under_evaluator_review', 'approved', 'rejected', 'closed', 'draft']
-
-const ACTIVITY_LABELS = {
-  application_created: 'Application received',
-  evaluation_triggered: 'Evaluation started',
-  evaluation_failed: 'Evaluation could not complete',
-  validation_failed: 'Application failed validation',
-  reviews_assigned: 'Courses assigned to evaluators',
-  staff_roster_imported: 'Staff roster imported',
-  status_changed: 'Status updated',
-  decision_made: 'Decision recorded',
-  info_request_created: 'Information requested from student',
-  course_decision: 'Course decision recorded',
-  note_added: 'Note added'
-}
-
-const activityLabel = (action) => ACTIVITY_LABELS[action] || action.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
-
-function timeAgo(d) {
-  const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs} h ago`
-  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(d))
-}
-
-function greeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-}
+const FINAL = ['approved', 'rejected', 'closed']
 
 export default function AdminDashboard() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [state, setState] = useState({ loading: true, data: null, error: null })
+  const [assigning, setAssigning] = useState(false)
 
   const load = useCallback(async () => {
     setState(p => ({ ...p, loading: true }))
@@ -65,166 +30,145 @@ export default function AdminDashboard() {
 
   useEffect(() => { load() }, [load])
 
+  const assignNow = async () => {
+    setAssigning(true)
+    try {
+      const res = await assignPendingApplications()
+      toast.success(`${res.data.courses} course${res.data.courses === 1 ? '' : 's'} assigned across ${res.data.applications} application${res.data.applications === 1 ? '' : 's'}`)
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Courses could not be assigned')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
   const d = state.data
   const firstName = (user?.full_name || '').split(' ')[0]
+  const today = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date())
+
+  if (state.loading && !d) return <div className="flex justify-center py-24"><Spinner size="lg" className="text-primary-600" /></div>
+  if (state.error) return <div className="staff-card"><EmptyState title="The overview could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
+
+  const n = (s) => d.by_status[s] || 0
+  const completed = FINAL.reduce((sum, s) => sum + n(s), 0)
+  const a = d.attention || {}
+  const highWorkload = a.high_workload || []
+
+  // Only what an administrator should act on, each one click from where it's handled
+  const items = [
+    a.unassigned_applications > 0 && {
+      icon: Inbox, tone: 'warn',
+      title: `${a.unassigned_applications} application${a.unassigned_applications === 1 ? ' has' : 's have'} courses not yet assigned`,
+      detail: 'Route them to evaluators by subject and workload.',
+      action: <Button size="sm" onClick={assignNow} loading={assigning}>Assign now</Button>
+    },
+    a.courses_without_evaluator > 0 && {
+      icon: UserX, tone: 'warn',
+      title: `${a.courses_without_evaluator} course${a.courses_without_evaluator === 1 ? ' has' : 's have'} no matching evaluator`,
+      detail: 'Add an evaluator with that subject expertise.',
+      to: '/admin/users', cta: 'Evaluators'
+    },
+    highWorkload.length > 0 && {
+      icon: Gauge, tone: 'warn',
+      title: `${highWorkload.length} evaluator${highWorkload.length === 1 ? ' is' : 's are'} near capacity`,
+      detail: highWorkload.slice(0, 3).map(e => `${e.full_name} (${e.open}/${e.capacity})`).join(', '),
+      to: '/admin/users', cta: 'Evaluators'
+    },
+    n('information_required') > 0 && {
+      icon: MessageSquare, tone: 'neutral',
+      title: `${n('information_required')} application${n('information_required') === 1 ? ' is' : 's are'} waiting on the student`,
+      detail: 'Information has been requested.',
+      to: '/admin/applications?status=information_required', cta: 'View'
+    },
+    n('validation_failed') > 0 && {
+      icon: AlertTriangle, tone: 'bad',
+      title: `${n('validation_failed')} application${n('validation_failed') === 1 ? '' : 's'} failed validation`,
+      detail: 'Check the institution or transcript details.',
+      to: '/admin/applications?status=validation_failed', cta: 'View'
+    },
+    a.pending_transfers > 0 && {
+      icon: ArrowRightLeft, tone: 'neutral',
+      title: `${a.pending_transfers} transfer request${a.pending_transfers === 1 ? '' : 's'} not yet picked up`,
+      detail: 'Handed over to the next evaluator.'
+    },
+    n('submitted') > 0 && {
+      icon: Clock, tone: 'neutral',
+      title: `${n('submitted')} application${n('submitted') === 1 ? ' is' : 's are'} awaiting evaluation`,
+      detail: 'Received, transcript not yet evaluated.',
+      to: '/admin/applications?status=submitted', cta: 'View'
+    }
+  ].filter(Boolean)
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <section className="relative overflow-hidden rounded-2xl border border-[#dfe6f5] bg-gradient-to-br from-white via-[#f2f6fe] to-[#e9f0fd] px-5 sm:px-7 py-6">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-brand" aria-hidden="true" />
-        <BUCrest className="absolute -right-6 -bottom-10 w-48 h-56 opacity-[0.06] pointer-events-none" />
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-primary-800">{greeting()}{firstName ? `, ${firstName}` : ''}</p>
-            <h1 className="mt-1 text-[26px] leading-tight text-staff-ink">Transfer credit administration</h1>
-            <p className="mt-2 text-[13px] text-staff-ink2">
-              {d ? `${d.open_applications} open applications · ${d.reviews.open} courses with evaluators · ${d.active_evaluators} active evaluators` : 'Loading the latest figures…'}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={load} aria-label="Refresh" title="Refresh">
-              <RefreshCw className={`w-4 h-4 ${state.loading ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/admin/users')}>
-              <Users className="w-4 h-4" />
-              Manage evaluators
-            </Button>
-            <Button onClick={() => navigate('/admin/applications')}>
-              View applications
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''} · ${today}`}
+        title="Transfer Credit Overview"
+        actions={<Link to="/admin/reports" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800"><BarChart3 className="w-4 h-4" />Reports</Link>}
+      />
 
-      {state.loading && !d ? (
-        <div className="staff-card flex justify-center py-20"><Spinner size="lg" className="text-primary-600" /></div>
-      ) : state.error ? (
-        <div className="staff-card"><EmptyState icon={Activity} title="The overview could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
-      ) : (
-        <>
-          {/* Headline figures */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard icon={Users} tone="info" label="Active evaluators" value={d.active_evaluators}
-              sub={`${d.evaluators} in the evaluator roster`} onClick={() => navigate('/admin/users')} />
-            <KpiCard icon={GraduationCap} tone="neutral" label="Students" value={d.students} sub="with a transfer application" />
-            <KpiCard icon={FileText} tone="ok" label="Applications" value={d.applications}
-              sub={`${d.open_applications} open`} onClick={() => navigate('/admin/applications')} />
-            <KpiCard icon={ClipboardList} tone="warn" label="Courses awaiting review" value={d.reviews.open}
-              sub={`${d.reviews.queued} upcoming · ${d.reviews.completed} completed`} />
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <section className="staff-card p-5">
-              <CardHead title="Applications by status" hint="Select a status to open the list" />
-              <BarList
-                rows={STATUS_ORDER.filter(s => d.by_status[s]).map(s => ({
-                  key: s, label: STATUS_LABELS[s] || s, value: d.by_status[s],
-                  onClick: () => navigate(`/admin/applications?status=${s}`)
-                }))}
-                unit="applications"
-                emptyText="No applications yet"
-              />
-            </section>
-            <section className="staff-card p-5">
-              <CardHead title="Applications by BU program" hint="Top programs" />
-              <BarList rows={d.by_program.map(p => ({ key: p.program, label: p.program, value: p.count }))} unit="applications" emptyText="No applications yet" />
-            </section>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4">
-            <section className="staff-card p-5">
-              <CardHead
-                title="Evaluator workload"
-                hint={
-                  <span className="flex items-center gap-3">
-                    <Legend color={SERIES_1} label="Open" />
-                    <Legend color={SERIES_2} label="Completed" />
-                  </span>
-                }
-              />
-              <Workload rows={d.evaluator_workload} onEmpty={() => navigate('/admin/users')} />
-            </section>
-            <section className="staff-card p-5">
-              <CardHead title="Recent activity" hint={<Link to="/admin/audit" className="font-semibold text-primary-600 hover:text-primary-700">Audit log</Link>} />
-              {d.recent_activity.length === 0 ? (
-                <p className="text-sm text-staff-muted py-6 text-center">No activity yet</p>
-              ) : (
-                <ol className="relative space-y-3 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-staff-line">
-                  {d.recent_activity.map((a, i) => (
-                    <li key={i} className="relative pl-6 text-[13px]">
-                      <span className="absolute left-0 top-1 w-[15px] h-[15px] rounded-full bg-white border-2 border-primary-500" aria-hidden="true" />
-                      <p className="font-medium text-staff-ink">{activityLabel(a.action)}</p>
-                      <p className="text-xs text-staff-muted">
-                        {[a.reference_number && `${a.reference_number}${a.student_name ? ` · ${a.student_name}` : ''}`, a.actor, timeAgo(a.created_at)].filter(Boolean).join(' · ')}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-function CardHead({ title, hint }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 className="text-[15px] font-semibold text-staff-ink">{title}</h2>
-      {hint && <span className="text-xs text-staff-muted">{hint}</span>}
-    </div>
-  )
-}
-
-function Legend({ color, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-staff-ink2">
-      <i className="w-2.5 h-2.5 rounded-[3px]" style={{ background: color }} aria-hidden="true" />
-      {label}
-    </span>
-  )
-}
-
-// Stacked bar per evaluator: open (series 1) then completed (series 2), with a 2px gap between segments
-function Workload({ rows, onEmpty }) {
-  if (rows.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-sm text-staff-muted mb-3">No active evaluators yet.</p>
-        <Button size="sm" onClick={onEmpty}><UserPlus className="w-4 h-4" />Add evaluators</Button>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <Metric label="Applications" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
+        <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
+        <Metric label="Completed" value={completed} detail={`${n('approved')} approved · ${n('rejected')} rejected`} />
+        <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />
       </div>
-    )
-  }
-  const max = Math.max(1, ...rows.map(r => r.open + r.completed))
-  return (
-    <ul className="space-y-2.5">
-      {rows.map(r => (
-        <li
-          key={r.full_name}
-          className="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] items-center gap-3 text-[13px]"
-          title={`${r.full_name}: ${r.open} open, ${r.completed} completed, ${r.queued} upcoming`}
-        >
-          <span className="flex items-center gap-2 min-w-0">
-            <span className={`w-7 h-7 rounded-full grid place-items-center text-[11px] font-bold flex-shrink-0 ${avatarTint(r.full_name)}`}>{initials(r.full_name)}</span>
-            <span className="min-w-0">
-              <span className="block truncate font-medium text-staff-ink">{r.full_name}</span>
-              <span className="block truncate text-[11.5px] text-staff-muted">{r.department}</span>
-            </span>
-          </span>
-          <span className="flex h-2.5 gap-[2px]" aria-hidden="true">
-            {r.open > 0 && <i className="block h-full rounded-l" style={{ width: `${(r.open / max) * 100}%`, background: SERIES_1, borderTopRightRadius: r.completed ? 0 : 4, borderBottomRightRadius: r.completed ? 0 : 4 }} />}
-            {r.completed > 0 && <i className="block h-full rounded-r" style={{ width: `${(r.completed / max) * 100}%`, background: SERIES_2, borderTopLeftRadius: r.open ? 0 : 4, borderBottomLeftRadius: r.open ? 0 : 4 }} />}
-            {r.open + r.completed === 0 && <i className="block h-full w-full rounded bg-staff-sunk" />}
-          </span>
-          <span className="text-xs text-staff-ink2 tabular-nums whitespace-nowrap">
-            <b className="text-staff-ink">{r.open}</b> open · {r.completed} done{r.queued ? ` · ${r.queued} upcoming` : ''}
-          </span>
-        </li>
-      ))}
-    </ul>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 items-start">
+        <section className="staff-card">
+          <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Needs attention</h2>
+          {items.length === 0 ? (
+            <div className="flex items-center gap-3 px-6 pb-6 text-[15px] text-staff-ink2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              Nothing needs your attention right now.
+            </div>
+          ) : (
+            <ul className="divide-y divide-staff-line2 border-t border-staff-line2">
+              {items.map(item => (
+                <li key={item.title} className="flex items-center gap-4 px-6 py-4">
+                  <span className={`w-9 h-9 rounded-full grid place-items-center flex-shrink-0 ${
+                    item.tone === 'bad' ? 'bg-red-50 text-red-700' : item.tone === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-staff-sunk text-staff-ink2'
+                  }`}>
+                    <item.icon className="w-[18px] h-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-staff-ink">{item.title}</span>
+                    <span className="block text-[13px] text-staff-muted truncate">{item.detail}</span>
+                  </span>
+                  {item.action || (item.to && (
+                    <Link to={item.to} className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800 whitespace-nowrap">
+                      {item.cta}<ArrowRight className="w-4 h-4" />
+                    </Link>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="staff-card">
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <h2 className="text-[17px] font-semibold text-staff-ink">Recent activity</h2>
+            <Link to="/admin/audit" className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">View all</Link>
+          </div>
+          {d.recent_activity.length === 0 ? (
+            <p className="px-6 pb-6 text-sm text-staff-muted">No activity yet.</p>
+          ) : (
+            <ul className="border-t border-staff-line2">
+              {d.recent_activity.slice(0, 6).map((r, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 px-6 py-3 text-[14px]">
+                  <span className="min-w-0">
+                    <span className="block text-staff-ink truncate">{activityLabel(r.action)}</span>
+                    <span className="block text-[12.5px] text-staff-muted truncate">{[r.reference_number, r.student_name, r.actor].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className="text-[12.5px] text-staff-muted whitespace-nowrap">{timeAgo(r.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
   )
 }

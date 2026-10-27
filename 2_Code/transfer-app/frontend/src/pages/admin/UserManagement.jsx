@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Edit2, Power, Users, X, Upload, Mail, Search, Building2, BookOpen, ClipboardList, CheckCircle2, Clock
+  Plus, Edit2, Power, Users, X, Upload, Mail, Search
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster } from '../../api/admin'
@@ -10,7 +10,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import KpiCard from '../../components/staff/KpiCard'
+import PageHeader from '../../components/staff/PageHeader'
 import StatusPill from '../../components/staff/StatusPill'
 import { initials, avatarTint } from '../../lib/reviews'
 
@@ -343,7 +343,7 @@ function EvaluatorCard({ ev, onEdit, onToggle, toggling }) {
   const load = Math.min(100, (open / capacity) * 100)
   const subjects = ev.expertise_subjects?.length ? ev.expertise_subjects : (ev.specializations || [])
   return (
-    <div className={`staff-card p-4 flex flex-col gap-3 ${ev.is_active ? '' : 'opacity-70'}`}>
+    <div className={`staff-card p-5 flex flex-col gap-4 ${ev.is_active ? '' : 'opacity-70'}`}>
       <div className="flex items-start gap-3">
         <span className={`w-10 h-10 rounded-full grid place-items-center text-sm font-bold flex-shrink-0 ${avatarTint(ev.full_name)}`}>{initials(ev.full_name)}</span>
         <div className="min-w-0 flex-1">
@@ -368,14 +368,10 @@ function EvaluatorCard({ ev, onEdit, onToggle, toggling }) {
       <div>
         <div className="flex justify-between text-xs mb-1">
           <span className="text-staff-muted">Workload</span>
-          <span className="text-staff-ink2 tabular-nums"><b className="text-staff-ink">{open}</b> open of {capacity}</span>
+          <span className="text-staff-ink2 tabular-nums"><b className="text-staff-ink">{open}</b> open of {capacity} · {ev.completed_reviews || 0} done</span>
         </div>
         <div className="h-2 rounded-full bg-staff-line2 overflow-hidden" title={`${open} open reviews, capacity ${capacity}`}>
           <i className={`block h-full rounded-full ${load >= 90 ? 'bg-red-600' : load >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.max(open ? 3 : 0, load)}%` }} />
-        </div>
-        <div className="flex gap-4 mt-2 text-xs text-staff-ink2">
-          <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{ev.completed_reviews || 0} completed</span>
-          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-staff-muted" />{ev.queued_reviews || 0} upcoming</span>
         </div>
       </div>
 
@@ -444,30 +440,23 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] leading-tight text-staff-ink">Evaluators</h1>
-          <p className="text-sm text-staff-muted mt-1">Evaluator accounts, the departments and courses they review, and their current workload.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setImportOpen(true)}>
-            <Upload className="w-4 h-4" />
-            Import staff roster
-          </Button>
-          <Button onClick={() => setModal({ open: true, evaluator: null })}>
-            <Plus className="w-4 h-4" />
-            Add Evaluator
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard icon={Users} tone="info" label="Active evaluators" value={active.length} sub={`${evaluators.length - active.length} inactive`} />
-        <KpiCard icon={Building2} tone="neutral" label="Departments" value={new Set(active.map(e => e.department || 'Other')).size} sub="with an active evaluator" />
-        <KpiCard icon={BookOpen} tone="ok" label="BU courses covered" value={coveredCourses} sub="by named course expertise" />
-        <KpiCard icon={ClipboardList} tone="warn" label="Open reviews" value={openTotal} sub="across all evaluators" />
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Evaluators"
+        subtitle={`${active.length} active across ${new Set(active.map(e => e.department || 'Other')).size} departments · ${coveredCourses} BU courses covered · ${openTotal} open reviews`}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              <Upload className="w-4 h-4" />
+              Import staff roster
+            </Button>
+            <Button onClick={() => setModal({ open: true, evaluator: null })}>
+              <Plus className="w-4 h-4" />
+              Add Evaluator
+            </Button>
+          </>
+        }
+      />
 
       <div className="staff-card p-4 space-y-3">
        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_14rem] gap-3">

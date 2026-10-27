@@ -4,6 +4,9 @@ import { requireAuth } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/require-role.js';
 import { query } from '../config/db.js';
 import { badRequest } from '../utils/errors.js';
+import * as reviewService from '../services/workflow/review.service.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The signed-in evaluator's own workspace. Every query is scoped to req.user.id; there is no way to ask
 // for another evaluator's data here.
@@ -37,16 +40,32 @@ const REVIEW_SELECT = `
 router.get('/dashboard', async (req, res, next) => {
   try {
     const me = req.user.id;
-    const [profile, counts, upNext, recent] = await Promise.all([
+    const [profile, counts, upNext, recent, activity] = await Promise.all([
       query(`SELECT e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases
              FROM evaluators e WHERE e.id = $1`, [me]),
       query(`SELECT status, COUNT(*)::int AS count,
                     COUNT(*) FILTER (WHERE completed_at >= DATE_TRUNC('month', NOW()))::int AS this_month
              FROM course_reviews WHERE evaluator_id = $1 GROUP BY status`, [me]),
-      query(`${REVIEW_SELECT} WHERE r.evaluator_id = $1 AND r.status = ANY($2)
-             ORDER BY (r.priority = 'high') DESC, r.assigned_at ASC NULLS LAST LIMIT 5`, [me, OPEN]),
+      // Needs attention: student replies first, then high priority, then handed-over and new work, oldest first
+      query(`${REVIEW_SELECT.replace('SELECT r.id,', 'SELECT ir.status AS info_status, tr.request_number, fp.full_name AS transferred_from, r.id,')}
+             LEFT JOIN information_requests ir ON ir.id = r.info_request_id
+             LEFT JOIN transfer_requests tr ON tr.id = r.transfer_request_id
+             LEFT JOIN profiles fp ON fp.id = tr.from_evaluator_id
+             WHERE r.evaluator_id = $1 AND r.status = ANY($2) AND (r.status <> 'info_requested' OR ir.status = 'responded')
+             ORDER BY (ir.status = 'responded') DESC NULLS LAST, (r.priority = 'high') DESC, (r.status = 'new') DESC, r.assigned_at ASC NULLS LAST
+             LIMIT 6`, [me, OPEN]),
       query(`${REVIEW_SELECT} WHERE r.evaluator_id = $1 AND r.status IN ('approved', 'rejected')
              ORDER BY r.completed_at DESC NULLS LAST LIMIT 5`, [me]),
+      // Recent activity: what happened to this evaluator's work (assignments, hand-overs) and what they did
+      query(`SELECT * FROM (
+               SELECT n.type AS kind, n.title, n.created_at, a.reference_number FROM notifications n
+               LEFT JOIN applications a ON a.id = n.application_id
+               WHERE n.recipient_id = $1 AND n.type IN ('evaluation_assigned', 'transfer_request')
+               UNION ALL
+               SELECT al.action, NULL, al.created_at, a.reference_number FROM audit_logs al
+               LEFT JOIN applications a ON a.id = al.application_id
+               WHERE al.actor_id = $1 AND al.action IN ('review_decided', 'review_info_requested', 'transfer_request_created')
+             ) x ORDER BY created_at DESC LIMIT 6`, [me]),
     ]);
     const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.count]));
     const n = (s) => byStatus[s] || 0;
@@ -65,6 +84,7 @@ router.get('/dashboard', async (req, res, next) => {
         },
         up_next: upNext.rows,
         recent_decisions: recent.rows,
+        recent_activity: activity.rows,
       },
     });
   } catch (err) { return next(err); }
@@ -93,6 +113,44 @@ router.get('/reviews', async (req, res, next) => {
     const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.count]));
     const tabCounts = Object.fromEntries(Object.entries(STATUS_FILTERS).map(([k, list]) => [k, list.reduce((s, x) => s + (byStatus[x] || 0), 0)]));
     return res.status(200).json({ data: rows.rows, meta: { counts: tabCounts } });
+  } catch (err) { return next(err); }
+});
+
+// One evaluation package (only the evaluator's own; anything else is 404)
+router.get('/reviews/:id', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    return res.status(200).json({ data: await reviewService.getReview(req.params.id, req.user.id) });
+  } catch (err) { return next(err); }
+});
+
+router.post('/reviews/:id/start', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    return res.status(200).json({ data: await reviewService.startReview(req.params.id, req.user) });
+  } catch (err) { return next(err); }
+});
+
+const decisionSchema = z.object({
+  decision: z.enum(['accept', 'reject']),
+  reason: z.string().max(2000).optional().nullable(),
+});
+
+router.post('/reviews/:id/decision', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    const parsed = decisionSchema.safeParse(req.body);
+    if (!parsed.success) return next(badRequest('Decision must be accept or reject'));
+    return res.status(200).json({ data: await reviewService.decideReview(req.params.id, parsed.data, req.user) });
+  } catch (err) { return next(err); }
+});
+
+router.post('/reviews/:id/request-info', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    const parsed = z.object({ message: z.string().trim().min(1, 'Describe the information you need').max(2000) }).safeParse(req.body);
+    if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
+    return res.status(200).json({ data: await reviewService.requestInformation(req.params.id, parsed.data, req.user) });
   } catch (err) { return next(err); }
 });
 

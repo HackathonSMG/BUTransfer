@@ -15,6 +15,8 @@ function crumbsFor(pathname, role) {
   if (pathname === '/evaluator') return ['My Workspace', 'Dashboard']
   if (pathname === '/evaluator/my-evaluations') return ['My Workspace', 'My Evaluations']
   if (pathname === '/evaluator/profile') return ['My Workspace', 'My Profile']
+  if (pathname.startsWith('/evaluator/reviews/')) return ['My Workspace', 'My Evaluations', 'Course Review']
+  if (pathname === '/admin/reports') return ['Administration', 'Reports']
   if (pathname === '/admin/applications') return ['Administration', 'Applications']
   if (pathname === '/evaluator/applications/new') return ['Administration', 'Applications', 'New Application']
   if (pathname.startsWith('/evaluator/applications/')) {

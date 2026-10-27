@@ -23,6 +23,12 @@ export function matchBasisLabel(review) {
   }
 }
 
+// Plain-language strength of a 0–1 course match; null when the course has no score
+export function matchLabel(score) {
+  if (score == null) return null
+  return score >= 0.85 ? 'Strong match' : score >= 0.65 ? 'Partial match' : 'Weak match'
+}
+
 export function formatDate(d) {
   if (!d) return '—'
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(d))

@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import * as rosterService from '../services/staff/roster.service.js';
+import { assignPendingApplications } from '../services/workflow/assignment.service.js';
 
 const PW = ['pass', 'word'].join('');
 
@@ -73,6 +74,14 @@ router.post('/import', async (req, res, next) => {
     if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
     const result = await rosterService.importRoster({ initialSecret: parsed.data.initial_password, actor: req.user });
     return res.status(200).json({ data: result });
+  } catch (err) { return next(err); }
+});
+
+// Routes every evaluated application that still has unassigned courses to the right evaluators
+router.post('/assign-pending', async (req, res, next) => {
+  try {
+    const results = await assignPendingApplications();
+    return res.status(200).json({ data: { applications: results.length, courses: results.reduce((n, r) => n + r.created, 0) } });
   } catch (err) { return next(err); }
 });
 
