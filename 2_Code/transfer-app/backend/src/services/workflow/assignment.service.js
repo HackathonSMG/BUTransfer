@@ -92,29 +92,32 @@ function recommend(course, sponsorMatches, equivalency) {
 }
 
 /**
- * Best evaluator for a subject/target: expertise course (3) + expertise subject (2) + department or
- * specialization naming the program (1). Ties: under capacity first, then fewest open reviews, then name.
+ * Best evaluator for a course. Points: expertise course (3) + expertise subject (2) + has decided this same
+ * transfer course before (1) + department or specialization naming the program (1). Workload comes first:
+ * evaluators under 80% of capacity are preferred over busier ones, then most points, then fewest open reviews.
  */
-function chooseEvaluator(evaluators, { subject, target, program }, load) {
+function chooseEvaluator(evaluators, { subject, target, program, experienced = new Set() }, load) {
   const scored = evaluators.map((e) => {
     let points = 0;
     const why = [];
     if (target && (e.expertise_courses || []).includes(target)) { points += 3; why.push(`Qualified for ${target}`); }
     if (subject && (e.expertise_subjects || []).includes(subject)) { points += 2; why.push(`${subject} subject expertise`); }
+    if (experienced.has(e.id)) { points += 1; why.push('Has evaluated this course before'); }
     const fields = [e.department, ...(e.specializations || [])].map(lower);
     if (program && fields.some((f) => f && (f.includes(lower(program)) || lower(program).includes(f)))) {
       points += 1; why.push(`${program} department`);
     }
     const open = e.open_reviews + (load.get(e.id) || 0);
-    return { e, points, why, open, over: open >= (e.max_concurrent_cases || Infinity) };
+    return { e, points, why, open, over: open >= 0.8 * (e.max_concurrent_cases || Infinity) };
   });
   const byLoad = (a, b) => (a.over - b.over) || (a.open - b.open) || a.e.full_name.localeCompare(b.e.full_name);
 
-  const specialists = scored.filter((s) => s.points > 0).sort((a, b) => (b.points - a.points) || byLoad(a, b));
+  const specialists = scored.filter((s) => s.points > 0).sort((a, b) => (a.over - b.over) || (b.points - a.points) || byLoad(a, b));
   if (specialists.length) {
     const best = specialists[0];
     const tied = specialists.filter((s) => s.points === best.points).length > 1;
-    return { evaluator: best.e, reason: [...best.why, ...(tied ? ['Lightest current workload'] : [])].join(' · ') };
+    const passedOver = specialists.some((s) => s.over && s.points > best.points);
+    return { evaluator: best.e, reason: [...best.why, ...(tied || passedOver ? ['Lightest current workload'] : [])].join(' · ') };
   }
   const general = scored.filter((s) => (s.e.expertise_subjects || []).includes(GENERAL_SUBJECT)).sort(byLoad)[0]
     || scored.sort(byLoad)[0];
@@ -162,6 +165,17 @@ export async function assignApplication(applicationId) {
     activeEvaluators(),
   ]);
   const equivalencies = new Map(equivalencyRows.map((e) => [e.eq_id, e]));
+  const { rows: experienceRows } = await query(
+    `SELECT DISTINCT tc.institution, tc.course_code, cd.decided_by FROM course_decisions cd JOIN transcript_courses tc ON tc.id = cd.transcript_course_id
+     WHERE cd.decided_by IS NOT NULL AND (tc.institution, tc.course_code) IN (SELECT institution, course_code FROM transcript_courses WHERE application_id = $1)`,
+    [applicationId]
+  );
+  const experience = new Map();
+  for (const r of experienceRows) {
+    const key = `${r.institution}|${r.course_code}`;
+    if (!experience.has(key)) experience.set(key, new Set());
+    experience.get(key).add(r.decided_by);
+  }
   const majorSubject = subjects.get(lower(application.transfer_to_program)) || null;
 
   // Refresh the recommendation on reviews nobody has opened yet
@@ -182,7 +196,8 @@ export async function assignApplication(applicationId) {
     const rec = recommend(c, sponsorRows.filter((m) => m.peer_institution === c.institution && m.peer_course === c.course_code), equivalencies.get(c.equivalency_id));
     const program = c.source_program || application.transfer_to_program;
     const subject = buSubject(rec.target) || subjects.get(lower(program)) || null;
-    const { evaluator, reason } = chooseEvaluator(evaluators, { subject, target: rec.target, program }, load);
+    const experienced = experience.get(`${c.institution}|${c.course_code}`);
+    const { evaluator, reason } = chooseEvaluator(evaluators, { subject, target: rec.target, program, experienced }, load);
     if (evaluator) load.set(evaluator.id, (load.get(evaluator.id) || 0) + 1);
     return { course: c, rec, subject, evaluator, reason };
   });

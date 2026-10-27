@@ -6,7 +6,7 @@ import StatusPill from '../../components/staff/StatusPill'
 import PageHeader from '../../components/staff/PageHeader'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchLabel } from '../../lib/reviews'
+import { REVIEW_STATUS, matchLabelClass } from '../../lib/reviews'
 
 const TABS = [
   ['open', 'Open'],
@@ -107,7 +107,6 @@ export default function MyEvaluations() {
             </li>
             {state.rows.map(r => {
               const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
-              const match = matchLabel(r.match_score)
               return (
                 <li key={r.id}>
                   <Link
@@ -129,10 +128,10 @@ export default function MyEvaluations() {
                       <span className="block text-[12.5px] text-staff-muted truncate">{r.institution}</span>
                     </span>
                     <span className="hidden md:block">
-                      {match ? (
+                      {r.match_label ? (
                         <>
                           <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{Math.round(r.match_score * 100)}%</span>
-                          <span className="block text-[12px] text-staff-muted">{match}</span>
+                          <span className={`block text-[12px] font-medium ${matchLabelClass(r.match_label)}`}>{r.match_label}</span>
                         </>
                       ) : <span className="text-[13px] text-staff-muted">Not scored</span>}
                     </span>

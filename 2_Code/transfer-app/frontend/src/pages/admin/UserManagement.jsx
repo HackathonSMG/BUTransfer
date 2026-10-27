@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Edit2, Power, Users, X, Upload, Mail, Search
+  Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster } from '../../api/admin'
+import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile } from '../../api/admin'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
@@ -12,7 +12,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import PageHeader from '../../components/staff/PageHeader'
 import StatusPill from '../../components/staff/StatusPill'
-import { initials, avatarTint } from '../../lib/reviews'
+import { initials, avatarTint, REVIEW_STATUS } from '../../lib/reviews'
 
 const INITIAL_FORM = {
   full_name: '',
@@ -336,70 +336,199 @@ function MiniStat({ label, value }) {
   )
 }
 
-// One evaluator: identity, expertise, workload against capacity, actions
-function EvaluatorCard({ ev, onEdit, onToggle, toggling }) {
-  const capacity = ev.max_concurrent_cases || 20
-  const open = ev.open_reviews || 0
-  const load = Math.min(100, (open / capacity) * 100)
-  const subjects = ev.expertise_subjects?.length ? ev.expertise_subjects : (ev.specializations || [])
+// Workload bar: open reviews against capacity (the percentage comes from the API)
+function WorkloadBar({ pct, className = '' }) {
+  const value = Math.min(100, pct || 0)
+  const color = value >= 80 ? 'bg-amber-500' : 'bg-primary-600'
   return (
-    <div className={`staff-card p-5 flex flex-col gap-4 ${ev.is_active ? '' : 'opacity-70'}`}>
-      <div className="flex items-start gap-3">
-        <span className={`w-10 h-10 rounded-full grid place-items-center text-sm font-bold flex-shrink-0 ${avatarTint(ev.full_name)}`}>{initials(ev.full_name)}</span>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-staff-ink truncate">{ev.full_name}</p>
-          <p className="text-xs text-staff-muted truncate">{[ev.title, ev.department].filter(Boolean).join(' · ')}</p>
-          <p className="text-xs text-staff-ink2 flex items-center gap-1 mt-0.5 min-w-0"><Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{ev.email}</span></p>
-        </div>
-        <StatusPill tone={ev.is_active ? 'ok' : 'neutral'}>{ev.is_active ? 'Active' : 'Inactive'}</StatusPill>
-      </div>
+    <span className={`block h-1.5 rounded-full bg-staff-line2 overflow-hidden ${className}`} aria-hidden="true">
+      <i className={`block h-full rounded-full ${color}`} style={{ width: `${Math.max(value ? 3 : 0, value)}%` }} />
+    </span>
+  )
+}
 
-      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
-        {subjects.slice(0, 4).map(s => (
-          <span key={s} className="text-[11.5px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-100">{s === 'GEN' ? 'General' : s}</span>
-        ))}
-        {ev.expertise_courses?.length > 0 && (
-          <span className="text-[11.5px] px-2 py-0.5 rounded-md bg-staff-sunk text-staff-ink2" title={ev.expertise_courses.join(', ')}>
-            {ev.expertise_courses.length} BU courses
+// One row: who, where, how much work, and whether anything needs attention
+function EvaluatorRow({ ev, onOpen }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(ev)}
+        className={`w-full grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.6fr)_6rem_6rem_minmax(0,1fr)_1rem] gap-x-5 gap-y-1 items-center px-6 py-4 text-left hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg ${ev.is_active ? '' : 'opacity-60'}`}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          <span className={`w-9 h-9 rounded-full grid place-items-center text-[12px] font-bold flex-shrink-0 ${avatarTint(ev.full_name)}`}>{initials(ev.full_name)}</span>
+          <span className="min-w-0">
+            <span className="block text-[15px] font-medium text-staff-ink truncate">
+              {ev.full_name}
+              {!ev.is_active && <span className="ml-2 text-[12px] font-medium text-staff-muted">Inactive</span>}
+            </span>
+            <span className="block text-[13px] text-staff-muted truncate">{ev.department || '—'}</span>
           </span>
+        </span>
+        <span className="hidden md:block">
+          <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{ev.open_reviews}</span>
+        </span>
+        <span className="hidden md:block">
+          <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{ev.completed_reviews}</span>
+        </span>
+        <span className="min-w-0 col-span-2 md:col-span-1 order-3 md:order-none">
+          {ev.attention.length > 0 ? (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-amber-800">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{ev.attention[0]}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <WorkloadBar pct={ev.workload_pct} className="flex-1 max-w-[10rem]" />
+              <span className="text-[12px] text-staff-muted tabular-nums">{ev.workload_pct ?? 0}%</span>
+            </span>
+          )}
+        </span>
+        <ChevronRight className="hidden md:block w-4 h-4 text-staff-muted" />
+      </button>
+    </li>
+  )
+}
+
+// Side panel with one evaluator's profile, loaded from the API
+function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling }) {
+  const [p, setP] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!evaluatorId) return
+    setP(null); setError(null)
+    getEvaluatorProfile(evaluatorId).then(res => setP(res.data)).catch(err => setError(err.response?.data?.message || err.message))
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [evaluatorId, onClose])
+
+  if (!evaluatorId) return null
+  const workload = p ? [
+    ['New', p.new_reviews], ['In progress', p.in_progress_reviews], ['Waiting on student', p.waiting_reviews], ['Upcoming', p.queued_reviews]
+  ] : []
+
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Evaluator profile">
+      <div className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-hidden="true" />
+      <aside className="absolute inset-y-0 right-0 w-full sm:w-[min(520px,92vw)] bg-white shadow-pop flex flex-col">
+        {!p ? (
+          <div className="flex-1 grid place-items-center">{error ? <p className="text-sm text-rose-700 px-6">{error}</p> : <Spinner size="lg" className="text-primary-600" />}</div>
+        ) : (
+          <>
+            <div className="flex items-start gap-4 px-6 py-5 border-b border-staff-line">
+              <span className={`w-12 h-12 rounded-full grid place-items-center text-[15px] font-bold flex-shrink-0 ${avatarTint(p.full_name)}`}>{initials(p.full_name)}</span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display text-[22px] font-semibold text-staff-ink leading-tight">{p.full_name}</h2>
+                <p className="text-[14px] text-staff-ink2">{[p.title, p.department].filter(Boolean).join(' · ')}</p>
+                <p className="text-[13px] text-staff-muted mt-0.5">{p.email}{p.evaluator_code ? ` · ${p.evaluator_code}` : ''}</p>
+              </div>
+              <button onClick={onClose} className="p-2 -mr-2 rounded-lg text-staff-muted hover:bg-staff-sunk" aria-label="Close"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+              {p.attention.length > 0 && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-[14px] text-amber-900 space-y-1">
+                  {p.attention.map(a => <p key={a} className="flex gap-2"><AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />{a}</p>)}
+                </div>
+              )}
+
+              <section>
+                <h3 className="staff-eyebrow mb-3">Workload</h3>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-[24px] font-semibold text-staff-ink tabular-nums">{p.open_reviews}<span className="text-[14px] font-medium text-staff-muted"> / {p.max_concurrent_cases} open</span></span>
+                  <span className="text-[13px] text-staff-muted">{p.workload_pct}% of capacity</span>
+                </div>
+                <WorkloadBar pct={p.workload_pct} />
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 mt-4 text-[14px]">
+                  {workload.map(([k, v]) => (
+                    <div key={k} className="flex justify-between"><dt className="text-staff-ink2">{k}</dt><dd className="font-semibold text-staff-ink tabular-nums">{v}</dd></div>
+                  ))}
+                </dl>
+              </section>
+
+              <section>
+                <h3 className="staff-eyebrow mb-3">Completed</h3>
+                <dl className="grid grid-cols-3 gap-3 text-center">
+                  {[['Last 7 days', p.completed_7d], ['This month', p.completed_month], ['All time', p.completed_reviews]].map(([k, v]) => (
+                    <div key={k} className="rounded-lg bg-staff-bg border border-staff-line2 py-3">
+                      <dd className="text-[20px] font-semibold text-staff-ink tabular-nums">{v}</dd>
+                      <dt className="text-[12px] text-staff-muted">{k}</dt>
+                    </div>
+                  ))}
+                </dl>
+                {p.avg_days_to_decide != null && <p className="text-[13px] text-staff-muted mt-2">On average {p.avg_days_to_decide} days from assignment to decision.</p>}
+              </section>
+
+              <section>
+                <h3 className="staff-eyebrow mb-3">Expertise</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {(p.expertise_subjects || []).map(s => (
+                    <span key={s} className="text-[12.5px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-100">{s === 'GEN' ? 'General' : s}</span>
+                  ))}
+                  {(p.specializations || []).map(s => (
+                    <span key={s} className="text-[12.5px] px-2 py-0.5 rounded-md bg-staff-sunk text-staff-ink2">{s}</span>
+                  ))}
+                </div>
+                {p.expertise_courses?.length > 0 ? (
+                  <p className="text-[13px] text-staff-ink2 mt-3 leading-relaxed"><span className="text-staff-muted">BU courses: </span>{p.expertise_courses.join(', ')}</p>
+                ) : <p className="text-[13px] text-staff-muted mt-3">Courses are routed by subject and department.</p>}
+              </section>
+
+              <section>
+                <h3 className="staff-eyebrow mb-3">Recent course reviews</h3>
+                {p.recent_reviews.length === 0 ? <p className="text-[14px] text-staff-muted">No course reviews yet.</p> : (
+                  <ul className="divide-y divide-staff-line2 border-y border-staff-line2">
+                    {p.recent_reviews.map(r => {
+                      const st = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
+                      return (
+                        <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]">
+                          <span className="min-w-0">
+                            <span className="block text-staff-ink truncate"><span className="font-mono">{r.course_code}</span> → <span className="font-mono">{r.target_bu_course || '—'}</span></span>
+                            <span className="block text-[12.5px] text-staff-muted truncate">{r.student_name} · {r.reference_number}</span>
+                          </span>
+                          <StatusPill tone={st.tone}>{st.label}</StatusPill>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </section>
+            </div>
+
+            <div className="flex gap-2 px-6 py-4 border-t border-staff-line">
+              <Button variant="secondary" onClick={() => onEdit(p)}><Edit2 className="w-4 h-4" />Edit</Button>
+              <Button variant="ghost" className="ml-auto" loading={toggling} onClick={() => onToggle(p)}>
+                <Power className="w-4 h-4" />{p.is_active ? 'Deactivate' : 'Reactivate'}
+              </Button>
+            </div>
+          </>
         )}
-      </div>
-
-      <div>
-        <div className="flex justify-between text-xs mb-1">
-          <span className="text-staff-muted">Workload</span>
-          <span className="text-staff-ink2 tabular-nums"><b className="text-staff-ink">{open}</b> open of {capacity} · {ev.completed_reviews || 0} done</span>
-        </div>
-        <div className="h-2 rounded-full bg-staff-line2 overflow-hidden" title={`${open} open reviews, capacity ${capacity}`}>
-          <i className={`block h-full rounded-full ${load >= 90 ? 'bg-red-600' : load >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`} style={{ width: `${Math.max(open ? 3 : 0, load)}%` }} />
-        </div>
-      </div>
-
-      <div className="flex gap-2 pt-1 border-t border-staff-line2">
-        <Button size="sm" variant="ghost" onClick={() => onEdit(ev)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>
-        {ev.evaluator_code && <span className="self-center font-mono text-[11.5px] text-staff-muted">{ev.evaluator_code}</span>}
-        <Button size="sm" variant="ghost" onClick={() => onToggle(ev)} loading={toggling} className="ml-auto">
-          <Power className="w-3.5 h-3.5" />{ev.is_active ? 'Deactivate' : 'Reactivate'}
-        </Button>
-      </div>
+      </aside>
     </div>
   )
 }
 
 export default function UserManagement() {
   const [evaluators, setEvaluators] = useState([])
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState({ open: false, evaluator: null })
   const [importOpen, setImportOpen] = useState(false)
   const [toggling, setToggling] = useState(null)
+  const [openId, setOpenId] = useState(null)
+  const [drawerKey, setDrawerKey] = useState(0)
   const [search, setSearch] = useState('')
   const [department, setDepartment] = useState('')
   const [status, setStatus] = useState('active')
+  const [attentionOnly, setAttentionOnly] = useState(false)
 
   const load = async () => {
     try {
       const data = await getEvaluators()
-      setEvaluators(data.data || data.evaluators || [])
+      setEvaluators(data.data || [])
+      setSummary(data.meta?.summary || null)
     } catch {
       toast.error('Failed to load evaluators')
     } finally {
@@ -415,6 +544,7 @@ export default function UserManagement() {
       await updateEvaluator(ev.id, { is_active: !ev.is_active })
       toast.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}`)
       await load()
+      setDrawerKey(k => k + 1)
     } catch {
       toast.error('Failed to update evaluator status')
     } finally {
@@ -427,13 +557,10 @@ export default function UserManagement() {
   const visible = evaluators.filter(e =>
     (!department || (e.department || 'Other') === department) &&
     (status === 'all' || (status === 'active') === Boolean(e.is_active)) &&
+    (!attentionOnly || e.attention.length > 0) &&
     (!q || [e.full_name, e.email, e.department, e.evaluator_code, ...(e.expertise_subjects || []), ...(e.expertise_courses || [])]
       .some(f => f && String(f).toLowerCase().includes(q)))
   )
-
-  const active = evaluators.filter(e => e.is_active)
-  const coveredCourses = new Set(active.flatMap(e => e.expertise_courses || [])).size
-  const openTotal = active.reduce((s, e) => s + (e.open_reviews || 0), 0)
 
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner size="xl" className="text-primary-600" /></div>
@@ -443,79 +570,76 @@ export default function UserManagement() {
     <div className="space-y-6">
       <PageHeader
         title="Evaluators"
-        subtitle={`${active.length} active across ${new Set(active.map(e => e.department || 'Other')).size} departments · ${coveredCourses} BU courses covered · ${openTotal} open reviews`}
+        subtitle="Who evaluates which subjects, and how their work is going."
         actions={
           <>
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>
-              <Upload className="w-4 h-4" />
-              Import staff roster
-            </Button>
-            <Button onClick={() => setModal({ open: true, evaluator: null })}>
-              <Plus className="w-4 h-4" />
-              Add Evaluator
-            </Button>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="w-4 h-4" />Import staff roster</Button>
+            <Button onClick={() => setModal({ open: true, evaluator: null })}><Plus className="w-4 h-4" />Add Evaluator</Button>
           </>
         }
       />
 
-      <div className="staff-card p-4 space-y-3">
-       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_14rem] gap-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, email, subject or course..."
-            aria-label="Search evaluators"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-          />
-        </div>
-        <Select aria-label="Status" placeholder="Active and inactive" options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
-          value={status === 'all' ? '' : status} onChange={e => setStatus(e.target.value || 'all')} />
-       </div>
-       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Department">
-          {[['', 'All departments', evaluators.length], ...departments.map(dep => [dep, dep, evaluators.filter(e => (e.department || 'Other') === dep).length])].map(([value, label, n]) => (
+      {summary && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px] text-staff-ink2">
+          <span><b className="text-staff-ink font-semibold">{summary.active}</b> active evaluators</span>
+          <span><b className="text-staff-ink font-semibold">{summary.departments}</b> departments</span>
+          <span><b className="text-staff-ink font-semibold">{summary.courses_covered}</b> BU courses covered</span>
+          <span><b className="text-staff-ink font-semibold">{summary.open_reviews}</b> open reviews</span>
+          {summary.need_attention > 0 && (
             <button
-              key={label}
               type="button"
-              onClick={() => setDepartment(value)}
-              aria-pressed={department === value}
-              className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-                department === value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-staff-line text-staff-ink2 hover:bg-staff-sunk'
-              }`}
+              onClick={() => setAttentionOnly(v => !v)}
+              aria-pressed={attentionOnly}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[14px] font-medium ${attentionOnly ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300'}`}
             >
-              {label} <span className={department === value ? 'text-white/80' : 'text-staff-muted'}>{n}</span>
+              <AlertTriangle className="w-4 h-4" />{summary.need_attention} need{summary.need_attention === 1 ? 's' : ''} attention
             </button>
-          ))}
-       </div>
-      </div>
-
-      {evaluators.length === 0 ? (
-        <div className="staff-card">
-          <EmptyState
-            icon={Users}
-            title="No evaluators yet"
-            description="Import the staff roster to create the evaluator accounts for each department, or add evaluators one at a time."
-            action={() => setImportOpen(true)}
-            actionLabel="Import staff roster"
-          />
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="staff-card"><EmptyState icon={Search} title="No evaluators match" description="Try another name, subject or department." /></div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {visible.map(ev => (
-            <EvaluatorCard key={ev.id} ev={ev} onEdit={e => setModal({ open: true, evaluator: e })} onToggle={handleToggle} toggling={toggling === ev.id} />
-          ))}
+          )}
         </div>
       )}
 
+      <section className="staff-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-staff-line2 grid grid-cols-1 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.8fr)] gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
+            <input
+              type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search name, subject or course..." aria-label="Search evaluators"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
+          <Select aria-label="Department" placeholder="All departments" options={departments.map(d => ({ value: d, label: d }))} value={department} onChange={e => setDepartment(e.target.value)} />
+          <Select aria-label="Status" placeholder="Active and inactive" options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+            value={status === 'all' ? '' : status} onChange={e => setStatus(e.target.value || 'all')} />
+        </div>
+
+        {evaluators.length === 0 ? (
+          <EmptyState icon={Users} title="No evaluators yet" description="Import the staff roster to create the evaluator accounts for each department, or add evaluators one at a time." action={() => setImportOpen(true)} actionLabel="Import staff roster" />
+        ) : visible.length === 0 ? (
+          <EmptyState icon={Search} title="No evaluators match" description="Try another name, subject or department." />
+        ) : (
+          <ul className="divide-y divide-staff-line2">
+            <li className="hidden md:grid grid-cols-[minmax(0,1.6fr)_6rem_6rem_minmax(0,1fr)_1rem] gap-x-5 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
+              <span>Evaluator</span><span>Pending</span><span>Completed</span><span>Workload</span><span />
+            </li>
+            {visible.map(ev => <EvaluatorRow key={ev.id} ev={ev} onOpen={e => setOpenId(e.id)} />)}
+          </ul>
+        )}
+      </section>
+
+      <EvaluatorDrawer
+        key={drawerKey}
+        evaluatorId={openId}
+        onClose={() => setOpenId(null)}
+        onEdit={e => setModal({ open: true, evaluator: e })}
+        onToggle={handleToggle}
+        toggling={toggling === openId}
+      />
       <EvaluatorModal
         isOpen={modal.open}
         onClose={() => setModal({ open: false, evaluator: null })}
         evaluator={modal.evaluator}
-        onSave={load}
+        onSave={() => { load(); setDrawerKey(k => k + 1) }}
       />
       <ImportRosterModal isOpen={importOpen} onClose={() => setImportOpen(false)} onDone={load} />
     </div>

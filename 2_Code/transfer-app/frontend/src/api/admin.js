@@ -38,3 +38,12 @@ export const importStaffRoster = (initialPassword) =>
 
 export const getStats = () =>
   client.get('/admin/stats').then(r => r.data)
+
+export const getEvaluatorProfile = (id) =>
+  client.get(`/evaluators/${id}/profile`).then(r => r.data)
+
+export const getConflicts = () =>
+  client.get('/admin/conflicts').then(r => r.data)
+
+export const recordStandardEquivalency = (body) =>
+  client.post('/admin/conflicts/standard', body).then(r => r.data)

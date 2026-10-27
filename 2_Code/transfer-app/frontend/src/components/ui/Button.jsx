@@ -6,7 +6,8 @@ const variantClasses = {
   secondary: 'bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-300 border-gray-300',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border-transparent',
   ghost: 'bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-300 border-transparent',
-  brand: 'bg-brand text-white hover:bg-brand-dark focus:ring-red-400 border-transparent'
+  brand: 'bg-brand text-white hover:bg-brand-dark focus:ring-red-400 border-transparent',
+  success: 'bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-500 border-transparent'
 }
 
 const sizeClasses = {

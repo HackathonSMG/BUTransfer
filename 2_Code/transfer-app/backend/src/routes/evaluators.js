@@ -42,27 +42,89 @@ const updateEvaluatorSchema = z.object({
 
 const EVALUATOR_COLUMNS = `p.*, e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases`;
 
+// Evaluators whose work needs an administrator's attention, and why (business rules live here, not in the UI)
+const STALE_DAYS = 7;
+function attentionFlags(r) {
+  const flags = [];
+  if (!r.is_active && (r.open_reviews > 0 || r.queued_reviews > 0)) flags.push('Inactive with assigned courses');
+  if (r.is_active && r.max_concurrent_cases && r.open_reviews >= 0.8 * r.max_concurrent_cases) flags.push('Near capacity');
+  if (r.oldest_open_days != null && r.oldest_open_days >= STALE_DAYS) flags.push(`Oldest open review waiting ${r.oldest_open_days} days`);
+  return flags;
+}
+
+const REVIEW_COUNTS = `
+  COUNT(r.id) FILTER (WHERE r.status = 'new')::int AS new_reviews,
+  COUNT(r.id) FILTER (WHERE r.status = 'in_progress')::int AS in_progress_reviews,
+  COUNT(r.id) FILTER (WHERE r.status = 'info_requested')::int AS waiting_reviews,
+  COUNT(r.id) FILTER (WHERE r.status IN ('new', 'in_progress', 'info_requested'))::int AS open_reviews,
+  COUNT(r.id) FILTER (WHERE r.status = 'queued')::int AS queued_reviews,
+  COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected'))::int AS completed_reviews,
+  COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected') AND r.completed_at >= NOW() - INTERVAL '7 days')::int AS completed_7d,
+  COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected') AND r.completed_at >= DATE_TRUNC('month', NOW()))::int AS completed_month,
+  (EXTRACT(DAY FROM NOW() - MIN(r.assigned_at) FILTER (WHERE r.status IN ('new', 'in_progress', 'info_requested'))))::int AS oldest_open_days`;
+
 router.get('/', async (req, res, next) => {
   try {
     const result = await query(
       // Inactive evaluators are listed too, so they can be reactivated; their history stays intact
       `SELECT p.id, p.full_name, p.email, p.phone, p.created_at, (p.is_active AND e.is_active) AS is_active,
               e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
-              (SELECT COUNT(*) FROM applications a WHERE a.assigned_evaluator_id = e.id AND a.status NOT IN ('approved', 'rejected', 'closed')) AS current_case_count,
-              (SELECT COUNT(*) FROM applications a WHERE a.assigned_evaluator_id = e.id) AS total_cases,
-              COUNT(r.id) FILTER (WHERE r.status IN ('new', 'in_progress', 'info_requested')) AS open_reviews,
-              COUNT(r.id) FILTER (WHERE r.status = 'queued') AS queued_reviews,
-              COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'rejected')) AS completed_reviews
+              (SELECT COUNT(*)::int FROM applications a WHERE a.assigned_evaluator_id = e.id AND a.status NOT IN ('approved', 'rejected', 'closed')) AS current_case_count,
+              ${REVIEW_COUNTS}
        FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
        GROUP BY p.id, p.full_name, p.email, p.phone, p.created_at, p.is_active, e.id
        ORDER BY (p.is_active AND e.is_active) DESC, e.department NULLS LAST, p.full_name ASC`
     );
-    const int = (v) => parseInt(v, 10);
+    const data = result.rows.map((r) => ({
+      ...r,
+      workload_pct: r.max_concurrent_cases ? Math.round((100 * r.open_reviews) / r.max_concurrent_cases) : null,
+      attention: attentionFlags(r),
+    }));
+    const active = data.filter((r) => r.is_active);
     return res.status(200).json({
-      data: result.rows.map((r) => ({
-        ...r, current_case_count: int(r.current_case_count), total_cases: int(r.total_cases),
-        open_reviews: int(r.open_reviews), queued_reviews: int(r.queued_reviews), completed_reviews: int(r.completed_reviews),
-      })),
+      data,
+      meta: {
+        summary: {
+          active: active.length,
+          inactive: data.length - active.length,
+          departments: new Set(active.map((r) => r.department).filter(Boolean)).size,
+          courses_covered: new Set(active.flatMap((r) => r.expertise_courses || [])).size,
+          open_reviews: active.reduce((n, r) => n + r.open_reviews, 0),
+          need_attention: data.filter((r) => r.attention.length).length,
+        },
+      },
+    });
+  } catch (err) { return next(err); }
+});
+
+// One evaluator's profile: master data, workload by status, throughput and recent course reviews
+router.get('/:id/profile', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return next(badRequest('Invalid evaluator id'));
+    const [base, recent] = await Promise.all([
+      query(
+        `SELECT p.id, p.full_name, p.email, p.created_at, (p.is_active AND e.is_active) AS is_active, e.evaluator_code, e.title, e.department,
+                e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
+                ${REVIEW_COUNTS},
+                ROUND(AVG(EXTRACT(EPOCH FROM (r.completed_at - r.assigned_at)) / 86400) FILTER (WHERE r.completed_at IS NOT NULL AND r.assigned_at IS NOT NULL)::numeric, 1) AS avg_days_to_decide
+         FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
+         WHERE e.id = $1 GROUP BY p.id, e.id`, [id]),
+      query(
+        `SELECT r.id, r.status, r.target_bu_course, r.assigned_at, r.completed_at, tc.institution, tc.course_code, a.reference_number, a.student_name
+         FROM course_reviews r JOIN transcript_courses tc ON tc.id = r.transcript_course_id JOIN applications a ON a.id = r.application_id
+         WHERE r.evaluator_id = $1 ORDER BY COALESCE(r.completed_at, r.started_at, r.assigned_at, r.created_at) DESC LIMIT 8`, [id]),
+    ]);
+    if (!base.rows.length) return next(notFound('Evaluator'));
+    const ev = base.rows[0];
+    return res.status(200).json({
+      data: {
+        ...ev,
+        avg_days_to_decide: ev.avg_days_to_decide != null ? Number(ev.avg_days_to_decide) : null,
+        workload_pct: ev.max_concurrent_cases ? Math.round((100 * ev.open_reviews) / ev.max_concurrent_cases) : null,
+        attention: attentionFlags(ev),
+        recent_reviews: recent.rows,
+      },
     });
   } catch (err) { return next(err); }
 });

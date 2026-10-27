@@ -3,7 +3,7 @@
 export const REVIEW_STATUS = {
   queued: { label: 'Upcoming', tone: 'neutral' },
   new: { label: 'New', tone: 'info' },
-  in_progress: { label: 'In Progress', tone: 'ready' },
+  in_progress: { label: 'In Progress', tone: 'neutral' },
   info_requested: { label: 'Waiting on Student', tone: 'warn' },
   approved: { label: 'Approved', tone: 'ok' },
   rejected: { label: 'Rejected', tone: 'bad' }
@@ -23,10 +23,9 @@ export function matchBasisLabel(review) {
   }
 }
 
-// Plain-language strength of a 0–1 course match; null when the course has no score
-export function matchLabel(score) {
-  if (score == null) return null
-  return score >= 0.85 ? 'Strong match' : score >= 0.65 ? 'Partial match' : 'Weak match'
+// Colour for the match label the API returns (presentation only)
+export function matchLabelClass(label) {
+  return label === 'Strong match' ? 'text-emerald-700' : label === 'Partial match' ? 'text-amber-700' : label ? 'text-rose-700' : 'text-staff-muted'
 }
 
 export function formatDate(d) {

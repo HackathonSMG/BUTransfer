@@ -5,6 +5,10 @@ import { requireRole } from '../middleware/require-role.js';
 import { query } from '../config/db.js';
 import { badRequest } from '../utils/errors.js';
 import * as reviewService from '../services/workflow/review.service.js';
+import { matchLabel } from '../services/workflow/knowledge.service.js';
+
+// The match label is decided here, not in the browser
+const withLabel = (rows) => rows.map((r) => ({ ...r, match_label: matchLabel(r.match_score) }));
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,8 +86,8 @@ router.get('/dashboard', async (req, res, next) => {
           open: n('new') + n('in_progress') + n('info_requested'),
           open_applications: apps.applications,
         },
-        up_next: upNext.rows,
-        recent_decisions: recent.rows,
+        up_next: withLabel(upNext.rows),
+        recent_decisions: withLabel(recent.rows),
         recent_activity: activity.rows,
       },
     });
@@ -112,7 +116,7 @@ router.get('/reviews', async (req, res, next) => {
     ]);
     const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.count]));
     const tabCounts = Object.fromEntries(Object.entries(STATUS_FILTERS).map(([k, list]) => [k, list.reduce((s, x) => s + (byStatus[x] || 0), 0)]));
-    return res.status(200).json({ data: rows.rows, meta: { counts: tabCounts } });
+    return res.status(200).json({ data: withLabel(rows.rows), meta: { counts: tabCounts } });
   } catch (err) { return next(err); }
 });
 
@@ -151,6 +155,15 @@ router.post('/reviews/:id/request-info', async (req, res, next) => {
     const parsed = z.object({ message: z.string().trim().min(1, 'Describe the information you need').max(2000) }).safeParse(req.body);
     if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
     return res.status(200).json({ data: await reviewService.requestInformation(req.params.id, parsed.data, req.user) });
+  } catch (err) { return next(err); }
+});
+
+router.post('/reviews/:id/escalate', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    const parsed = z.object({ note: z.string().max(1000).optional().nullable() }).safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Note is too long'));
+    return res.status(200).json({ data: await reviewService.escalate(req.params.id, parsed.data, req.user) });
   } catch (err) { return next(err); }
 });
 

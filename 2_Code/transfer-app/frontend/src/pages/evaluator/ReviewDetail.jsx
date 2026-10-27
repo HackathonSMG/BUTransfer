@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, X, MessageSquare, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, X, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getReview, startReview, decideReview, requestReviewInfo } from '../../api/my'
+import { getReview, startReview, decideReview, requestReviewInfo, escalateReview } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
 import TranscriptDrawer from '../../components/evaluator/TranscriptDrawer'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchLabel, formatDate } from '../../lib/reviews'
+import { REVIEW_STATUS, matchLabelClass, formatDate } from '../../lib/reviews'
 import { activityLabel } from '../../lib/staffFormat'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
@@ -39,6 +39,12 @@ export default function ReviewDetail() {
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [openSections, setOpenSections] = useState({})
+  const openSection = (key) => {
+    setOpenSections(o => ({ ...o, [key]: true }))
+    setTimeout(() => document.getElementById(`section-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
+  const sectionProps = (key) => ({ id: `section-${key}`, open: !!openSections[key], onToggle: (v) => setOpenSections(o => ({ ...o, [key]: v })) })
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +73,9 @@ export default function ReviewDetail() {
       if (dialog === 'info') {
         await requestReviewInfo(id, text)
         toast.success('Information requested from the student')
+      } else if (dialog === 'escalate') {
+        await escalateReview(id, text)
+        toast.success('Sent to the transfer credit administrators')
       } else {
         const res = await decideReview(id, dialog, text)
         toast.success(dialog === 'accept' ? 'Equivalency approved' : 'Course rejected')
@@ -92,7 +101,9 @@ export default function ReviewDetail() {
   }
 
   const d = state.data
-  const { review: r, application: app, source_course: src, target_course: bu, proposed, evidence } = d
+  const { review: r, application: app, source_course: src, target_course: bu, proposed, evidence, knowledge: k } = d
+  const conflicts = k?.conflicts || []
+  const previous = k?.previous
   const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
   const isOpen = OPEN.includes(r.status)
   const pct = r.match_score != null ? Math.round(r.match_score * 100) : null
@@ -112,6 +123,11 @@ export default function ReviewDetail() {
           </p>
           <h1 className="text-[30px] leading-tight text-staff-ink mt-1">{app.student_name}</h1>
           <p className="text-[15px] text-staff-ink2 mt-1">{app.transfer_to_program} · transferring from {app.transfer_from_institution}</p>
+          {r.assignment_reason && (
+            <p className="text-[13px] text-staff-muted mt-2">
+              <span className="font-medium text-staff-ink2">Assignment context:</span> {r.assignment_reason}
+            </p>
+          )}
         </div>
         <Button variant="secondary" onClick={() => setTranscriptOpen(true)}>
           <FileText className="w-4 h-4" />
@@ -156,7 +172,7 @@ export default function ReviewDetail() {
             {pct != null ? (
               <>
                 <p className="text-[44px] leading-none font-semibold text-staff-ink tabular-nums mt-1">{pct}%</p>
-                <p className={`text-[14px] font-semibold mt-1 ${r.match_score >= 0.85 ? 'text-emerald-700' : r.match_score >= 0.65 ? 'text-amber-700' : 'text-red-700'}`}>{matchLabel(r.match_score)}</p>
+                <p className={`text-[14px] font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
               </>
             ) : (
               <p className="text-[20px] font-semibold text-staff-muted mt-2">Not scored</p>
@@ -166,6 +182,7 @@ export default function ReviewDetail() {
             <p className="text-[13px] font-medium text-staff-ink2">Recommendation</p>
             <p className="text-[18px] font-semibold text-staff-ink mt-1">{proposed?.label || 'Evaluator to decide'}</p>
             <p className="text-[14px] text-staff-ink2 mt-1">{basisSentence(r)}</p>
+            <KnowledgeCues k={k} onConflicts={() => openSection('conflicts')} onPrevious={() => openSection('previous')} />
             <button
               type="button"
               onClick={() => { setEvidenceOpen(true); document.getElementById('matching-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
@@ -188,6 +205,16 @@ export default function ReviewDetail() {
         <Disclosure id="matching-details" title="Matching details" open={evidenceOpen} onToggle={setEvidenceOpen}>
           <Evidence evidence={evidence} src={src} bu={bu} />
         </Disclosure>
+        {previous && (
+          <Disclosure {...sectionProps('previous')} title={`Previous decisions (${previous.total + (k.similar?.length || 0)})`}>
+            <PreviousDecisions k={k} src={src} target={r.target_bu_course} />
+          </Disclosure>
+        )}
+        {conflicts.length > 0 && (
+          <Disclosure {...sectionProps('conflicts')} title={<span className="flex items-center gap-2">Equivalency conflicts ({conflicts.length})<span className="w-2 h-2 rounded-full bg-amber-500" /></span>}>
+            <Conflicts k={k} canEscalate={isOpen} onEscalate={() => openDialog('escalate')} />
+          </Disclosure>
+        )}
         <Disclosure title="Evaluation history">
           <History d={d} />
         </Disclosure>
@@ -210,13 +237,17 @@ export default function ReviewDetail() {
               <Button variant="secondary" onClick={() => openDialog('reject')} className="!text-red-700 !border-red-200 hover:!bg-red-50">
                 <X className="w-4 h-4" />Reject
               </Button>
-              <Button onClick={() => openDialog('accept')} disabled={!proposed} title={proposed ? undefined : 'No BU course has been proposed'}>
+              <Button variant="success" onClick={() => openDialog('accept')} disabled={!proposed} title={proposed ? undefined : 'No BU course has been proposed'}>
                 <Check className="w-4 h-4" />Accept equivalency
               </Button>
             </>
           ) : (
             <>
-              <p className="flex-1 text-[15px] text-staff-ink2">This course has been decided.</p>
+              <p className="flex-1 text-[15px] text-staff-ink2">
+                {r.status === 'queued'
+                  ? 'This course opens for your decision once the earlier review of this application is finished.'
+                  : 'This course has been decided.'}
+              </p>
               {d.next_review_id ? (
                 <Button onClick={() => navigate(`/evaluator/reviews/${d.next_review_id}`)}>Next evaluation<ArrowRight className="w-4 h-4" /></Button>
               ) : (
@@ -240,7 +271,7 @@ export default function ReviewDetail() {
       <Modal
         isOpen={dialog !== null}
         onClose={() => !submitting && setDialog(null)}
-        title={dialog === 'accept' ? 'Approve course equivalency?' : dialog === 'reject' ? 'Reject equivalency' : 'Additional information required'}
+        title={dialog === 'accept' ? 'Approve course equivalency?' : dialog === 'reject' ? 'Reject equivalency' : dialog === 'escalate' ? 'Ask an administrator to review' : 'Additional information required'}
         size="sm"
       >
         <div className="space-y-4">
@@ -258,6 +289,17 @@ export default function ReviewDetail() {
                 placeholder="e.g. Content does not cover the data structures required for CAS CS 112."
                 className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
               />
+            </label>
+          )}
+          {dialog === 'escalate' && (
+            <label className="block">
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">Note for the administrators</span>
+              <textarea
+                value={text} onChange={e => setText(e.target.value)} rows={3} autoFocus
+                placeholder="e.g. Earlier decisions award different BU courses. Which should be the standard?"
+                className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              />
+              <span className="block text-[12.5px] text-staff-muted mt-1.5">Administrators can record a standard equivalency for future transcripts. Your decision on this course stays yours.</span>
             </label>
           )}
           {dialog === 'info' && (
@@ -286,10 +328,10 @@ export default function ReviewDetail() {
             <Button
               onClick={submit}
               loading={submitting}
-              disabled={dialog !== 'accept' && !text.trim()}
-              variant={dialog === 'reject' ? 'danger' : 'primary'}
+              disabled={!['accept', 'escalate'].includes(dialog) && !text.trim()}
+              variant={dialog === 'reject' ? 'danger' : dialog === 'accept' ? 'success' : 'primary'}
             >
-              {dialog === 'accept' ? 'Confirm approval' : dialog === 'reject' ? 'Reject' : 'Send request'}
+              {dialog === 'accept' ? 'Confirm approval' : dialog === 'reject' ? 'Reject' : dialog === 'escalate' ? 'Send to administrators' : 'Send request'}
             </Button>
           </div>
         </div>
@@ -415,7 +457,7 @@ function Evidence({ evidence: e, src, bu }) {
   }
   return (
     <div className="space-y-5 text-[14px]">
-      {items.length === 0 && e.reasons.length === 0 && <p className="text-staff-muted">No matching evidence on file for this course.</p>}
+      {items.length === 0 && e.reasons.length === 0 && !e.review_notes && <p className="text-staff-muted">No matching evidence on file for this course.</p>}
       {items.length > 0 && (
         <ul className="space-y-3">
           {items.map((it, i) => (
@@ -425,6 +467,17 @@ function Evidence({ evidence: e, src, bu }) {
             </li>
           ))}
         </ul>
+      )}
+      {e.review_notes && (
+        <div>
+          <p className="text-staff-muted mb-1.5">Review notes</p>
+          <p className="text-staff-ink2 leading-relaxed">{e.review_notes}</p>
+        </div>
+      )}
+      {e.missing_information && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
+          <span className="font-medium">Missing information:</span> {e.missing_information}
+        </div>
       )}
       {e.reasons.length > 0 && (
         <div>
@@ -441,6 +494,119 @@ function Evidence({ evidence: e, src, bu }) {
             ))}
           </ol>
         </div>
+      )}
+    </div>
+  )
+}
+
+// One-line cues next to the recommendation: established equivalency, earlier decisions, conflicts
+function KnowledgeCues({ k, onConflicts, onPrevious }) {
+  if (!k) return null
+  const cues = []
+  if (k.established?.bu_course) {
+    cues.push(
+      <span key="est" className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+        <BadgeCheck className="w-3.5 h-3.5" />Established equivalency: {k.established.bu_course}
+      </span>
+    )
+  }
+  if (k.previous.total > 0) {
+    const mc = k.previous.most_common
+    cues.push(
+      <button key="prev" type="button" onClick={onPrevious} className="inline-flex items-center gap-1.5 text-staff-ink2 bg-staff-sunk border border-staff-line rounded-full px-2.5 py-0.5 hover:border-slate-300">
+        <HistoryIcon className="w-3.5 h-3.5" />Evaluated {k.previous.total} time{k.previous.total === 1 ? '' : 's'} before{mc ? ` · most often ${mc.award}` : ''}
+      </button>
+    )
+  }
+  if (k.conflicts.length) {
+    cues.push(
+      <button key="conf" type="button" onClick={onConflicts} className="inline-flex items-center gap-1.5 text-amber-900 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 hover:border-amber-300">
+        <AlertTriangle className="w-3.5 h-3.5" />Earlier decisions disagree
+      </button>
+    )
+  }
+  return cues.length ? <div className="flex flex-wrap gap-2 mt-3 text-[12.5px] font-medium">{cues}</div> : null
+}
+
+function PreviousDecisions({ k, src, target }) {
+  const p = k.previous
+  return (
+    <div className="space-y-5 text-[14px]">
+      {k.established && (
+        <p className="text-staff-ink2">
+          <span className="font-medium text-staff-ink">Established equivalency:</span> {k.established.bu_course || k.established.outcome}
+          {k.established.approved_on && <span className="text-staff-muted"> · since {formatDate(k.established.approved_on)}</span>}
+          {k.established.from_decisions > 0 && <span className="text-staff-muted"> · from {k.established.from_decisions} decisions</span>}
+        </p>
+      )}
+      {p.total === 0 ? (
+        <p className="text-staff-muted">{src?.course_code} has not been evaluated before.</p>
+      ) : (
+        <div>
+          <p className="text-staff-muted mb-2">{src?.course_code} at {src?.institution}: {p.total} earlier decision{p.total === 1 ? '' : 's'}</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {p.outcomes.map(o => (
+              <span key={o.award} className={`rounded-lg border px-3 py-1.5 ${o.grants_bu_course ? 'border-emerald-200 bg-emerald-50/60' : 'border-staff-line bg-staff-sunk'}`}>
+                <span className="font-mono font-semibold text-staff-ink">{o.award}</span>
+                <span className="text-staff-muted"> · {o.count}×</span>
+              </span>
+            ))}
+          </div>
+          <ul className="divide-y divide-staff-line2 border-y border-staff-line2">
+            {p.decisions.map(d => (
+              <li key={d.decision_id} className="py-2.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
+                <span className="text-staff-muted tabular-nums">{formatDate(d.decided_on)}</span>
+                <span>
+                  <span className="text-staff-ink">{d.decision}{d.bu_awarded && d.bu_awarded !== '—' ? `: ${d.bu_awarded}` : ''}</span>
+                  <span className="text-staff-muted"> · {d.source === 'evaluator' ? d.evaluator || 'Evaluator' : 'Reference record'}</span>
+                  {d.reason && <span className="block text-[13px] text-staff-ink2">{d.reason}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {k.similar?.length > 0 && (
+        <div>
+          <p className="text-staff-muted mb-2">Other courses evaluated as {target}</p>
+          <ul className="space-y-1">
+            {k.similar.map((s, i) => (
+              <li key={i} className="flex flex-wrap gap-x-2">
+                <span className="font-mono text-staff-ink">{s.course_code}</span>
+                <span className="text-staff-muted">{s.institution}</span>
+                <span className="text-staff-ink2">→ {s.bu_awarded}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CONFLICT_TITLES = {
+  different_bu_course: 'Different BU courses awarded',
+  different_outcome: 'Different outcomes',
+  match_divergence: 'Very different course-match scores'
+}
+
+function Conflicts({ k, canEscalate, onEscalate }) {
+  return (
+    <div className="space-y-4 text-[14px]">
+      <ul className="space-y-3">
+        {k.conflicts.map(c => (
+          <li key={c.type} className="flex gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <span><span className="font-medium text-staff-ink">{CONFLICT_TITLES[c.type] || c.type}</span><span className="block text-staff-ink2">{c.summary}</span></span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[13px] text-staff-muted">The decisions behind this are listed under Previous decisions. You remain the decision-maker for this course; an administrator can record a standard equivalency for future transcripts.</p>
+      {k.escalations?.length > 0 && (
+        <p className="text-[13px] text-staff-ink2">Already sent to administrators by {k.escalations[0].actor} on {formatDate(k.escalations[0].created_at)}.</p>
+      )}
+      {canEscalate && (
+        <Button size="sm" variant="secondary" onClick={onEscalate}><Flag className="w-3.5 h-3.5" />Ask an administrator to review</Button>
       )}
     </div>
   )

@@ -7,6 +7,7 @@ import {
   Settings,
   ScrollText,
   BarChart3,
+  GitCompare,
   Library,
   ClipboardCheck,
   UserCircle,
@@ -39,6 +40,7 @@ const adminSections = [
       { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
       { to: '/admin/users', label: 'Evaluators', icon: Users },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
+      { to: '/admin/conflicts', label: 'Equivalency Conflicts', icon: GitCompare },
       { to: '/admin/reports', label: 'Reports', icon: BarChart3 }
     ]
   },

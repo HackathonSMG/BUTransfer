@@ -22,3 +22,6 @@ export const requestReviewInfo = (id, message) =>
 // Short-lived link to an uploaded document (the transcript PDF)
 export const getDocumentLink = (documentId) =>
   client.get(`/documents/${documentId}`).then(r => r.data)
+
+export const escalateReview = (id, note) =>
+  client.post(`/my/reviews/${id}/escalate`, { note }).then(r => r.data)

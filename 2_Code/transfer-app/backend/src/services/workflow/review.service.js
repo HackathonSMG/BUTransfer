@@ -7,6 +7,7 @@ import { sendNotification } from '../notification.service.js';
 import { createInfoRequest } from '../application.service.js';
 import { recordCourseDecision, recommendationOf } from '../credit/memory.service.js';
 import { badRequest, notFound } from '../../utils/errors.js';
+import { courseKnowledge, matchLabel } from './knowledge.service.js';
 
 const OPEN = ['new', 'in_progress', 'info_requested'];
 
@@ -75,6 +76,11 @@ export async function getReview(reviewId, userId) {
       : { rows: [] },
   ]);
 
+  const sourceCourse = course.rows[0] || null;
+  const knowledge = sourceCourse
+    ? await courseKnowledge({ institution: sourceCourse.institution, courseCode: sourceCourse.course_code, targetBuCourse: r.target_bu_course })
+    : null;
+
   const precedents = ev?.precedent_ids?.length
     ? (await query(`SELECT decision_id, decision, bu_awarded, reason, TO_CHAR(decided_on, 'YYYY-MM-DD') AS decided_on FROM past_decisions
                     WHERE decision_id = ANY($1) AND status = 'active' ORDER BY decided_on DESC NULLS LAST`, [ev.precedent_ids])).rows
@@ -82,7 +88,7 @@ export async function getReview(reviewId, userId) {
 
   return {
     review: {
-      id: r.id, status: r.status, priority: r.priority, match_score: r.match_score, match_basis: r.match_basis,
+      id: r.id, status: r.status, priority: r.priority, match_score: r.match_score, match_label: matchLabel(r.match_score), match_basis: r.match_basis,
       sponsor_match_level: r.sponsor_match_level, target_bu_course: r.target_bu_course, assigned_at: r.assigned_at,
       started_at: r.started_at, completed_at: r.completed_at, assignment_reason: r.assignment_reason,
     },
@@ -90,7 +96,7 @@ export async function getReview(reviewId, userId) {
       id: r.application_id, reference_number: r.reference_number, student_name: r.student_name,
       transfer_from_institution: r.transfer_from_institution, transfer_to_program: r.transfer_to_program,
     },
-    source_course: course.rows[0] || null,
+    source_course: sourceCourse,
     target_course: target.rows[0] || null,
     proposed: proposedOutcome(r, ev),
     evidence: {
@@ -101,7 +107,11 @@ export async function getReview(reviewId, userId) {
       sponsor_matches: sponsor.rows,
       equivalency: equivalency.rows[0] || null,
       precedents,
+      // The external review step's notes, when it ran for this course (stored on course_evaluations)
+      review_notes: ev?.agent_rationale || null,
+      missing_information: ev?.agent_missing || null,
     },
+    knowledge,
     decision: decision.rows[0] || null,
     info_request: infoRequest.rows[0] || null,
     transcript: { courses: transcript.rows, documents: documents.rows },
@@ -229,4 +239,23 @@ async function handOffIfDone(applicationId, user) {
   return { request_number: tr.request_number, courses: batch.length };
 }
 
-export default { getReview, startReview, decideReview, requestInformation };
+/** Flags a course for administrator attention (e.g. a conflict with earlier decisions); notifies every active admin. */
+export async function escalate(reviewId, { note }, user) {
+  const r = await ownReview(reviewId, user.id);
+  const { rows: [tc] } = await query(`SELECT institution, course_code FROM transcript_courses WHERE id = $1`, [r.transcript_course_id]);
+  const text = String(note || '').trim() || 'Earlier decisions for this course disagree.';
+  await auditLog({ applicationId: r.application_id, action: 'conflict_escalated', actorId: user.id, actorEmail: user.email,
+    details: { review_id: reviewId, institution: tc.institution, course_code: tc.course_code, note: text } });
+  const { rows: admins } = await query(`SELECT id FROM profiles WHERE role = 'admin' AND is_active`);
+  for (const a of admins) {
+    await sendNotification({
+      recipientId: a.id, applicationId: r.application_id, type: 'conflict_escalated',
+      title: `Equivalency review requested: ${tc.institution} ${tc.course_code}`,
+      message: `${user.full_name}: ${text}`,
+      data: { reference_number: r.reference_number, institution: tc.institution, course_code: tc.course_code },
+    });
+  }
+  return { escalated: true, notified: admins.length };
+}
+
+export default { getReview, startReview, decideReview, requestInformation, escalate };
