@@ -8,6 +8,7 @@ import { log as auditLog } from '../services/audit.service.js';
 import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, assignApplication } from '../services/workflow/assignment.service.js';
 import { POLICY } from '../services/credit/policy.js';
+import { ownershipView, unassignedReason } from '../services/workflow/ownership.service.js';
 
 // The Credit Evaluation Office (Problem 1, steps 3, 4 and 7): monitors every application, places courses that
 // have no subject specialist, resolves duplicates and deadline exceptions, and posts decided transfer credit.
@@ -45,11 +46,16 @@ router.get('/overview', async (_req, res, next) => {
              WHERE a.status <> 'closed'
              GROUP BY a.id HAVING COUNT(cd.id) FILTER (WHERE cp.id IS NULL) > 0
              ORDER BY (a.status = 'ready_for_posting') DESC, a.submitted_at ASC NULLS LAST LIMIT 20`),
+      // Courses without an evaluator, and courses held by an evaluator who is now inactive or unavailable
       query(`SELECT r.id, r.status, r.target_bu_course, r.assignment_reason, r.assigned_at, a.id AS application_id, a.reference_number, a.student_name,
-                    tc.institution, tc.course_code, tc.title
+                    tc.institution, tc.course_code, tc.title, p.full_name AS evaluator_name,
+                    (r.evaluator_id IS NOT NULL) AS needs_reassignment
              FROM course_reviews r JOIN applications a ON a.id = r.application_id JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-             WHERE r.queue = 'credit_office' AND r.status IN ('new', 'in_progress', 'info_requested')
-             ORDER BY r.assigned_at ASC NULLS LAST LIMIT 20`),
+             LEFT JOIN evaluators e ON e.id = r.evaluator_id LEFT JOIN profiles p ON p.id = r.evaluator_id
+             WHERE r.status IN ('new', 'in_progress', 'info_requested', 'queued')
+               AND ((r.queue = 'credit_office' AND r.evaluator_id IS NULL)
+                    OR (r.evaluator_id IS NOT NULL AND (e.is_active = false OR (e.availability = 'unavailable' AND (e.unavailable_until IS NULL OR e.unavailable_until >= CURRENT_DATE)))))
+             ORDER BY r.assigned_at ASC NULLS LAST LIMIT 50`),
       query(`SELECT COUNT(*) FILTER (WHERE ir.status = 'pending')::int AS pending,
                     COUNT(*) FILTER (WHERE ir.status = 'responded')::int AS received
              FROM information_requests ir WHERE ir.kind = 'syllabus'`),
@@ -83,7 +89,7 @@ router.get('/overview', async (_req, res, next) => {
           office_queue: officeQueue.rows.length, duplicates: duplicates.rows.length, deadline_issues: deadlines.length, escalations: escalations.rows.length },
         escalations: escalations.rows,
         ready_to_post: toPost.rows,
-        office_queue: officeQueue.rows,
+        office_queue: officeQueue.rows.map((r) => ({ ...r, reason_category: unassignedReason(r.assignment_reason, { unavailable: r.needs_reassignment }) })),
         duplicates: duplicates.rows,
         deadlines: deadlines.map((a) => ({ id: a.id, reference_number: a.reference_number, student_name: a.student_name, start_term: a.expected_start_term,
           status: a.deadline.status, deadline: a.deadline.deadline, days_left: a.deadline.days_left, exception: a.deadline_exception })),
@@ -146,6 +152,7 @@ router.get('/applications/:id', async (req, res, next) => {
         information_requests: requests.rows,
         history: history.rows,
         applicant_updates: applicantUpdates.rows,
+        ownership: await ownershipView(app.id),
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });

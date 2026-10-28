@@ -495,3 +495,48 @@ Migration `011_applicant_experience.sql` adds:
 - additional information required;
 - mixed outcomes;
 - completed.
+
+## 12. Fourth round: review ownership and Application Lookup
+
+**Goal:** staff can see where an application is pending and who owns each course, without opening the database.
+
+### Ownership model (no new tables)
+- **Current owner of a course:** its `course_reviews` row:
+  - `evaluator_id`, `status`, `assigned_at`;
+  - `assignment_reason` and `assignment_context`;
+  - `queue`, where `credit_office` with no evaluator means unassigned.
+- **Assignment history:** `review_assignments` already keeps every assignment. The open row is the current one; reassignments close the old row and add a new one.
+- **Derived view:** `workflow/ownership.service.js` works out, per application:
+  - the operational **stage**: Processing, Unassigned, Reassignment Required, Pending Evaluator Review, In Review, Waiting for Applicant, Credit Office Review, Completed, Closed, Needs Attention;
+  - the current owner(s) and the courses blocking completion;
+  - every course with its evaluator and department;
+  - the assignment history (Assigned, Reassigned, Routed to / Returned to Credit Evaluation Office, Review completed).
+- **Reassignment Required:** an open review whose evaluator is inactive or marked unavailable.
+
+### API (existing endpoints extended)
+- `GET /api/applications`:
+  - each row carries `stage`, `current_owner_name`, `current_owner_department`, `owners_count`, `pending_course`, `pending_since`, `unassigned_reviews`;
+  - new filters: `stage` (including `needs_attention`), `owner_id`, `department`, `min_age_days`; sorting by `pending_since`;
+  - for the Credit Office and admins, `stats.ownership` returns counts by stage, needs-attention and unassigned-review counts, and the filter options.
+  - Evaluators keep the existing scope: only applications with a course assigned to them.
+- `GET /api/applications/:id` and `GET /api/office/applications/:id` now include `ownership`.
+- `GET /api/office/overview`: the unassigned queue also lists courses whose evaluator is unavailable, each with a reason category (No subject specialist, Evaluator unavailable, Returned for another review, Established equivalency needs confirmation, Unknown course, Manual assignment required).
+
+### UI
+- **Credit Office / admin Applications queue:**
+  - stage chips with counts;
+  - Needs attention and Unassigned reviews indicators;
+  - evaluator, department and age filters;
+  - columns: Application, Applicant, Status, Current evaluator (+N more, pending course), Department, Pending since, Age.
+- **Current Review Assignment panel** on the Credit Office application page and the evaluation report page. It shows:
+  - Where is it / Currently with / Blocking completion;
+  - assigned evaluator, department, assigned time, pending duration and assignment context;
+  - a course and evaluator table;
+  - the assignment history.
+- **Application Lookup** (`/evaluator/lookup`, evaluator menu): server-side search by application number, partial applicant name or email. Results show stage, current evaluator, department and pending since, and open the existing details page.
+- **My Evaluations:** each row shows when it was assigned and how long it has been waiting.
+- The Credit Office dashboard's **Unassigned reviews** list shows the reason for each course.
+
+**Age** is operational information, not an SLA; no SLA is defined.
+
+**Applicants see none of this.** The public tracking response has no evaluator names, emails, assignments or history.

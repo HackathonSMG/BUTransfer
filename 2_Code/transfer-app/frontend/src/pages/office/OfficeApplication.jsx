@@ -10,6 +10,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { DECISION_LABELS, formatDate } from '../../lib/reviews'
 import { activityLabel, timeAgo } from '../../lib/staffFormat'
+import ReviewAssignment from '../../components/staff/ReviewAssignment'
 
 // Delivery state of an applicant email (notifications.email_status)
 const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry', sent: 'sent', logged: 'logged (email not configured)', failed: 'failed', suppressed: 'not sent (test address)' }
@@ -97,6 +98,9 @@ export default function OfficeApplication() {
           </Button>
         </div>
       </header>
+
+      {/* Where the application is and who holds each course */}
+      <ReviewAssignment ownership={d.ownership} />
 
       {app.applicant_comments && (
         <section className="staff-card px-6 py-4">

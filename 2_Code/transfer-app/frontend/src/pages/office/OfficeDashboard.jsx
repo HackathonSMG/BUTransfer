@@ -107,7 +107,7 @@ export default function OfficeDashboard() {
 
           <Queue
             icon={Inbox}
-            title="Courses waiting for an evaluator"
+            title="Unassigned reviews"
             empty="Every course has an evaluator."
             rows={d.office_queue}
             action={d.office_queue.length > 0 && <Button size="sm" variant="secondary" onClick={place} loading={placing}>Assign where possible</Button>}
@@ -115,7 +115,10 @@ export default function OfficeDashboard() {
               <Link to={`/office/applications/${r.application_id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-staff-bg">
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] text-staff-ink truncate"><span className="font-mono font-medium">{r.course_code}</span> {r.title}</span>
-                  <span className="block text-[12.5px] text-staff-muted truncate">{r.institution} · {r.reference_number} · {r.assignment_reason}</span>
+                  <span className="block text-[12.5px] text-staff-muted truncate">{r.institution} · {r.reference_number} · {r.student_name}</span>
+                  <span className={`block text-[12.5px] font-medium truncate ${r.needs_reassignment ? 'text-amber-800' : 'text-rose-800'}`} title={r.assignment_reason || ''}>
+                    {r.needs_reassignment ? `Reassignment required: ${r.evaluator_name} is unavailable` : r.reason_category}
+                  </span>
                 </span>
                 <ArrowRight className="w-4 h-4 text-staff-muted" />
               </Link>
