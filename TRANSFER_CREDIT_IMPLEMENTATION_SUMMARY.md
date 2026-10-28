@@ -540,3 +540,43 @@ Migration `011_applicant_experience.sql` adds:
 **Age** is operational information, not an SLA; no SLA is defined.
 
 **Applicants see none of this.** The public tracking response has no evaluator names, emails, assignments or history.
+
+## 13. Fifth round: UX polish, credit summary, email design, test kit
+
+**Applicant**
+- **Transfer Credit Summary** on the tracking page shows Credits Accepted, Credits Awarded and Credits Pending, plus courses evaluated, accepted (equivalent / elective), not accepted and pending.
+  - The figures come from `lifecycle.summarizeCourses`. New fields were added; existing ones are unchanged.
+- **Course results table:** Previous course | Credits | BU equivalent | Result (Equivalent / Elective Credit / Not Accepted / Pending / Action Needed) | BU units. The explanation and any request are shown on expand.
+- **Timeline:** Department Review shows **Not needed** when every course was settled without an evaluator.
+- **Track Application always requires the application number + email:**
+  - nothing is kept between visits;
+  - `/status/<token>` links redirect to the form;
+  - public pages ignore a signed-in staff session, so the staff portal chrome no longer appears there.
+- BU red is the primary colour on the public pages too, for one visual identity.
+
+**Staff**
+- My Evaluations columns: Application | Applicant | Course | Status | Assigned | Waiting.
+- The evaluation report has:
+  - readable audit entries instead of raw JSON;
+  - "Applicant Tracking" (the `/track` link with the number) instead of the private status link;
+  - "Applicant Information".
+- Waiting statuses say "Waiting for applicant" everywhere.
+- The AI-style icon was replaced.
+
+**Email:** the shared applicant template was redesigned:
+- email-safe nested tables with inline styles;
+- a preheader and a BU header;
+- a prominent application number between rules;
+- a status badge;
+- a bulletproof **Track Your Application** button, with a VML fallback for Outlook;
+- a narrow-screen layout and a footer.
+
+There are no external resources, and the event rules are unchanged.
+
+**Fixes made along the way** (documented in `TRANSFER_CREDIT_TEST_SCENARIOS.md`):
+- **Transcript reader:** `A+` rows were dropped, and blank credits were read as 0.
+- **Staff eligibility report:** GPA and credits are no longer collected from applicants, so they are now shown as "to be verified from the transcript" instead of failed criteria. The public eligibility checker is unchanged.
+
+**Test kit:**
+- `5_Test_Cases/transcripts/`: 17 PDFs plus their generator, `run_scenarios.mjs` and `scenario_results.json`.
+- `TRANSFER_CREDIT_TEST_SCENARIOS.md`: the scenario catalog and test matrix. The automated run passes 24/24 checks.

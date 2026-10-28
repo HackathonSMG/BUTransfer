@@ -103,52 +103,46 @@ export default function MyEvaluations() {
           />
         ) : (
           <ul className="divide-y divide-staff-line2">
-            <li className="hidden md:grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_8rem_9rem_1rem] gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
-              <span>Application</span><span>Course mapping</span><span>Match</span><span>Status</span><span />
+            <li className="hidden lg:grid grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1.5fr)_9.5rem_7rem_5.5rem_1rem] gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
+              <span>Application</span><span>Applicant</span><span>Course</span><span>Status</span><span>Assigned</span><span className="text-right">Waiting</span><span />
             </li>
             {state.rows.map(r => {
               const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
+              const open = !['approved', 'rejected'].includes(r.status)
               return (
                 <li key={r.id}>
                   <Link
                     to={`/evaluator/reviews/${r.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_8rem_9rem_1rem] gap-x-4 gap-y-2 items-center px-6 py-4 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1.5fr)_9.5rem_7rem_5.5rem_1rem] gap-x-4 gap-y-1.5 items-center px-6 py-3.5 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg text-[14px]"
                   >
-                    <span className="min-w-0">
-                      <span className="block text-[15px] font-medium text-staff-ink truncate">{r.student_name}</span>
-                      <span className="block text-[12.5px] text-staff-muted font-mono">{r.reference_number}</span>
+                    <span className="font-mono font-medium text-staff-ink">{r.reference_number}</span>
+                    <span className="min-w-0 order-3 lg:order-none col-span-2 lg:col-span-1">
+                      <span className="block text-staff-ink font-medium truncate">{r.student_name}</span>
+                      {r.priority === 'high' && <span className="block text-[11.5px] font-semibold text-red-700">High priority</span>}
                     </span>
-                    <span className="min-w-0 order-3 md:order-none col-span-2 md:col-span-1">
-                      <span className="block text-[14px] text-staff-ink">
+                    <span className="min-w-0 order-4 lg:order-none col-span-2 lg:col-span-1">
+                      <span className="block text-staff-ink">
                         <span className="font-mono">{r.course_code}</span>
                         <span className="text-staff-muted"> → </span>
                         {r.target_bu_course
                           ? <span className="font-mono font-semibold text-primary-800">{r.target_bu_course}</span>
                           : <span className="text-staff-muted italic">to be determined</span>}
                       </span>
-                      <span className="block text-[12.5px] text-staff-muted truncate">{r.institution}</span>
+                      <span className="block text-[12.5px] text-staff-muted truncate">
+                        {r.institution}
+                        {r.match_label && <> · <span className={matchLabelClass(r.match_label)}>{matchDisplay(r).value ? `${matchDisplay(r).value} ` : ''}{r.match_label}</span></>}
+                      </span>
                       {r.returned_reason && r.status === 'new'
                         ? <span className="block text-[12px] text-amber-800 truncate">Returned by the Credit Evaluation Office: {r.returned_reason}</span>
                         : r.assignment_reason && <span className="block text-[12px] text-staff-muted truncate" title={r.assignment_reason}>{r.assignment_reason}</span>}
                     </span>
-                    <span className="hidden md:block">
-                      {r.match_label ? (
-                        <>
-                          {matchDisplay(r).value && <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{matchDisplay(r).value}</span>}
-                          <span className={`block text-[12px] font-medium ${matchLabelClass(r.match_label)}`}>{r.match_label}</span>
-                        </>
-                      ) : <span className="text-[13px] text-staff-muted">Not scored</span>}
+                    <span className="justify-self-end lg:justify-self-start"><StatusPill tone={status.tone}>{status.label}</StatusPill></span>
+                    <span className="hidden lg:block text-[13px] text-staff-ink2" title={r.assigned_at ? formatDateTime(r.assigned_at) : ''}>{r.assigned_at ? formatDateTime(r.assigned_at).split(',').slice(0, 2).join(',') : '—'}</span>
+                    <span className="hidden lg:block text-right tabular-nums text-[13px] text-staff-ink2">{open && r.assigned_at ? pendingFor(r.assigned_at) : '—'}</span>
+                    <span className="lg:hidden order-5 col-span-2 text-[12.5px] text-staff-muted">
+                      {r.assigned_at ? `Assigned ${formatDateTime(r.assigned_at)}${open ? ` · waiting ${pendingFor(r.assigned_at)}` : ''}` : ''}
                     </span>
-                    <span className="flex flex-col items-end md:items-start gap-1">
-                      <StatusPill tone={status.tone}>{status.label}</StatusPill>
-                      {r.priority === 'high' && <span className="text-[11.5px] font-semibold text-red-700">High priority</span>}
-                      {r.assigned_at && (
-                        <span className="text-[11.5px] text-staff-muted whitespace-nowrap" title={`Assigned ${formatDateTime(r.assigned_at)}`}>
-                          Assigned {formatDateTime(r.assigned_at).split(',')[0]}{!['approved', 'rejected'].includes(r.status) && ` · waiting ${pendingFor(r.assigned_at)}`}
-                        </span>
-                      )}
-                    </span>
-                    <ChevronRight className="hidden md:block w-4 h-4 text-staff-muted" />
+                    <ChevronRight className="hidden lg:block w-4 h-4 text-staff-muted" />
                   </Link>
                 </li>
               )

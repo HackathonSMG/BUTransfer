@@ -28,7 +28,7 @@ The public site has two actions and needs no account:
 | Confirmation | `/apply/submitted` | Application number, email, status, Track Application |
 | Track Application | `/track` (optionally `?application=APP-2026-0012`) | Application number + email, then the tracking page |
 | Self-check / eligibility (unchanged) | `/self-check`, `/eligibility` | Previews before applying; nothing is stored |
-| Older private links (unchanged) | `/status/:token` | Links from emails sent before this release keep working |
+| Older private links | `/status/:token` | Redirect to Track Application: the number and email are always required |
 
 The top bar on public pages offers **Start Application**, **Track Application** and **Staff Sign In**. Applicants are never asked to create an account or sign in.
 
@@ -181,7 +181,11 @@ When every course is posted the application becomes **Completed** (`credit_poste
   - each stage is done, in progress or upcoming, with the date it was reached;
   - computed on the server from the application's status, its courses and its status history.
 - **Action required** banner when a syllabus or other information is requested.
-- **Final outcome**, once completed: BU credits awarded, courses accepted and courses not accepted.
+- **Transfer Credit Summary**, from the backend course summary:
+  - **Credits Accepted:** decided and accepted, posted or not.
+  - **Credits Awarded:** posted to the record with grade T.
+  - **Credits Pending:** BU units of courses still being evaluated. A course with missing credits is counted separately, never as 0.
+  - Courses evaluated, accepted (equivalent / elective), not accepted and pending.
 - **Course Evaluation** table, grouped by institution:
   - previous course, evaluation status, transfer result, BU units;
   - expanding a row gives the explanation, or the upload/reply form for a request.
@@ -280,7 +284,9 @@ The audit rows are the persisted **status history** from which the tracking time
   - A wrong number and a wrong email give the same "not found" answer.
   - Drafts cannot be tracked.
   - `/track/APP-…` alone opens nothing; the number in `/track?application=` only pre-fills the form.
-- After verification the API returns the application's random access token. The page keeps it in session storage for that browser tab only, never in the URL.
+- After verification the API returns the application's random access token. The page holds it in memory only, never in storage or the URL.
+- Every visit asks for both details again: a refresh, a later visit, a number in the link, or a signed-in staff session never opens an application.
+- Public pages (landing, apply, track, sign-in) always use the public layout, even when staff are signed in, so the staff portal never mixes into the applicant view.
 - **Existing-application check**:
   - shows masked numbers only;
   - the full numbers are only emailed to the address itself;

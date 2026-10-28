@@ -19,8 +19,8 @@ const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry
 const STATE = {
   posted: { label: 'Posted', tone: 'ok' },
   decided: { label: 'Awaiting final review', tone: 'info' },
-  information_requested: { label: 'Waiting on student', tone: 'warn' },
-  information_received: { label: 'Student answered', tone: 'info' },
+  information_requested: { label: 'Waiting for applicant', tone: 'warn' },
+  information_received: { label: 'Applicant answered', tone: 'info' },
   department_review: { label: 'Department review', tone: 'neutral' },
   waiting_for_review: { label: 'Queued for hand-off', tone: 'neutral' },
   credit_office_review: { label: 'Needs an evaluator', tone: 'warn' },
@@ -155,7 +155,7 @@ export default function OfficeApplication() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Tile label="Courses" value={s.courses} />
         <Tile label="Decided" value={s.decided} />
-        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the student` : null} />
+        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the applicant` : null} />
         <Tile label="Posted" value={s.posted} />
         <Tile label="Credits posted" value={s.credits_posted} detail={s.credits_approved ? `${s.credits_approved} credits decided, not yet posted` : null} />
       </div>

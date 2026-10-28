@@ -46,7 +46,7 @@ export default function MyDashboard() {
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <Metric label="New" value={c.new} detail={c.upcoming ? `${c.upcoming} more coming after other reviews` : 'Assigned, not yet opened'} to="/evaluator/my-evaluations?status=new" accent={c.new > 0} />
-        <Metric label="In progress" value={c.in_progress + c.info_requested} detail={c.info_requested ? `${c.info_requested} waiting on the student` : 'Opened and under review'} to="/evaluator/my-evaluations?status=in_progress" />
+        <Metric label="In progress" value={c.in_progress + c.info_requested} detail={c.info_requested ? `${c.info_requested} waiting on the applicant` : 'Opened and under review'} to="/evaluator/my-evaluations?status=in_progress" />
         <Metric label="Completed" value={c.completed} detail={`${c.completed_this_month} this month`} to="/evaluator/my-evaluations?status=completed" />
         <Metric
           label="Workload"

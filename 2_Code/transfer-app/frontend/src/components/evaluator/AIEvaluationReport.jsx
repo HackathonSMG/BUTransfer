@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
   CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp,
-  RefreshCw, Loader2, FileX, Flag, Brain, AlignLeft
+  RefreshCw, Loader2, FileX, Flag, ClipboardList, AlignLeft
 } from 'lucide-react'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
@@ -84,7 +84,7 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
   if (!evaluation) {
     return (
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-        <Brain className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
         <h4 className="font-semibold text-gray-700 mb-1">Evaluation Not Started</h4>
         <p className="text-sm text-gray-500 mb-4">
           Run the evaluation to check this application against the eligibility criteria and compare its courses.

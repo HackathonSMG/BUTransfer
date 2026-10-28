@@ -6,29 +6,18 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import ApplicationTracker from '../../components/applicant/ApplicationTracker'
 
-// Track Transfer Credit Application: application number + the email it was submitted with. The access token the
-// API returns is kept for this browser tab only (sessionStorage), never put in the URL.
-const SESSION_KEY = 'bu.transfer.tracking'
+// Track Transfer Credit Application: the application number + the email it was submitted with, checked by the
+// API every time. The access token the API returns is held in memory for this page only: a refresh, a later
+// visit, a number in the URL or a signed-in staff session never opens an application without both details.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const readSession = () => { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)) || null } catch { return null } }
 
 export default function TrackApplication() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const requested = (params.get('application') || '').toUpperCase()
-  const stored = readSession()
-  const [session, setSession] = useState(stored && (!requested || stored.reference_number === requested) ? stored : null)
+  const [session, setSession] = useState(null)
 
-  const open = (s) => {
-    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)) } catch { /* private mode */ }
-    setSession(s)
-    setParams({ application: s.reference_number }, { replace: true })
-    window.scrollTo({ top: 0 })
-  }
-  const close = () => {
-    try { sessionStorage.removeItem(SESSION_KEY) } catch { /* private mode */ }
-    setSession(null)
-    setParams({}, { replace: true })
-  }
+  const open = (s) => { setSession(s); window.scrollTo({ top: 0 }) }
+  const close = () => setSession(null)
 
   if (session) {
     return (
@@ -42,7 +31,7 @@ export default function TrackApplication() {
       </div>
     )
   }
-  return <TrackForm initialNumber={requested} onOpen={open} />
+  return <TrackForm initialNumber={requested || session?.reference_number || ''} onOpen={open} />
 }
 
 function TrackForm({ initialNumber, onOpen }) {

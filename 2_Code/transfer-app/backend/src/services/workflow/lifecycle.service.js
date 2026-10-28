@@ -173,20 +173,37 @@ export async function courseStates(applicationId) {
   });
 }
 
-/** Counts over course states, for the student and the staff views. */
+/**
+ * Counts over course states, for the student and the staff views.
+ * credits_posted: BU units posted to the record (awarded). credits_approved: decided, not yet posted.
+ * credits_accepted = both. credits_pending: BU units of courses still being evaluated, as converted from the
+ * transcript (they show 0 units until decided); a course whose credits are missing is counted in
+ * pending_without_credits instead of being treated as 0.
+ */
 export function summarizeCourses(courses) {
-  const s = { courses: courses.length, decided: 0, posted: 0, pending: 0, needs_student_action: 0, credits_posted: 0, credits_approved: 0, credits_pending_source: 0 };
+  const s = {
+    courses: courses.length, decided: 0, posted: 0, pending: 0, needs_student_action: 0, credits_posted: 0, credits_approved: 0, credits_pending_source: 0,
+    courses_accepted: 0, courses_equivalent: 0, courses_elective: 0, courses_not_accepted: 0, credits_accepted: 0, credits_pending: 0, pending_without_credits: 0,
+  };
   for (const c of courses) {
     if (c.state === 'withdrawn') continue;
-    if (c.state === 'posted') { s.posted += 1; s.decided += 1; s.credits_posted += c.units; }
-    else if (c.state === 'decided') { s.decided += 1; s.credits_approved += c.units; }
-    else {
+    if (c.state === 'posted' || c.state === 'decided') {
+      s.decided += 1;
+      if (c.state === 'posted') { s.posted += 1; s.credits_posted += c.units; } else s.credits_approved += c.units;
+      if (c.outcome === 'transfer') { s.courses_accepted += 1; s.courses_equivalent += 1; }
+      else if (c.outcome === 'elective') { s.courses_accepted += 1; s.courses_elective += 1; }
+      else s.courses_not_accepted += 1;
+    } else {
       s.pending += 1;
       if (c.state === 'information_requested') s.needs_student_action += 1;
+      if (c.bu_credits == null) s.pending_without_credits += 1; else s.credits_pending += c.bu_credits;
     }
   }
   s.credits_posted = round2(s.credits_posted);
   s.credits_approved = round2(s.credits_approved);
+  s.credits_accepted = round2(s.credits_posted + s.credits_approved);
+  s.credits_pending = round2(s.credits_pending);
+  s.credits_pending_source = s.credits_pending;
   return s;
 }
 
