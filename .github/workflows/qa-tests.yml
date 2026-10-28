@@ -1,7 +1,9 @@
 # MOVE THIS FILE TO: .github/workflows/qa-tests.yml  (next to master_transcripts.yml)
 #
-# QA on every build: after each successful deploy of 2_Code/transfer-app, run the Playwright tests against the
-# deployed site, have the Foundry agent "bu-transfer-qa-analyst" write the report, and show it on the run's Summary page.
+# QA on every build: after each successful deploy of 2_Code/transfer-app,
+#  1. the Foundry agent "bu-transfer-test-writer" writes extra tests for what changed (read-only, not committed),
+#  2. the full Playwright suite + those AI tests run against the deployed site,
+#  3. the Foundry agent "bu-transfer-qa-analyst" writes the report shown on the run's Summary page.
 # The deployed site is the PRODUCTION slot, so only read-only tests run (ALLOW_SUBMIT=false).
 
 name: QA tests and report
@@ -44,6 +46,7 @@ jobs:
       EVALUATOR_PASSWORD: ${{ secrets.QA_EVALUATOR_PASSWORD }}
       FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
       FOUNDRY_QA_AGENT_NAME: ${{ vars.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst' }}
+      FOUNDRY_TEST_AGENT_NAME: ${{ vars.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer' }}
       HAS_AZURE: ${{ secrets.AZURE_CLIENT_ID != '' }}
 
     steps:
@@ -78,17 +81,21 @@ jobs:
           done
           echo "Site did not respond"; exit 1
 
-      - name: Run Playwright tests
-        continue-on-error: true   # the report is written even when tests fail
-        run: npx playwright test
-
-      - name: Azure login (for the Foundry agent)
+      - name: Azure login (for the Foundry agents)
         if: ${{ env.HAS_AZURE == 'true' }}
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Write tests for this build with the Foundry agent
+        if: ${{ env.HAS_AZURE == 'true' }}
+        run: node foundry/generate-tests.mjs
+
+      - name: Run Playwright tests (existing suite + AI-written tests)
+        continue-on-error: true   # the report is written even when tests fail
+        run: npx playwright test
 
       - name: Write QA report with the Foundry agent
         if: ${{ always() }}
@@ -103,6 +110,9 @@ jobs:
             2_Code/transfer-app/qa/playwright-report
             2_Code/transfer-app/qa/qa-report.md
             2_Code/transfer-app/qa/test-results/junit.xml
+            2_Code/transfer-app/qa/tests/generated/ai-tests.spec.js
+            2_Code/transfer-app/qa/tests/generated/ai-status.json
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Fail on new regressions
