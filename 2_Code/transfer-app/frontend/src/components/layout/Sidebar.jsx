@@ -28,7 +28,7 @@ const evaluatorSections = [
     links: [
       { to: '/evaluator', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: isReviewDetail },
-      { to: '/evaluator/lookup', label: 'Application Lookup', icon: FileSearch, alsoActive: isApplicationDetail },
+      { to: '/evaluator/lookup', label: 'Evaluation Lookup', icon: FileSearch, alsoActive: isApplicationDetail },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/evaluator/profile', label: 'My Profile', icon: UserCircle }
     ]
@@ -40,7 +40,7 @@ const officeSections = [
   {
     links: [
       { to: '/office', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
+      { to: '/admin/applications', label: 'Credit Evaluations', icon: FileText, alsoActive: isApplicationDetail },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/admin/conflicts', label: 'Equivalency Conflicts', icon: GitCompare }
     ]
@@ -52,7 +52,7 @@ const adminSections = [
     links: [
       { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/office', label: 'Credit Office', icon: Stamp, end: true },
-      { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
+      { to: '/admin/applications', label: 'Credit Evaluations', icon: FileText, alsoActive: isApplicationDetail },
       { to: '/admin/users', label: 'Evaluators', icon: Users },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/admin/conflicts', label: 'Equivalency Conflicts', icon: GitCompare },

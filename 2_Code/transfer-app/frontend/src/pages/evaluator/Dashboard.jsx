@@ -88,12 +88,12 @@ export default function ApplicationsList() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Applications"
-        subtitle={stats ? `${stats.total} transfer applications received` : ' '}
+        title="Credit Evaluations"
+        subtitle={stats ? `${stats.total} transfer credit evaluations received` : ' '}
         actions={
           <Button onClick={() => navigate('/evaluator/applications/new')}>
             <FilePlus className="w-4 h-4" />
-            New Application
+            New Evaluation
           </Button>
         }
       />
@@ -115,7 +115,7 @@ export default function ApplicationsList() {
       )}
 
       {/* Stage chips */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by where the application is">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by where the evaluation is">
         <Chip active={!filters.stage && !filters.status} onClick={() => setStage('')} label="All" count={stats?.total} />
         {own?.needs_attention > 0 && <Chip active={filters.stage === 'needs_attention'} onClick={() => setStage(filters.stage === 'needs_attention' ? '' : 'needs_attention')} label="Needs attention" count={own.needs_attention} />}
         {STAGE_CHIPS.filter(([s]) => byStage[s] || filters.stage === s).map(([s, label]) => (
@@ -160,12 +160,12 @@ export default function ApplicationsList() {
         {state.loading ? (
           <div className="flex items-center justify-center py-16"><Spinner size="lg" className="text-primary-600" /></div>
         ) : state.error ? (
-          <EmptyState icon={ClipboardList} title="Applications could not be loaded" description={state.error} action={load} actionLabel="Try Again" />
+          <EmptyState icon={ClipboardList} title="Evaluations could not be loaded" description={state.error} action={load} actionLabel="Try Again" />
         ) : apps.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title="No applications found"
-            description="No applications match your current filters."
+            title="No evaluations found"
+            description="No evaluations match your current filters."
             action={() => setFilters(f => ({ ...DEFAULT_FILTERS, limit: f.limit }))}
             actionLabel="Clear Filters"
           />

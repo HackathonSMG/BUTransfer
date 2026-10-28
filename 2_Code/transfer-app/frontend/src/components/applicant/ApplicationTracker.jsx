@@ -240,7 +240,7 @@ export default function ApplicationTracker({ token, headerAction = null }) {
       const res = await getApplicationStatus(token)
       setState({ loading: false, data: res.data || res, error: null })
     } catch (err) {
-      setState(s => ({ loading: false, data: s.data, error: s.data ? null : errMessage(err, 'We could not open this application.') }))
+      setState(s => ({ loading: false, data: s.data, error: s.data ? null : errMessage(err, 'We could not open this transfer credit evaluation.') }))
     }
     getStudentNotifications(token).then(d => setNotifications(d.data || [])).catch(() => {})
   }, [token])
@@ -272,13 +272,13 @@ export default function ApplicationTracker({ token, headerAction = null }) {
   }
 
   if (state.loading) {
-    return <div className="py-24 text-center"><Spinner size="lg" className="text-brand mx-auto" /><p className="text-sm text-gray-500 mt-3">Loading your application…</p></div>
+    return <div className="py-24 text-center"><Spinner size="lg" className="text-brand mx-auto" /><p className="text-sm text-gray-500 mt-3">Loading your transfer credit status…</p></div>
   }
   if (state.error) {
     return (
       <div className="max-w-md mx-auto py-20 px-4 text-center">
         <span className="w-14 h-14 rounded-full bg-red-50 grid place-items-center mx-auto"><AlertCircle className="w-7 h-7 text-red-600" /></span>
-        <h1 className="text-xl font-semibold text-gray-900 mt-4">Application not available</h1>
+        <h1 className="text-xl font-semibold text-gray-900 mt-4">Transfer credit status not available</h1>
         <p className="text-gray-500 mt-2">{state.error}</p>
       </div>
     )
@@ -303,10 +303,10 @@ export default function ApplicationTracker({ token, headerAction = null }) {
       <section className="bg-white rounded-2xl border border-gray-200 px-5 sm:px-6 py-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Transfer Credit Application</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Transfer Credit ID</p>
             <div className="flex items-center gap-1.5 mt-1">
               <h1 className="font-mono text-2xl font-bold text-gray-900">{app.reference_number}</h1>
-              <button type="button" onClick={copy} className="p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100" aria-label="Copy application number">
+              <button type="button" onClick={copy} className="p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100" aria-label="Copy Transfer Credit ID">
                 {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
@@ -325,7 +325,7 @@ export default function ApplicationTracker({ token, headerAction = null }) {
 
       {/* Progress */}
       {app.progress?.stages && (
-        <Card title="Application Progress">
+        <Card title="Transfer Credit Progress">
           <Progress stages={app.progress.stages} />
         </Card>
       )}
@@ -400,10 +400,10 @@ export default function ApplicationTracker({ token, headerAction = null }) {
 
       <div className="grid lg:grid-cols-2 gap-5">
         {/* Application information */}
-        <Card title="Application Information">
+        <Card title="Credit Transfer Details">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">
             {[
-              ['Application number', <span className="font-mono">{app.reference_number}</span>],
+              ['Transfer Credit ID', <span className="font-mono">{app.reference_number}</span>],
               ['Submitted', fmt(app.submitted_at || app.created_at)],
               ['Student', app.student_name],
               ['Email', app.student_email],

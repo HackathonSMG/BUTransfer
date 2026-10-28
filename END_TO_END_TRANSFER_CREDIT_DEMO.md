@@ -352,13 +352,13 @@ Files: `4_Sample_Transcripts/Transcript_STU-001_*.pdf` (two files) and `5_Demo_D
 
 **Applicant**
 1. Open `/`. Click **Submit Transcripts for Evaluation**. The form opens with no sign-in.
-2. Step 1: enter your name, **a real email address you can read**, Riverside Community College, **Computer Science**, **Fall 2027**. Click **Continue**.
+2. Step 1: drop both STU-001 transcripts. Each is read as you add it: Riverside (5 courses) and Pacific Coast (1 quarter course). Click **Review details**.
    - If that email already has an application, the existing-application panel appears (Scenario B). Choose **Submit Another Application** to continue.
-3. Step 2: drop both STU-001 transcripts on **Academic Transcript**. Watch the progress bars, then **Uploaded**.
+3. Step 2: name, student ID, BU program and start term show as **Detected from transcript**. Enter **a real email address you can read**.
 4. Optionally add the CSC 220 syllabus under **Supporting Documents**. Remove it with ✕ to show removal.
 5. Step 3: add a comment, e.g. "CSC 220 was renamed in 2025."
-6. Step 4: review, tick the confirmation, click **Submit Application**.
-7. The confirmation page shows the **application number**, your email, status **Submitted · Processing** and "We've sent a confirmation email".
+6. Tick the confirmation (the button is disabled until you do), then click **Submit for Credit Evaluation**.
+7. The confirmation page shows the **Transfer Credit ID** (`TC-YYYY-NNNN`), your email, status **Submitted · Processing** and "We've sent a confirmation email".
 8. Open your inbox: **Transfer Credit Application Received — APP-…** with a **Track Application** button.
 9. Click **Track Application**. Enter the application number and email.
 10. The tracking page shows **Processing**, then **Department Review**: three courses evaluated by established equivalency, three pending at 0 BU units. You receive **Course Evaluation Update**.

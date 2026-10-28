@@ -39,6 +39,23 @@ export function invalidateEngine() {
 }
 
 /**
+ * Reads a transcript PDF without storing anything, the same way an upload does, so the student can confirm
+ * what was found before submitting: institution, calendar, courses and the header (name, student ID, BU major,
+ * BU start term). Catalog titles replace truncated ones, as on import.
+ */
+export async function readTranscript(buffer) {
+  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
+  const parsed = await parseTranscript(buffer, aiClient);
+  let courses = parsed.courses;
+  if (parsed.institution && courses.length) {
+    const titles = await query(`SELECT UPPER(course_code) AS code, title FROM catalog_courses WHERE institution = $1`, [parsed.institution]);
+    const titleOf = new Map(titles.rows.map((r) => [r.code, r.title]));
+    courses = courses.map((c) => ({ ...c, title: titleOf.get(c.course_code.toUpperCase()) || c.title }));
+  }
+  return { institution: parsed.institution, credit_system: parsed.credit_system, courses, student: parsed.student || {} };
+}
+
+/**
  * Reads the course rows from an uploaded transcript PDF into transcript_courses.
  * Courses are appended after any already on the application, keeping transcript order.
  */

@@ -16,7 +16,7 @@ export default function StudentPortal() {
       const res = await getMyApplications()
       setState({ loading: false, rows: res.data, error: null })
     } catch (err) {
-      setState({ loading: false, rows: [], error: err.response?.data?.message || 'Your applications could not be loaded.' })
+      setState({ loading: false, rows: [], error: err.response?.data?.message || 'Your transfer credit evaluations could not be loaded.' })
     }
   }, [])
   useEffect(() => { load() }, [load])
@@ -39,7 +39,7 @@ export default function StudentPortal() {
         </div>
       </div>
 
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">My Applications</h2>
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">My Transfer Credit Evaluations</h2>
       {state.loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" className="text-primary-600" /></div>
       ) : state.error ? (
@@ -47,7 +47,7 @@ export default function StudentPortal() {
       ) : state.rows.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
           <FileText className="w-8 h-8 text-gray-300 mx-auto" />
-          <p className="font-medium text-gray-900 mt-3">No applications yet</p>
+          <p className="font-medium text-gray-900 mt-3">No evaluations yet</p>
           <p className="text-sm text-gray-500 mt-1">Start your transfer credit evaluation and upload your transcript.</p>
         </div>
       ) : (

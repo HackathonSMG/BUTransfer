@@ -51,10 +51,10 @@ export default function OfficeDashboard() {
     try {
       const res = await processExistingApplications()
       const r = res.data
-      toast.success(`${r.applications} applications checked: ${r.established_applied} courses settled by established equivalencies, ${r.reviews_created} assigned, ${r.duplicates_flagged} possible duplicates`)
+      toast.success(`${r.applications} evaluations checked: ${r.established_applied} courses settled by established equivalencies, ${r.reviews_created} assigned, ${r.duplicates_flagged} possible duplicates`)
       load()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Existing applications could not be processed')
+      toast.error(err.response?.data?.message || 'Existing evaluations could not be processed')
     } finally {
       setProcessing(false)
     }
@@ -72,18 +72,18 @@ export default function OfficeDashboard() {
       <PageHeader
         eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         title="Credit Evaluation Office"
-        subtitle="Process each application's courses, place the ones without a specialist, and post decided transfer credit."
+        subtitle="Process each evaluation's courses, place the ones without a specialist, and post decided transfer credit."
         actions={<>
-          <Button size="sm" variant="secondary" onClick={processExisting} loading={processing} title="Apply established equivalencies, duplicate checks and assignment to applications evaluated earlier">Process existing applications</Button>
+          <Button size="sm" variant="secondary" onClick={processExisting} loading={processing} title="Apply established equivalencies, duplicate checks and assignment to evaluations processed earlier">Process existing evaluations</Button>
           <Link to="/admin/applications" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800">All applications<ArrowRight className="w-4 h-4" /></Link>
         </>}
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Awaiting final review" value={c.ready_for_posting} detail={`fully decided · ${c.applications_with_unposted} applications have decided courses`} accent={c.ready_for_posting > 0} />
+        <Metric label="Awaiting final review" value={c.ready_for_posting} detail={`fully decided · ${c.applications_with_unposted} evaluations have decided courses`} accent={c.ready_for_posting > 0} />
         <Metric label="With departments" value={c.in_department_review} detail={`${c.queued_reviews} queued for a hand-off`} />
         <Metric label="Settled without department work" value={c.established_applied + c.policy_applied} detail={`${c.established_applied} established equivalencies · ${c.policy_applied} policy outcomes`} />
-        <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} applications complete`} />
+        <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} evaluations complete`} />
       </div>
 
       <ImpactPanel impact={d.impact} />

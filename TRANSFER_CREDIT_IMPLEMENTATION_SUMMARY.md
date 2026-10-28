@@ -625,3 +625,43 @@ This round followed the read-only review of Problem 1. Only misaligned parts wer
 **Student transparency**
 - The tracking summary adds Matched Automatically, With Department Review and Waiting for Your Syllabus.
 - A plain next-step line says what, if anything, the student needs to do.
+
+## 15. Seventh round: transcript-first submission and Transfer Credit ID
+
+**Terminology.** The system is transfer credit evaluation, not an application or admission. Student-facing wording:
+
+| Before | Now |
+|---|---|
+| Application number | Transfer Credit ID |
+| Submit Application | Submit for Credit Evaluation |
+| Application Submitted | Credit Evaluation Submitted |
+| Track Application | Track Transfer Credit / Transfer Credit Status |
+| Application Information | Credit Transfer Details |
+
+Staff now see "Credit Evaluations" and "Evaluation Lookup", and emails use the same terms. Internal tables, fields and routes (`applications`, `reference_number`, `/apply`, `/track`) are unchanged.
+
+**Transfer Credit ID:**
+- Format `TC-YYYY-NNNN`, generated when a submission is created.
+- Earlier `APP-…` IDs remain valid for tracking.
+- Email links use `/track?id=…`; `?application=` from older emails still works.
+
+**Submission flow (`/apply`)**
+1. **Upload transcripts** (one per college). Each is read immediately by the existing parser through `POST /api/student/transcripts/read`, which stores nothing. The parser's structured layout now also reads the header block: student name, student ID, BU major and BU start term.
+2. **Review & confirm:**
+   - Detected values are shown as "Detected from transcript".
+   - Only missing or conflicting values are asked for.
+   - The email is always entered by hand, because transcripts don't carry it.
+   - Supporting documents and comments are optional.
+   - The submit button stays disabled until at least one transcript is read, the required details are complete and the confirmation box is ticked.
+3. **Submit:** the existing draft → upload → submit APIs create **one** evaluation for all transcripts.
+
+**Field decisions:**
+
+| Field | Decision |
+|---|---|
+| Name | From the transcript; asked for only if not detected or if transcripts disagree |
+| Student ID | From the transcript; optional; kept in `academic_history` |
+| Previous institution | Always from the transcripts |
+| BU program | Needed (R8, evaluator order, reporting); from the transcript, else selected |
+| BU start term | Needed (one-year deadline); from the transcript, else selected |
+| Email | Entered by hand |

@@ -36,7 +36,7 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
           <span className="font-semibold text-blue-900">Evaluation In Progress</span>
         </div>
         <p className="text-sm text-blue-700">
-          This application is being evaluated. This typically takes 30–60 seconds.
+          These transcripts are being evaluated. This typically takes 30–60 seconds.
         </p>
       </div>
     )

@@ -24,20 +24,20 @@ export default function ApplicationSubmitted() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 sm:px-10 pt-10 pb-8 text-center">
             <span className="w-14 h-14 rounded-full bg-green-50 grid place-items-center mx-auto"><CheckCircle2 className="w-8 h-8 text-green-600" /></span>
-            <h1 className="font-display text-[28px] sm:text-3xl font-semibold text-gray-900 mt-4">Application Submitted</h1>
+            <h1 className="font-display text-[28px] sm:text-3xl font-semibold text-gray-900 mt-4">Credit Evaluation Submitted</h1>
             <p className="text-gray-600 mt-2">
-              {state.applicant ? `Thank you, ${state.applicant}. ` : ''}Your transcripts have been submitted for transfer credit evaluation.
+              {state.student ? `Thank you, ${state.student}. ` : ''}Your transcripts have been submitted for transfer credit evaluation.
             </p>
 
             <div className="mt-7 rounded-xl border border-gray-200 bg-gray-50 px-5 py-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Application Number</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Transfer Credit ID</p>
               <div className="mt-1.5 flex items-center justify-center gap-2">
                 <span className="font-mono text-[28px] sm:text-[32px] font-bold tracking-wide text-gray-900">{state.reference_number}</span>
-                <button type="button" onClick={copy} className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white" aria-label="Copy application number">
+                <button type="button" onClick={copy} className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white" aria-label="Copy Transfer Credit ID">
                   {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Keep this number. You need it with your email address to track your application.</p>
+              <p className="text-xs text-gray-500 mt-1">Keep this ID. You need it with your email address to check your transfer credit status.</p>
             </div>
 
             <dl className="mt-5 grid sm:grid-cols-2 gap-3 text-left">
@@ -56,9 +56,9 @@ export default function ApplicationSubmitted() {
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link to={`/track?application=${encodeURIComponent(state.reference_number)}`}
+              <Link to={`/track?id=${encodeURIComponent(state.reference_number)}`}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-brand text-white font-semibold hover:bg-brand-dark">
-                Track Application<ArrowRight className="w-4 h-4" />
+                Track Transfer Credit<ArrowRight className="w-4 h-4" />
               </Link>
               <Link to="/" className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">Return to Home</Link>
             </div>
@@ -74,7 +74,7 @@ export default function ApplicationSubmitted() {
                 </li>
               ))}
             </ol>
-            <p className="text-xs text-gray-500 mt-5">Processing continues even if you close this page. We will email you when your application reaches an important stage.</p>
+            <p className="text-xs text-gray-500 mt-5">Processing continues even if you close this page. We will email you when your evaluation reaches an important stage.</p>
           </div>
         </div>
       </div>

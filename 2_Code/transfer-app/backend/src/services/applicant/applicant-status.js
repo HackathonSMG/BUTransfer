@@ -5,8 +5,8 @@
 // Internal status -> applicant wording. validation_failed is an internal problem the Credit Evaluation Office
 // resolves, so the applicant just sees the application as under review.
 const PRESENTATION = {
-  draft: { label: 'Not Submitted', tone: 'waiting', description: 'This application has not been submitted yet.' },
-  submitted: { label: 'Submitted', tone: 'progress', description: 'Your application has been received and is waiting to be processed.' },
+  draft: { label: 'Not Submitted', tone: 'waiting', description: 'These transcripts have not been submitted yet.' },
+  submitted: { label: 'Submitted', tone: 'progress', description: 'Your transcripts have been received and are waiting to be processed.' },
   under_evaluation: { label: 'Processing', tone: 'progress', description: 'We are reading your transcript and checking each course against BU\'s transfer equivalency records.' },
   evaluation_completed: { label: 'Processing', tone: 'progress', description: 'Your courses have been checked. We are routing the ones that need a closer look to the academic departments.' },
   validation_failed: { label: 'Under Review', tone: 'progress', description: 'The transfer credit team is reviewing your documents.' },
@@ -16,18 +16,18 @@ const PRESENTATION = {
   credit_posted: { label: 'Completed', tone: 'done', description: 'Your transfer credit evaluation is complete and the results are posted.' },
   approved: { label: 'Decision Available', tone: 'done', description: 'A decision has been made on your application.' },
   rejected: { label: 'Decision Available', tone: 'done', description: 'A decision has been made on your application.' },
-  closed: { label: 'Closed', tone: 'waiting', description: 'This application has been closed by the Credit Evaluation Office.' },
+  closed: { label: 'Closed', tone: 'waiting', description: 'This transfer credit evaluation has been closed by the Credit Evaluation Office.' },
 };
 
 export function applicantStatus(status) {
-  return { key: status, ...(PRESENTATION[status] || { label: 'In Progress', tone: 'progress', description: 'Your application is being processed.' }) };
+  return { key: status, ...(PRESENTATION[status] || { label: 'In Progress', tone: 'progress', description: 'Your transfer credit evaluation is being processed.' }) };
 }
 
 /** Statuses after which the applicant has a final outcome (used for "active application" checks). */
 export const FINISHED_STATUSES = ['credit_posted', 'approved', 'rejected', 'closed'];
 
 export const STAGES = [
-  { key: 'submitted', label: 'Application Submitted' },
+  { key: 'submitted', label: 'Transcripts Submitted' },
   { key: 'documents', label: 'Documents Processing' },
   { key: 'evaluation', label: 'Course Evaluation' },
   { key: 'department', label: 'Department Review' },

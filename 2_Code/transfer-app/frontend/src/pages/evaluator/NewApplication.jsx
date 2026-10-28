@@ -67,13 +67,13 @@ export default function NewApplication() {
         }
       }
       if (failed.length > 0) {
-        toast.error(`Some documents could not be uploaded (${failed.join(', ')}). You can add them on the application page.`)
+        toast.error(`Some documents could not be uploaded (${failed.join(', ')}). You can add them on the evaluation page.`)
       }
 
       toast.success(`Application ${application.reference_number} created`)
       navigate(`/evaluator/applications/${application.id}`)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create application')
+      toast.error(err.response?.data?.message || 'Failed to create the evaluation')
       setSubmitting(false)
     }
   }
@@ -82,11 +82,11 @@ export default function NewApplication() {
     <div className="max-w-3xl space-y-5">
       <div>
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-2">
-          <Link to="/evaluator" className="hover:text-gray-700">Applications</Link>
+          <Link to="/evaluator" className="hover:text-gray-700">Credit Evaluations</Link>
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-gray-900 font-medium">New Application</span>
+          <span className="text-gray-900 font-medium">New Evaluation</span>
         </div>
-        <h1 className="text-xl font-bold text-gray-900">New Application</h1>
+        <h1 className="text-xl font-bold text-gray-900">New Credit Evaluation</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Raise a transfer application on a student's behalf. They get a status link to follow it.
         </p>
@@ -190,7 +190,7 @@ export default function NewApplication() {
           </div>
         </Card>
 
-        <Card title="Documents" subtitle="Optional now: you can also upload documents later from the application page.">
+        <Card title="Documents" subtitle="Optional now: you can also upload documents later from the evaluation page.">
           <div className="space-y-5">
             <FileUpload
               label="Official Transcript"
