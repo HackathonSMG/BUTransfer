@@ -233,6 +233,12 @@ export default function ApplicationDetail() {
               <InfoField label="Academic Standing" value={app.academic_history?.academic_standing} />
               <InfoField label="Transfer Date" value={app.academic_history?.transfer_date} />
             </dl>
+            {app.applicant_comments && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Additional Information from the Applicant</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{app.applicant_comments}</p>
+              </div>
+            )}
             {app.personal_statement && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Personal Statement</p>

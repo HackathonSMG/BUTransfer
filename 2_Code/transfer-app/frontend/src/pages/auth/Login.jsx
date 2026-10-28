@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { LogIn, Eye, EyeOff, UserPlus, Check } from 'lucide-react'
+import { LogIn, Eye, EyeOff, Check, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import Input from '../../components/ui/Input'
@@ -10,28 +10,24 @@ import { homeFor } from '../../lib/homeFor'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// One sign-in for everyone: the account's role decides where the user lands. Students can also create an
-// account here (?mode=register); ?next= returns them to where they were going (e.g. the application form).
+// Staff sign-in (evaluators, Credit Evaluation Office, administrators); the account's role decides where the
+// user lands. Applicants don't sign in: they apply and track with their application number and email.
+// ?next= returns a signed-in user to the page they were going to.
 export default function Login() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { login, register } = useAuth()
-  const [mode, setMode] = useState(params.get('mode') === 'register' ? 'register' : 'signin')
-  const [fullName, setFullName] = useState('')
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const next = params.get('next')
-  const registering = mode === 'register'
 
   const validate = () => {
     const errs = {}
-    if (registering && fullName.trim().length < 2) errs.fullName = 'Enter your full name'
     if (!email.trim() || !EMAIL.test(email)) errs.email = 'Enter a valid email address'
     if (!password) errs.password = 'Password is required'
-    else if (registering && password.length < 8) errs.password = 'Use at least 8 characters'
     return errs
   }
 
@@ -42,20 +38,18 @@ export default function Login() {
 
     setLoading(true)
     try {
-      const user = registering ? await register(fullName.trim(), email.trim(), password) : await login(email, password)
-      toast.success(registering ? 'Your student account is ready' : `Welcome back, ${user.full_name || user.email}!`)
-      // ?next= only applies to students (it points into the student journey)
-      navigate(user.role === 'student' && next?.startsWith('/') ? next : homeFor(user.role))
+      const user = await login(email, password)
+      toast.success(`Welcome back, ${user.full_name || user.email}!`)
+      navigate(next?.startsWith('/') && !next.startsWith('//') ? next : homeFor(user.role))
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error?.message || (registering ? 'The account could not be created' : 'Invalid email or password')
+      const msg = err.response?.data?.message || err.response?.data?.error?.message || 'Invalid email or password'
       setErrors({ general: msg })
-      toast.error(msg)
     } finally {
       setLoading(false)
     }
   }
 
-  const switchMode = (m) => { setMode(m); setErrors({}) }
+  const clear = (key) => setErrors(p => ({ ...p, [key]: '', general: '' }))
 
   return (
     <div className="min-h-[calc(100vh-4rem)] grid lg:grid-cols-2">
@@ -69,9 +63,9 @@ export default function Login() {
           </span>
         </div>
         <div className="relative z-10 max-w-md">
-          <h2 className="font-display text-[34px] leading-tight font-semibold">Your earlier coursework, evaluated with care.</h2>
+          <h2 className="font-display text-[34px] leading-tight font-semibold">Every course evaluated with care, from transcript to posted credit.</h2>
           <ul className="mt-6 space-y-2.5 text-[15px] text-red-50">
-            {['Upload your transcripts once', 'Follow every course as it is evaluated', 'See exactly which credits transfer'].map(t => (
+            {['Review the courses assigned to your department', 'Compare with equivalency records and past decisions', 'Finalize and post transfer credit'].map(t => (
               <li key={t} className="flex items-center gap-2.5"><Check className="w-4 h-4 text-white" />{t}</li>
             ))}
           </ul>
@@ -83,58 +77,41 @@ export default function Login() {
       {/* Right: the form */}
       <main className="flex items-center justify-center px-4 sm:px-8 py-12 bg-gray-50">
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2.5 mb-6">
+          <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <BUCrest className="w-8 h-9" />
-            <span className="font-display text-[18px] font-semibold text-gray-900">BU Transfer Portal</span>
+            <span>
+              <span className="block font-display text-[18px] font-semibold text-gray-900 leading-tight">Boston University</span>
+              <span className="block text-xs text-gray-500">Transfer Credit Evaluation</span>
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{registering ? 'Create your student account' : 'Sign in'}</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {registering
-              ? 'Start your transfer credit evaluation and follow it from submission to posted credit.'
-              : 'Students, evaluators and Credit Evaluation Office staff use the same sign-in.'}
-          </p>
+          <h1 className="font-display text-[30px] font-semibold text-gray-900 leading-tight">Welcome back</h1>
+          <p className="text-gray-500 text-[15px] mt-1.5">For evaluators, the Credit Evaluation Office and administrators.</p>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-7 mt-6">
+          <form onSubmit={handleSubmit} noValidate className="bg-white rounded-2xl shadow-sm border border-gray-200 p-7 mt-7 space-y-5">
             {errors.general && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700 mb-5">{errors.general}</div>
+              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700" role="alert">{errors.general}</div>
             )}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {registering && (
-                <Input label="Full name" required value={fullName} autoComplete="name"
-                  onChange={e => { setFullName(e.target.value); setErrors(p => ({ ...p, fullName: '', general: '' })) }} error={errors.fullName} />
-              )}
+            <Input
+              label="Email address" required type="email" placeholder="you@bu.edu" value={email}
+              onChange={e => { setEmail(e.target.value); clear('email') }} error={errors.email} autoComplete="username"
+            />
+            <div className="relative">
               <Input
-                label="Email address" required type="email" placeholder={registering ? 'you@example.com' : 'your@bu.edu'} value={email}
-                onChange={e => { setEmail(e.target.value); setErrors(p => ({ ...p, email: '', general: '' })) }}
-                error={errors.email} autoComplete="email"
+                label="Password" required type={showPassword ? 'text' : 'password'} value={password}
+                onChange={e => { setPassword(e.target.value); clear('password') }} error={errors.password} autoComplete="current-password"
               />
-              <div className="relative">
-                <Input
-                  label="Password" required type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password}
-                  onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: '', general: '' })) }}
-                  error={errors.password} autoComplete={registering ? 'new-password' : 'current-password'}
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <Button type="submit" loading={loading} className="w-full" size="lg">
-                {registering ? <UserPlus className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
-                {registering ? 'Create account' : 'Sign in'}
-              </Button>
-            </form>
-          </div>
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <Button type="submit" loading={loading} className="w-full" size="lg"><LogIn className="w-4 h-4" />Sign in</Button>
+            <p className="text-xs text-gray-500 text-center">Forgot your password? Contact your portal administrator to reset it.</p>
+          </form>
 
-          <p className="mt-6 text-center text-sm text-gray-500">
-            {registering ? (
-              <>Already have an account? <button type="button" onClick={() => switchMode('signin')} className="text-primary-600 hover:text-primary-700 font-medium">Sign in</button></>
-            ) : (
-              <>New transfer student? <button type="button" onClick={() => switchMode('register')} className="text-primary-600 hover:text-primary-700 font-medium">Create an account</button></>
-            )}
-          </p>
-          <p className="mt-2 text-center text-xs text-gray-400">
-            Have a secure status link from an earlier application? It still works. <Link to="/" className="underline">Home</Link>
-          </p>
+          <div className="mt-6 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-600 flex items-start gap-3">
+            <Search className="w-4 h-4 mt-0.5 text-gray-400 flex-shrink-0" />
+            <span>Applying for transfer credit? You don't need an account. <Link to="/track" className="font-semibold text-brand hover:underline">Track your application</Link> or <Link to="/apply" className="font-semibold text-brand hover:underline">start one</Link>.</span>
+          </div>
         </div>
       </main>
     </div>

@@ -4,7 +4,8 @@
 // the course's review returns to the evaluator's queue and the evaluator is notified.
 import { query } from '../../config/db.js';
 import { log as auditLog } from '../audit.service.js';
-import { sendNotification, notifyStudent } from '../notification.service.js';
+import { sendNotification } from '../notification.service.js';
+import { notifyApplicant } from '../notifications/applicant-notification.service.js';
 import { uploadDocument } from '../document.service.js';
 import { extractText } from '../credit/transcript-parser.js';
 import { rematchCourse } from '../credit/credit.service.js';
@@ -37,13 +38,13 @@ export async function requestCourseInformation({ applicationId, transcriptCourse
   if (reviewId) {
     await query(`UPDATE course_reviews SET status = 'info_requested', info_request_id = $1 WHERE id = $2`, [request.id, reviewId]);
   }
-  await notifyStudent(tc, kind === 'syllabus' ? 'syllabus_required' : 'information_required',
-    kind === 'syllabus'
-      ? `Please upload the syllabus for ${tc.course_code} ${tc.title || ''} from your status page. Until it is reviewed, the course shows 0 units.`.replace(/\s+/g, ' ')
-      : `More information is needed about ${tc.course_code}: ${text}`);
   await auditLog({ applicationId, action: kind === 'syllabus' ? 'syllabus_requested' : 'info_request_created', actorId: actor?.id || requestedBy || null,
     actorEmail: actor?.email || null, details: { info_request_id: request.id, course_code: tc.course_code, review_id: reviewId, automatic: !requestedBy && !actor } });
   await refreshApplicationStatus(applicationId, actor?.id || null);
+  // After the status refresh, so the email shows "Action Required"
+  await notifyApplicant(applicationId, 'information_required', {
+    items: [kind === 'syllabus' ? `the syllabus for ${tc.course_code} ${tc.title || ''}`.replace(/\s+/g, ' ').trim() : `more information about ${tc.course_code}: ${text}`],
+  });
   return request;
 }
 

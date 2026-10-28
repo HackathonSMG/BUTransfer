@@ -3,6 +3,8 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { pool } from './config/db.js';
 import { startEmailPoller } from './services/gmail-poller.service.js';
+import { startEmailOutboxWorker } from './services/notifications/email-outbox.service.js';
+import { emailProvider } from './services/email.service.js';
 
 const app = createApp();
 const PORT = env.PORT || 4000;
@@ -14,9 +16,10 @@ const server = app.listen(PORT, () => {
   console.log(`  Health      : http://localhost:${PORT}/api/health`);
   console.log(`  Supabase    : ${env.SUPABASE_URL}`);
   console.log(`  Agent       : ${env.FOUNDRY_PROJECT_ENDPOINT ? `Foundry agent ${env.FOUNDRY_AGENT_NAME}` : 'off (credit engine only)'}`);
-  console.log(`  Email       : ${env.SMTP_USER || 'not configured'}`);
+  console.log(`  Email       : ${emailProvider() === 'smtp' ? `SMTP (${env.SMTP_HOST})` : 'log (development: emails are written to the server log)'}`);
   console.log();
   startEmailPoller();
+  startEmailOutboxWorker();
 });
 
 async function shutdown(signal) {
