@@ -1,0 +1,7 @@
+node_modules/
+.env
+test-results/
+playwright-report/
+playwright/.auth/
+qa-report.md
+qa-summary.json
