@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  CheckSquare, FileText, Scale, Award, BookOpen,
+  FileText, Scale, Award, BookOpen,
   ArrowRight, Search, ExternalLink, Shield, Mail
 } from 'lucide-react'
 
@@ -55,7 +55,7 @@ export default function Home() {
             Transfer Your Credits<br />to Boston University
           </h1>
           <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
-            Submit your previous coursework for transfer credit evaluation. Upload your transcript, receive an
+            For admitted transfer students: submit final transcripts from every college you attended, receive an
             application number, and follow every course through evaluation until your credit is posted.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -64,7 +64,7 @@ export default function Home() {
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-brand font-semibold rounded-xl hover:bg-red-50 transition-colors shadow-lg"
             >
               <FileText className="w-5 h-5" />
-              Start Transfer Credit Eligibility
+              Submit Transcripts for Evaluation
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
@@ -83,7 +83,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="mt-6 text-sm text-red-100">
-            No account needed. Not sure yet? <Link to="/eligibility" className="underline underline-offset-2 hover:text-white inline-flex items-center gap-1"><CheckSquare className="w-3.5 h-3.5" />Check eligibility</Link>
+            No account needed. Academic departments make the final decision on every course.
           </p>
         </div>
       </section>

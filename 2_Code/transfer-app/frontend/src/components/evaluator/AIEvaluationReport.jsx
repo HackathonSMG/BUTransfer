@@ -1,82 +1,13 @@
 import React, { useState } from 'react'
 import {
-  CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp,
   RefreshCw, Loader2, FileX, Flag, ClipboardList, AlignLeft
 } from 'lucide-react'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
-import Spinner from '../ui/Spinner'
 
-// The eligibility check's score and its wording both come from the API (score_label); the browser adds no
-// thresholds of its own. It describes the initial eligibility criteria, not a course match.
-const LABEL_TONES = { ok: ['bg-green-500', 'text-green-700'], warn: ['bg-yellow-400', 'text-yellow-700'], bad: ['bg-red-500', 'text-red-700'] }
-
-function EligibilityScore({ score, label }) {
-  const pct = Math.round((score || 0) * 100)
-  const [bar, text] = LABEL_TONES[label?.tone] || ['bg-gray-400', 'text-gray-700']
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">Initial eligibility criteria met</span>
-        <span className={`text-lg font-bold ${text}`}>{pct}%</span>
-      </div>
-      <div className="w-full bg-gray-100 rounded-full h-3">
-        <div className={`h-3 rounded-full transition-all duration-500 ${bar}`} style={{ width: `${pct}%` }} />
-      </div>
-      {label?.text && <p className="text-xs text-gray-500 mt-1">{label.text}</p>}
-    </div>
-  )
-}
-
-// The backend reports pass / fail / unable_to_determine
-const RESULT_ALIASES = { pass: 'met', fail: 'not_met' }
-const FLAG_VARIANTS = { positive: 'success', concern: 'warning', critical: 'error' }
-
-function CriterionRow({ criterion }) {
-  const [expanded, setExpanded] = useState(false)
-  const result = RESULT_ALIASES[criterion.result] || criterion.result
-  const resultVariant = result === 'met' ? 'met'
-    : result === 'not_met' ? 'not_met'
-    : 'needs_verification'
-
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div
-        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex-shrink-0">
-          {result === 'met'
-            ? <CheckCircle className="w-4 h-4 text-green-600" />
-            : result === 'not_met'
-            ? <XCircle className="w-4 h-4 text-red-600" />
-            : <AlertCircle className="w-4 h-4 text-yellow-600" />
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-gray-900">{criterion.criterion_name || criterion.name}</span>
-        </div>
-        <Badge variant={resultVariant} className="flex-shrink-0">
-          {result === 'met' ? 'Met' : result === 'not_met' ? 'Not Met' : 'Needs Verification'}
-        </Badge>
-        {expanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-      </div>
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-gray-100 bg-gray-50">
-          {criterion.explanation && (
-            <p className="text-sm text-gray-700 mt-2">{criterion.explanation}</p>
-          )}
-          {criterion.evidence && (
-            <div className="mt-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Evidence</span>
-              <p className="text-sm text-gray-600 mt-1">{criterion.evidence}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+// The evaluation report for staff: missing documents, flags, the course-evaluation summary and the full report.
+// Students are already admitted, so no admission-eligibility score is shown.
 
 export default function AIEvaluationReport({ evaluation, onTrigger, triggering = false }) {
   const [showFullReport, setShowFullReport] = useState(false)
@@ -87,7 +18,7 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
         <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
         <h4 className="font-semibold text-gray-700 mb-1">Evaluation Not Started</h4>
         <p className="text-sm text-gray-500 mb-4">
-          Run the evaluation to check this application against the eligibility criteria and compare its courses.
+          Run the evaluation to read the transcript and evaluate each course for BU credit.
         </p>
         <Button onClick={onTrigger} loading={triggering} size="sm">
           <RefreshCw className="w-4 h-4" />
@@ -111,7 +42,6 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
     )
   }
 
-  const results = evaluation.criteria_results || evaluation.results || []
   const flags = evaluation.flags || []
   const missingDocs = evaluation.missing_documents || []
   // The backend stores recommendations as a single paragraph
@@ -121,29 +51,11 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
 
   return (
     <div className="space-y-5">
-      {/* Eligibility criteria */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <EligibilityScore score={evaluation.confidence_score || evaluation.overall_score} label={evaluation.score_label} />
-        {evaluatedAt && (
-          <p className="text-xs text-gray-400 mt-2">
-            Evaluated: {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evaluatedAt))}
-          </p>
-        )}
-      </div>
-
-      {/* Per-Criterion Results */}
-      {results.length > 0 && (
-        <div>
-          <h5 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-gray-500" />
-            Criteria Results ({results.length})
-          </h5>
-          <div className="space-y-2">
-            {results.map((r, i) => (
-              <CriterionRow key={r.criterion_id || i} criterion={r} />
-            ))}
-          </div>
-        </div>
+      {/* Admitted students: no admission-eligibility score here; this report covers the course evaluation */}
+      {evaluatedAt && (
+        <p className="text-xs text-gray-400">
+          Evaluated: {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evaluatedAt))}
+        </p>
       )}
 
       {/* Missing Documents */}

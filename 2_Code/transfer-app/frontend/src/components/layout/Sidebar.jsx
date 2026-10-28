@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   FileText,
   Users,
-  Settings,
   ScrollText,
   BarChart3,
   GitCompare,
@@ -63,7 +62,6 @@ const adminSections = [
   {
     title: 'Settings',
     links: [
-      { to: '/admin/criteria', label: 'Eligibility Criteria', icon: Settings },
       { to: '/admin/audit', label: 'Audit Logs', icon: ScrollText }
     ]
   }

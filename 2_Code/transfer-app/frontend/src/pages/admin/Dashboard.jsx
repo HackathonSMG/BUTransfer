@@ -68,7 +68,7 @@ export default function AdminDashboard() {
     },
     a.syllabi_pending > 0 && {
       icon: FileText, tone: 'neutral',
-      title: `${a.syllabi_pending} syllabus request${a.syllabi_pending === 1 ? '' : 's'} waiting on applicants`,
+      title: `${a.syllabi_pending} syllabus request${a.syllabi_pending === 1 ? '' : 's'} waiting on students`,
       detail: 'The courses return to their evaluators when the syllabus arrives.'
     },
     a.conflicts > 0 && {
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
     },
     n('information_required') > 0 && {
       icon: MessageSquare, tone: 'neutral',
-      title: `${n('information_required')} application${n('information_required') === 1 ? ' is' : 's are'} waiting on the applicant`,
+      title: `${n('information_required')} application${n('information_required') === 1 ? ' is' : 's are'} waiting on the student`,
       detail: 'Information has been requested.',
       to: '/admin/applications?status=information_required', cta: 'View'
     },
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Applications" value={d.applications} detail={`${d.students} applicants`} to="/admin/applications" />
+        <Metric label="Applications" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
         <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
         <Metric label="Completed" value={d.completed_applications} detail={`${d.credits_posted ?? 0} credits posted · ${d.established_applied ?? 0} courses by established equivalency`} />
         <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />

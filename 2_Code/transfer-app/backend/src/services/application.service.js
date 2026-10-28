@@ -339,8 +339,6 @@ function buildEvaluationResult(application, documents, eligibility, credit, cred
     `From: ${application.transfer_from_institution}`,
     `To: ${application.transfer_to_program}`,
     '',
-    `ELIGIBILITY: ${eligibility.score}/100 (${eligibility.eligible ? 'meets the initial requirements' : 'does not meet all required criteria'})`,
-    '',
     ...(lines.length ? ['COURSES:', ...lines, ''] : []),
     `SUMMARY: ${recommendations}`,
     '',

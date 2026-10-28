@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { REVIEW_STATUS, DECISION_LABELS, matchLabelClass, formatDate } from '../../lib/reviews'
 import { activityLabel } from '../../lib/staffFormat'
+import CourseComparison from '../../components/evaluator/CourseComparison'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
 const INFO_SUGGESTIONS = ['Detailed course description', 'Learning outcomes', 'Contact hours', 'Lab component']
@@ -212,7 +213,10 @@ export default function ReviewDetail() {
         <div className="mt-6 pt-6 border-t border-staff-line2 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4 items-center">
           <MatchSummary r={r} />
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-staff-ink2">Recommendation</p>
+            <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-staff-ink2">
+              System recommendation
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-staff-muted border border-staff-line rounded px-1.5 py-px">Advisory</span>
+            </p>
             <p className="text-[18px] font-semibold text-staff-ink mt-1">{proposed?.label || 'Evaluator to decide'}</p>
             <p className="text-[14px] text-staff-ink2 mt-1">{basisSentence(r)}</p>
             <KnowledgeCues k={k} onConflicts={() => openSection('conflicts')} onPrevious={() => openSection('previous')} />
@@ -221,11 +225,15 @@ export default function ReviewDetail() {
               onClick={() => { setEvidenceOpen(true); document.getElementById('matching-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
               className="mt-2 text-[13px] font-semibold text-primary-700 hover:text-primary-800"
             >
-              View matching evidence
+              View supporting evidence
             </button>
+            <p className="mt-3 text-[12.5px] text-staff-muted">The recommendation explains the evidence; the department evaluator makes the final academic decision.</p>
           </div>
         </div>
       </section>
+
+      {/* Why the recommendation fits: BU outcomes and topics against the transfer course's description and syllabus */}
+      <CourseComparison comparison={d.comparison} src={src} buCourses={buCourses} />
 
       {/* Details on demand */}
       <section className="staff-card mt-6 divide-y divide-staff-line2">
@@ -237,11 +245,11 @@ export default function ReviewDetail() {
             <div className="space-y-6">{buCourses.map(c => <CourseDetails key={c.course_code} c={c} institution="Boston University" heading={buCourses.length > 1 ? c.course_code : null} />)}</div>
           ) : <p className="text-[14px] text-staff-muted">No BU course has been proposed for this course.</p>}
         </Disclosure>
-        <Disclosure id="matching-details" title="Matching evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
+        <Disclosure id="matching-details" title="Supporting evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
           <Evidence evidence={evidence} src={src} buCourses={buCourses} syllabus={d.syllabus} />
         </Disclosure>
         {previous && (
-          <Disclosure {...sectionProps('previous')} title={`Previous decisions (${previous.total + (k.similar?.length || 0)})`}>
+          <Disclosure {...sectionProps('previous')} title={`Similar past decisions (${previous.total + (k.similar?.length || 0)})`}>
             <PreviousDecisions k={k} src={src} target={r.target_bu_course} />
           </Disclosure>
         )}
@@ -275,7 +283,7 @@ export default function ReviewDetail() {
           {isOpen ? (
             <>
               <div className="hidden sm:block min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-staff-muted">Recommendation</p>
+                <p className="text-[13px] font-medium text-staff-muted">System recommendation · the decision is yours</p>
                 <p className="text-[15px] font-semibold text-staff-ink truncate font-mono">{mapping}</p>
               </div>
               <span className="sm:hidden flex-1" />
@@ -284,7 +292,7 @@ export default function ReviewDetail() {
                 <span className="hidden sm:inline">Request information</span><span className="sm:hidden">Request info</span>
               </Button>
               <Button variant="success" onClick={() => openDecision()}>
-                <Check className="w-4 h-4" />Record decision
+                <Check className="w-4 h-4" />Record department decision
               </Button>
             </>
           ) : (
@@ -317,7 +325,7 @@ export default function ReviewDetail() {
       <Modal
         isOpen={dialog !== null}
         onClose={() => !submitting && setDialog(null)}
-        title={dialog === 'decide' ? 'Evaluation decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
+        title={dialog === 'decide' ? 'Department decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
         size={dialog === 'decide' ? 'md' : 'sm'}
       >
         <div className="space-y-4">
@@ -593,7 +601,7 @@ function StatusBanner({ d }) {
             {decision.bu_award ? `: ${decision.bu_award}` : ''}
             {decision.bu_units != null && approved ? ` · ${Number(decision.bu_units)} BU units` : ''}
           </p>
-          <p className="text-staff-ink2">{[decision.decided_by, formatDate(decision.decided_at)].filter(Boolean).join(' · ')}</p>
+          <p className="text-staff-ink2">Department decision · {[decision.decided_by, formatDate(decision.decided_at)].filter(Boolean).join(' · ')}</p>
           {decision.reason && <p className="text-staff-ink2 mt-1">{decision.reason}</p>}
         </div>
       </div>
@@ -608,11 +616,11 @@ function StatusBanner({ d }) {
           <p className="font-semibold text-staff-ink">
             {replied
               ? `${info.kind === 'syllabus' ? 'Syllabus received' : 'The student replied'} ${formatDate(info.responded_at)}`
-              : `Waiting on the applicant for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
+              : `Waiting on the student for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
           </p>
           <p className="text-staff-ink2">Requested {formatDate(info.created_at)}{info.message ? `: ${info.message}` : ''}</p>
           {info.student_response && <p className="text-staff-ink mt-1"><span className="font-medium">Reply:</span> {info.student_response}</p>}
-          {replied && syllabus?.compared && <p className="text-staff-ink2 mt-1">The syllabus was compared with the BU catalog; the matching evidence below reflects it.</p>}
+          {replied && syllabus?.compared && <p className="text-staff-ink2 mt-1">The syllabus was compared with the BU catalog; the course comparison below reflects it.</p>}
         </div>
       </div>
     )
@@ -729,6 +737,20 @@ function Evidence({ evidence: e, src, buCourses, syllabus }) {
       {e.missing_information && (
         <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
           <span className="font-medium">Missing information:</span> {e.missing_information}
+        </div>
+      )}
+      {e.rule_sources?.length > 0 && (
+        <div>
+          <p className="text-staff-muted mb-1.5">Rules applied</p>
+          <ul className="space-y-1">
+            {e.rule_sources.map(rule => (
+              <li key={rule.code} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-[12.5px] text-staff-ink">{rule.code}</span>
+                <span className="text-staff-ink">{rule.name}</span>
+                <span className={`text-[11.5px] font-medium px-1.5 rounded border ${rule.source === 'Problem statement' ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-staff-line bg-staff-sunk text-staff-ink2'}`}>{rule.source}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {e.reasons.length > 0 && (
@@ -894,7 +916,7 @@ function InfoRequests({ requests }) {
           <span className="text-staff-muted tabular-nums">{formatDate(q.created_at)}</span>
           <span>
             <span className="text-staff-ink">{q.kind === 'syllabus' ? 'Syllabus requested' : 'Information requested'}</span>
-            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the applicant' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
+            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the student' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
             {q.message && <span className="block text-[13px] text-staff-ink2">{q.message}</span>}
             {q.student_response && <span className="block text-[13px] text-staff-ink"><span className="font-medium">Reply:</span> {q.student_response}</span>}
             {q.document_id && <span className="inline-block mt-1"><DocumentButton id={q.document_id} label={q.document_name || 'Open file'} icon={Paperclip} /></span>}

@@ -580,3 +580,48 @@ There are no external resources, and the event rules are unchanged.
 **Test kit:**
 - `5_Test_Cases/transcripts/`: 17 PDFs plus their generator, `run_scenarios.mjs` and `scenario_results.json`.
 - `TRANSFER_CREDIT_TEST_SCENARIOS.md`: the scenario catalog and test matrix. The automated run passes 24/24 checks.
+
+## 14. Sixth round: alignment with the problem statement
+
+This round followed the read-only review of Problem 1. Only misaligned parts were changed.
+
+**Post-admission framing**
+- The process now reads as **transfer credit evaluation for admitted students** (problem step 2: "After admission…"). Changes:
+  - landing CTA **Submit Transcripts for Evaluation**;
+  - the `/apply` page titled **Transfer Credit Evaluation**;
+  - navbar, confirmation and tracking wording;
+  - "Student" instead of "Applicant".
+- The admission eligibility pre-check page was removed; `/eligibility` redirects to the self-check.
+- The staff report no longer shows the admission eligibility score or criteria, and the report text no longer has an ELIGIBILITY line.
+- The admin "Eligibility Criteria" menu item was removed. The backend criteria and the page remain.
+
+**No student accounts**
+- The dormant public `POST /api/auth/register` endpoint and the frontend `register` were removed.
+- Students submit and track with application number + email; status in production belongs to MyBU Student.
+- Existing student accounts still sign in, and staff authentication is unchanged.
+
+**Evaluator decision ownership**
+- "System recommendation" is marked **Advisory**, and the page states that the department evaluator makes the final decision.
+- Sections were renamed **Supporting evidence** and **Similar past decisions**.
+- The decision action is now **Record department decision**, and decided courses show "Department decision · name · date".
+- **Rules applied** shows each rule with its source: Problem statement / Supplied program data / Transcript data / Implementation assumption (`RULE_SOURCES` in `policy.js`).
+
+**Course comparison** (`credit/comparison.js`, shown by `CourseComparison.jsx`)
+- Transfer and BU courses side by side: code, title, credits, description, learning outcomes.
+- Each BU learning outcome and topic is marked covered / partly / not evident against the transfer course's description, outcomes and syllabus, with the matched terms.
+- Shared and missing terms, and a credit-hour comparison.
+- Deterministic and explanatory; the engine is unchanged, and syllabus text is not sent to the browser.
+
+**Measured outcome** (`workflow/impact.service.js`, shown by `ImpactPanel.jsx`)
+- Headline: **automation rate** = courses settled by established equivalency or deterministic policy rule / all courses evaluated.
+- Also shown, all counted from stored data:
+  - automatic vs department decisions, pending and quarter courses;
+  - outcomes;
+  - syllabi requested, and department decisions made without a request;
+  - evaluator agreement with the recommendation;
+  - median times.
+- Shown on Reports and the Credit Office dashboard, and per application on the Credit Office application page. For the 6-course STU-001 demo: 6 courses, 3 resolved automatically, 3 with departments, 1 quarter course, 50%.
+
+**Student transparency**
+- The tracking summary adds Matched Automatically, With Department Review and Waiting for Your Syllabus.
+- A plain next-step line says what, if anything, the student needs to do.

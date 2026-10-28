@@ -185,11 +185,16 @@ function CreditSummary({ summary, complete }) {
   ]
   const counts = [
     ['Courses Evaluated', `${summary.decided} of ${summary.courses}`],
-    ['Courses Accepted', summary.courses_accepted],
-    ['Equivalent / Elective', `${summary.courses_equivalent} / ${summary.courses_elective}`],
-    ['Not Accepted', summary.courses_not_accepted],
+    ['Matched Automatically', summary.courses_matched_automatically],
+    ['With Department Review', summary.courses_in_department_review],
+    ['Waiting for Your Syllabus', summary.courses_awaiting_syllabus],
     ['Courses Pending', summary.pending]
   ]
+  const outcomes = `${summary.courses_accepted} accepted (${summary.courses_equivalent} equivalent, ${summary.courses_elective} elective) · ${summary.courses_not_accepted} not accepted`
+  // What the student needs to do next, from the same summary
+  const next = complete ? 'Your evaluation is complete. No further action is needed.'
+    : summary.needs_student_action ? `Action needed: upload the ${summary.courses_awaiting_syllabus ? 'syllabus' : 'information'} requested on the course${summary.needs_student_action === 1 ? '' : 's'} marked "Action Needed" below.`
+      : 'Nothing is needed from you right now. We will email you when your courses are decided.'
   return (
     <section className={`rounded-2xl border ${complete ? 'border-green-200 bg-gradient-to-b from-green-50 to-white' : 'border-gray-200 bg-white'}`} aria-labelledby="credit-summary">
       <div className="px-5 sm:px-6 pt-5 pb-1 flex flex-wrap items-center justify-between gap-2">
@@ -207,6 +212,7 @@ function CreditSummary({ summary, complete }) {
           </div>
         ))}
       </div>
+      <p className={`mx-5 sm:mx-6 mb-4 rounded-lg px-3.5 py-2.5 text-sm ${summary.needs_student_action && !complete ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'bg-gray-50 text-gray-700'}`}>{next}</p>
       <dl className="grid grid-cols-2 sm:grid-cols-5 border-t border-gray-100">
         {counts.map(([k, v]) => (
           <div key={k} className="px-5 sm:px-6 py-3 border-gray-100 [&:not(:last-child)]:sm:border-r">
@@ -215,6 +221,7 @@ function CreditSummary({ summary, complete }) {
           </div>
         ))}
       </dl>
+      <p className="px-5 sm:px-6 py-3 border-t border-gray-100 text-xs text-gray-600">Decided so far: {outcomes}</p>
     </section>
   )
 }
@@ -398,7 +405,7 @@ export default function ApplicationTracker({ token, headerAction = null }) {
             {[
               ['Application number', <span className="font-mono">{app.reference_number}</span>],
               ['Submitted', fmt(app.submitted_at || app.created_at)],
-              ['Applicant', app.student_name],
+              ['Student', app.student_name],
               ['Email', app.student_email],
               ['Previous institution', app.transfer_from_institution],
               ['Intended program', app.transfer_to_program],

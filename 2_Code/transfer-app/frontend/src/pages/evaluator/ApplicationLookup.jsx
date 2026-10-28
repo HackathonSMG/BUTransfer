@@ -14,7 +14,7 @@ const STAGE = {
   draft: ['Draft', 'neutral'], processing: ['Processing', 'neutral'], needs_attention: ['Needs Attention', 'bad'],
   unassigned: ['Unassigned', 'bad'], reassignment_required: ['Reassignment Required', 'bad'],
   pending_review: ['Pending Evaluator Review', 'info'], in_review: ['In Review', 'info'],
-  waiting_for_applicant: ['Waiting for Applicant', 'warn'], credit_office_review: ['Credit Office Review', 'info'],
+  waiting_for_applicant: ['Waiting for Student', 'warn'], credit_office_review: ['Credit Office Review', 'info'],
   completed: ['Completed', 'ok'], closed: ['Closed', 'neutral']
 }
 export const stageOf = (key) => STAGE[key] || [key || 'Unknown', 'neutral']
@@ -50,7 +50,7 @@ export default function ApplicationLookup() {
       <PageHeader title="Application Lookup" subtitle="Find where an application is and who currently has it." />
 
       <section className="staff-card p-5">
-        <label htmlFor="lookup" className="block text-[14px] font-medium text-staff-ink mb-2">Application number, applicant name or email</label>
+        <label htmlFor="lookup" className="block text-[14px] font-medium text-staff-ink mb-2">Application number, student name or email</label>
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-staff-muted pointer-events-none" />
           <input
@@ -70,7 +70,7 @@ export default function ApplicationLookup() {
 
       <section className="staff-card overflow-hidden">
         {q.length < 2 ? (
-          <EmptyState icon={FileSearch} title="Search for an application" description="Enter at least two characters of an application number, applicant name or email address." />
+          <EmptyState icon={FileSearch} title="Search for an application" description="Enter at least two characters of an application number, student name or email address." />
         ) : state.loading && !state.rows ? (
           <div className="flex justify-center py-16"><Spinner size="lg" className="text-primary-600" /></div>
         ) : state.error ? (
@@ -96,7 +96,7 @@ export function OwnershipTable({ rows, detailsPath, showAge = false }) {
   return (
     <ul className="divide-y divide-staff-line2">
       <li className={`hidden lg:grid ${showAge ? 'grid-cols-[9rem_minmax(0,1.2fr)_11rem_minmax(0,1.2fr)_minmax(0,1fr)_9rem_5rem_1rem]' : 'grid-cols-[9rem_minmax(0,1.2fr)_11rem_minmax(0,1.2fr)_minmax(0,1fr)_10rem_1rem]'} gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow`}>
-        <span>Application</span><span>Applicant</span><span>Status</span><span>Current evaluator</span><span>Department</span><span>Pending since</span>{showAge && <span className="text-right">Age</span>}<span />
+        <span>Application</span><span>Student</span><span>Status</span><span>Current evaluator</span><span>Department</span><span>Pending since</span>{showAge && <span className="text-right">Age</span>}<span />
       </li>
       {rows.map(a => {
         const [label, tone] = stageOf(a.stage)

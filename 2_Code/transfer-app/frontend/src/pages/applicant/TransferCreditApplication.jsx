@@ -14,11 +14,11 @@ import Spinner from '../../components/ui/Spinner'
 import DocumentDropzone, { ACCEPTED, formatSize } from '../../components/applicant/DocumentDropzone'
 import { PROGRAMS, TERMS, PROGRAM_DEPARTMENTS } from '../../lib/application'
 
-// Transfer Credit Eligibility Application: no account needed. The application is saved as a draft once the
+// Transfer Credit Evaluation: an admitted transfer student submits transcripts; no account needed. The application is saved as a draft once the
 // applicant's details are entered, documents upload to it as they are chosen (transcripts are read on upload),
 // and submitting starts processing on the server. The application number and email are then used to track it.
 const STEPS = [
-  { id: 1, label: 'Applicant Information' },
+  { id: 1, label: 'Student Information' },
   { id: 2, label: 'Academic Documents' },
   { id: 3, label: 'Additional Information' },
   { id: 4, label: 'Review & Submit' }
@@ -44,14 +44,14 @@ function toPayload(d) {
   }
 }
 
-export default function EligibilityApplication() {
+export default function TransferCreditApplication() {
   const { user, isAuthenticated, loading } = useAuth()
   if (loading) return <PageSpinner />
   if (isAuthenticated && user.role !== 'student') {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <h1 className="text-xl font-bold text-gray-900">You are signed in as staff</h1>
-        <p className="text-gray-500 mt-2">Applicants submit this form without an account. Staff raise applications from the staff portal.</p>
+        <p className="text-gray-500 mt-2">Students submit transcripts without an account. Staff raise applications from the staff portal.</p>
       </div>
     )
   }
@@ -178,10 +178,10 @@ function ApplicationWizard({ accountEmail }) {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <p className="text-sm font-semibold text-brand tracking-wide uppercase">Boston University · Transfer Credit</p>
-          <h1 className="font-display text-3xl sm:text-[34px] font-semibold text-gray-900 mt-2 leading-tight">Transfer Credit Eligibility</h1>
+          <h1 className="font-display text-3xl sm:text-[34px] font-semibold text-gray-900 mt-2 leading-tight">Transfer Credit Evaluation</h1>
           <p className="text-gray-600 mt-3 text-[15px] leading-relaxed max-w-2xl">
-            Submit your previous coursework for transfer credit evaluation. Upload your transcript and any supporting
-            documents. After you submit, you will receive an application number to track your application. No account is needed.
+            For admitted transfer students. Submit the final transcript from every college you attended, plus any supporting
+            documents. Each course is evaluated for BU credit, and you receive an application number to follow the evaluation. No account is needed.
           </p>
           <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500">
             <span className="inline-flex items-center gap-1.5"><FileSearch className="w-4 h-4" />About 5 minutes</span>
@@ -206,7 +206,7 @@ function ApplicationWizard({ accountEmail }) {
           )}
 
           {step === 1 && !existing && (
-            <StepBody title="Applicant Information" intro="We use your email address to send updates and to let you track your application.">
+            <StepBody title="Student Information" intro="We use your email address to send updates and to let you track your application.">
               <div className="grid sm:grid-cols-2 gap-4">
                 <Input label="First name" required autoComplete="given-name" value={details.first_name} onChange={e => set('first_name', e.target.value)} error={errors.first_name} />
                 <Input label="Last name" required autoComplete="family-name" value={details.last_name} onChange={e => set('last_name', e.target.value)} error={errors.last_name} />
@@ -265,7 +265,7 @@ function ApplicationWizard({ accountEmail }) {
 
           {step === 4 && (
             <StepBody title="Review & Submit" intro="Check your application before you submit it.">
-              <ReviewBlock title="Applicant Information" onEdit={() => go(1)}>
+              <ReviewBlock title="Student Information" onEdit={() => go(1)}>
                 <Field label="Name" value={`${details.first_name} ${details.last_name}`} />
                 <Field label="Email address" value={details.email} />
                 <Field label="Previous institution" value={details.institution} />
@@ -321,7 +321,7 @@ function ApplicationWizard({ accountEmail }) {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          Already applied? <Link to="/track" className="font-semibold text-brand hover:underline">Track your application</Link>
+          Already submitted? <Link to="/track" className="font-semibold text-brand hover:underline">Track your application</Link>
         </p>
       </div>
     </div>

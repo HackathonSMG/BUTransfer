@@ -4,7 +4,7 @@ export const REVIEW_STATUS = {
   queued: { label: 'Upcoming', tone: 'neutral' },
   new: { label: 'New', tone: 'info' },
   in_progress: { label: 'In Progress', tone: 'neutral' },
-  info_requested: { label: 'Waiting for Applicant', tone: 'warn' },
+  info_requested: { label: 'Waiting for Student', tone: 'warn' },
   approved: { label: 'Approved', tone: 'ok' },
   rejected: { label: 'No Credit', tone: 'bad' },
   withdrawn: { label: 'Withdrawn', tone: 'neutral' }

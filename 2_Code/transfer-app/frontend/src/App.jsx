@@ -6,8 +6,7 @@ import ProtectedRoute from './components/layout/ProtectedRoute'
 import Layout from './components/layout/Layout'
 
 import Home from './pages/Home'
-import EligibilityCheck from './pages/student/EligibilityCheck'
-import EligibilityApplication from './pages/applicant/EligibilityApplication'
+import TransferCreditApplication from './pages/applicant/TransferCreditApplication'
 import ApplicationSubmitted from './pages/applicant/ApplicationSubmitted'
 import TrackApplication from './pages/applicant/TrackApplication'
 import ApplicationStatus from './pages/student/ApplicationStatus'
@@ -48,13 +47,14 @@ export default function App() {
       <Routes>
         {/* Public applicant routes: no account needed */}
         <Route path="/" element={<Layout isPublic><Home /></Layout>} />
-        <Route path="/apply" element={<Layout isPublic><EligibilityApplication /></Layout>} />
+        <Route path="/apply" element={<Layout isPublic><TransferCreditApplication /></Layout>} />
         <Route path="/apply/submitted" element={<Layout isPublic><ApplicationSubmitted /></Layout>} />
         <Route path="/apply/confirm" element={<Navigate to="/track" replace />} />
         <Route path="/track" element={<Layout isPublic><TrackApplication /></Layout>} />
         {/* Links from earlier emails: tracking always asks for the application number and email */}
         <Route path="/status/:token" element={<Navigate to="/track" replace />} />
-        <Route path="/eligibility" element={<Layout isPublic><EligibilityCheck /></Layout>} />
+        {/* Admission eligibility is not part of transfer credit evaluation (students are already admitted) */}
+        <Route path="/eligibility" element={<Navigate to="/self-check" replace />} />
         <Route path="/self-check" element={<Layout isPublic><SelfCheck /></Layout>} />
 
         {/* Student portal: applications of student accounts created before applicant-first intake */}

@@ -5,6 +5,7 @@ import PageHeader from '../../components/staff/PageHeader'
 import BarList from '../../components/staff/BarList'
 import WorkloadChart, { WorkloadLegend } from '../../components/staff/WorkloadChart'
 import Spinner from '../../components/ui/Spinner'
+import ImpactPanel from '../../components/staff/ImpactPanel'
 import { STATUS_LABELS } from '../../components/application/StatusBadge'
 
 // Workflow order for the status chart
@@ -22,11 +23,12 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" subtitle="Where applications stand and how work is spread across evaluators." />
+      <PageHeader title="Reports" subtitle="The measured outcome, where applications stand and how work is spread across evaluators." />
       {error ? <p className="text-sm text-red-700">{error}</p> : !d ? (
         <div className="flex justify-center py-20"><Spinner size="lg" className="text-primary-600" /></div>
       ) : (
         <>
+          <ImpactPanel impact={d.impact} />
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <section className="staff-card p-6">
               <h2 className="text-[17px] font-semibold text-staff-ink mb-4">Applications by status</h2>
