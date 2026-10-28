@@ -21,7 +21,8 @@ export default function TranscriptDrawer({ open, onClose, student, courses, docu
     (acc[c.institution] = acc[c.institution] || []).push(c)
     return acc
   }, {})
-  const transcripts = documents.filter(d => d.document_type === 'transcript')
+  // Transcripts first, then the student's supporting documents (syllabi, course descriptions)
+  const transcripts = [...documents].sort((a, b) => (a.document_type === 'transcript' ? 0 : 1) - (b.document_type === 'transcript' ? 0 : 1))
 
   const openOriginal = async (doc) => {
     setOpening(doc.id)
@@ -63,7 +64,7 @@ export default function TranscriptDrawer({ open, onClose, student, courses, docu
                   <FileText className="w-5 h-5 text-staff-muted flex-shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14px] font-medium text-staff-ink truncate">{doc.file_name}</span>
-                    <span className="block text-[12.5px] text-staff-muted">Original document</span>
+                    <span className="block text-[12.5px] text-staff-muted">{doc.document_type === 'transcript' ? 'Transcript' : doc.document_type === 'syllabus' ? 'Syllabus' : 'Supporting document'}</span>
                   </span>
                   <span className="flex items-center gap-1 text-[13px] font-semibold text-primary-700">
                     {opening === doc.id ? 'Opening…' : 'Open'}<ExternalLink className="w-3.5 h-3.5" />

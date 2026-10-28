@@ -370,9 +370,9 @@ The problem statement does not define these. Each one is isolated in `policy.js`
 
 ## 8. Deploying
 
-1. Run `supabase/migrations/009_credit_lifecycle.sql` in the Supabase SQL editor. It only adds to the schema.
+1. Run `supabase/migrations/009_credit_lifecycle.sql`, then `010_final_review.sql`, in the Supabase SQL editor. Both only add to the schema.
 2. Merge and push. The GitHub Actions workflow builds and deploys as before.
-3. As an administrator, import the staff roster again on the Evaluators page. This creates the Credit Evaluation Office account; existing accounts keep their passwords.
+3. As an administrator, import the staff roster again on the Evaluators page. This creates the Credit Evaluation Office account and the demo student account (`maya.ortiz@students.example.org`, linked to her sample application); existing accounts keep their passwords.
 4. As an administrator or the Credit Office, open the Credit Office dashboard and click **Process existing applications** once. Established equivalencies are applied to applications evaluated earlier, and unopened reviews of those courses are withdrawn.
 5. Optional: run `supabase/seed/synthetic_audit_scenarios.sql`, then click **Run evaluation** on APP-2026-9101 to 9111 to demonstrate the edge cases.
 
@@ -402,3 +402,53 @@ These can't be solved from the supplied requirements and data:
   - R9, substitutions.
   
   They concern degree audit, not transfer posting.
+
+---
+
+## 10. Second round: the student journey and the Credit Office final review
+
+Added on branch `feature/student-journey`. It makes the whole story run in one connected flow, from the landing page to the student seeing their awarded credits. `END_TO_END_TRANSFER_CREDIT_DEMO.md` walks through it.
+
+### What changed
+
+| Area | Change |
+|---|---|
+| Landing page | **Start Transfer Credit Evaluation** is the main action. *Track your application* now points to the student portal. |
+| Sign-in | One split-layout sign-in page (BU red panel, form on the right) for every role; the account's role decides where each person lands. Students can create an account there. |
+| Student accounts | `POST /api/auth/register` creates a `student` account and signs it in. Staff accounts are still created only by administrators. |
+| Application | Four steps: student information (from the account), academic information, documents, review and submit. Unnecessary fields were removed: address, personal statement, ID. |
+| Draft, upload, submit | The application is saved as a draft; transcripts (one per college, required) and supporting documents (optional) are attached and read on upload; **Submit** (`POST /api/student/applications/:token/submit`) refuses a draft without a transcript, then starts processing. This fixes an old race where evaluation could start before the transcript arrived. Unfinished drafts can be resumed. |
+| Student portal | `/student` lists the student's own applications with database counts: courses, evaluated, pending, action needed, credits awarded (`GET /api/student/me/applications`). Each application opens its status page with the per-course results. |
+| Status page | Progress: Submitted → Documents Processed → Course Evaluation → Evaluator Review → Final Review → Completed. "We're reviewing your academic documents" while processing; a notice if the transcript couldn't be read (the Credit Office is notified). |
+| Evaluator | Decision options now include **Request more information**. Credits can be adjusted for any awarded outcome. Elective credit has a category. A **Returned by the Credit Evaluation Office** banner appears on a returned course. The dashboard adds workload and the number of open courses with a potential conflict. My Evaluations shows the assignment context. The transcript drawer also lists supporting documents. |
+| Credit Evaluation Office final review | Each decided course shows *Awaiting final review* with who decided it. **Return** sends one decision back (`POST /api/office/courses/:id/return`, reason required): the decision is removed (kept in the audit trail, its precedent revoked) and the course reopens for its evaluator, or for an assigned evaluator if it was settled automatically. **Finalize and post** posts the reviewed courses. The dashboard adds an *Escalations* list. Posted courses cannot be returned. |
+| Students and staff isolated | Students reach only their own applications; every staff API refuses them, and the student API refuses staff. |
+
+### Database
+
+Migration `010_final_review.sql` adds `course_reviews.returned_reason` and `returned_at`.
+
+The roster adds a `students` list: one synthetic demo student, linked to her existing application by email.
+
+### What the Credit Office can and cannot do
+
+- **The office can return a decision; it cannot modify the academic outcome itself.** The problem statement says academic departments make the final decision, so the office's review step is to accept a decision for posting or return it to the evaluator.
+- **"Request information" stays with the evaluator,** who owns the course. The office follows up on unreadable transcripts outside the app.
+
+### Tests
+
+| Suite | Result |
+|---|---|
+| Student journey (new, 25 checks) | **25/25**. Covers registration, draft rules, upload of the STU-001 transcripts, 6 courses extracted across 2 colleges, 3 established equivalencies applied, 3 courses assigned, student isolation, syllabus request and response, decisions and hand-offs, office return of an evaluator decision and of an auto-settled course, re-decision, posting with grade T, and the student's final view. |
+| Lifecycle | 67/67 |
+| Roles | 22/22 |
+| Review workflow | 20/20 |
+| Knowledge | 16/16 |
+| Course matching (`credit:eval`) | 76/76 |
+| Frontend production build | Passes |
+
+### Still not covered
+
+- **No manual course entry.** Transcripts must be PDFs with a text layer in the sample layout, unless the Foundry agent is configured. Otherwise the transcript is stored, the student is told, and the office is notified.
+- **No real MyBU Student connection.** "Posted" is shown on the student's status page.
+- **Email:** sending depends on the deployment's email settings; notifications are always stored and shown in the app.

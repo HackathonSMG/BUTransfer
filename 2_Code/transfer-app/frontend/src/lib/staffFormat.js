@@ -51,7 +51,11 @@ const ACTIVITY_LABELS = {
   evaluator_availability_changed: 'Evaluator availability changed',
   ready_for_posting: 'Ready for posting',
   assignment_needed: 'Course needs an evaluator',
-  information_received: 'Student answered a request'
+  information_received: 'Student answered a request',
+  decision_returned: 'Decision returned by the Credit Evaluation Office',
+  transcript_unreadable: 'Transcript could not be read',
+  student_registered: 'Student account created',
+  existing_applications_processed: 'Existing applications processed'
 }
 
 export function activityLabel(action) {

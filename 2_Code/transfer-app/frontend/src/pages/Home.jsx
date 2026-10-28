@@ -53,7 +53,7 @@ export default function Home() {
             Boston University Transfer Credit Evaluation System
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
-            Check Your Transfer<br />Eligibility Today
+            Transfer Your Credits<br />to Boston University
           </h1>
           <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
             Start your BU transfer journey. Preview how your courses are likely to transfer, then follow
@@ -61,11 +61,12 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/eligibility"
+              to="/apply"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-brand font-semibold rounded-xl hover:bg-red-50 transition-colors shadow-lg"
             >
-              <CheckSquare className="w-5 h-5" />
-              Check Eligibility
+              <FileText className="w-5 h-5" />
+              Start Transfer Credit Evaluation
+              <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/self-check"
@@ -75,12 +76,11 @@ export default function Home() {
               Preview Course Credit
             </Link>
             <Link
-              to="/apply"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white hover:bg-white/10 transition-colors"
+              to="/eligibility"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
             >
-              <FileText className="w-5 h-5" />
-              Start Application
-              <ArrowRight className="w-4 h-4" />
+              <CheckSquare className="w-5 h-5" />
+              Check Eligibility
             </Link>
           </div>
         </div>
@@ -120,9 +120,13 @@ export default function Home() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
           <Search className="w-10 h-10 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Application</h2>
-          <p className="text-gray-500 mb-6">
-            Enter your secure application token to check your status.
+          <p className="text-gray-500 mb-4">
+            Sign in to see every course, its status and the credits awarded.
           </p>
+          <Link to="/student" className="inline-flex items-center gap-2 px-6 py-3 mb-6 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition-colors">
+            Go to My Applications<ArrowRight className="w-4 h-4" />
+          </Link>
+          <p className="text-sm text-gray-500 mb-3">Or enter the secure token from your confirmation email:</p>
           <form onSubmit={handleTrack} className="flex gap-3">
             <input
               type="text"
@@ -138,12 +142,6 @@ export default function Home() {
               Track
             </button>
           </form>
-          <p className="text-sm text-gray-500 mt-3">
-            Already applied?{' '}
-            <span className="text-primary-600">
-              Use the secure link from your confirmation email.
-            </span>
-          </p>
         </div>
       </section>
 

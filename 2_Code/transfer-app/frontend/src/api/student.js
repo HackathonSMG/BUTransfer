@@ -40,3 +40,14 @@ export const getSelfCheckInstitutions = () =>
 
 export const runSelfCheck = (body) =>
   client.post('/student/self-check', body).then(r => r.data)
+
+// Student portal (signed-in student)
+export const getMyApplications = () =>
+  client.get('/student/me/applications').then(r => r.data)
+
+// Starts an application as a draft so documents can be attached before it is submitted
+export const startApplication = (application) =>
+  client.post('/student/applications', { ...application, draft: true }).then(r => r.data)
+
+export const submitDraftApplication = (token) =>
+  client.post(`/student/applications/${token}/submit`).then(r => r.data)

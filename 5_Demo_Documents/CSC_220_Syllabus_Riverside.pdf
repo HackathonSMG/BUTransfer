@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1344 >>
+stream
+BT /F1 10 Tf 60 750 Td 15 TL (Riverside Community College - Department of Computer Science) Tj T* (CSC 220  Data Structures in Java  4 credits  -  Course Syllabus) Tj T* (Prerequisite: CSC 110 Programming Fundamentals with a grade of C or better.) Tj T* (Course description: abstract data types and their implementation in Java. Lists, stacks,) Tj T* (queues, trees, binary search trees, heaps, hash tables and graphs. Recursion, generics,) Tj T* (iterators and an introduction to algorithm analysis with big-O notation.) Tj T* (Learning outcomes: implement and compare linked and array-based structures; analyse the) Tj T* (running time of searching and sorting algorithms; choose an appropriate data structure) Tj T* (for a problem; write and test object-oriented Java programs of moderate size.) Tj T* (Weekly topics: 1 Java review and generics; 2 algorithm analysis; 3-4 linked lists, stacks) Tj T* (and queues; 5 recursion; 6-7 trees and binary search trees; 8 heaps and priority queues;) Tj T* (9 hash tables; 10-11 graphs, BFS and DFS; 12 sorting algorithms; 13 review; 14 final exam.) Tj T* (Contact hours: 3 hours lecture and 2 hours lab per week for 15 weeks.) Tj T* (Assessment: programming projects 40%, quizzes 15%, midterm 20%, final exam 25%.) Tj T* (Synthetic document created for the BU transfer credit demonstration.) Tj T* ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001637 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1707
+%%EOF

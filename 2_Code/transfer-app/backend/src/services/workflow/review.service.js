@@ -128,6 +128,7 @@ export async function getReview(reviewId, userId) {
       match_percent: presentation.percent, match_basis: r.match_basis,
       sponsor_match_level: r.sponsor_match_level, target_bu_course: r.target_bu_course, assigned_at: r.assigned_at,
       started_at: r.started_at, completed_at: r.completed_at, assignment_reason: r.assignment_reason,
+      returned_reason: r.returned_reason, returned_at: r.returned_at,
       assignment_context: Array.isArray(r.assignment_context) && r.assignment_context.length ? r.assignment_context : (r.assignment_reason || '').split(' · ').filter(Boolean),
     },
     application: {

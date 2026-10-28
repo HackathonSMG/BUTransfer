@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 import * as eligibilityService from '../services/eligibility.service.js';
 import * as applicationService from '../services/application.service.js';
 import * as documentService from '../services/document.service.js';
@@ -30,7 +30,8 @@ const applicationSubmitSchema = z.object({
   academic_history: z.record(z.any()).optional().default({}),
   personal_statement: z.string().max(5000).optional().nullable(),
   additional_info: z.record(z.any()).optional().default({}),
-  student_profile_id: z.string().uuid().optional().nullable(),
+  // true: keep it as a draft until the documents are attached (POST /applications/:token/submit)
+  draft: z.boolean().optional().default(false),
 });
 
 export async function eligibilityCheck(req, res, next) {
@@ -46,11 +47,39 @@ export async function submitApplication(req, res, next) {
   try {
     const parseResult = applicationSubmitSchema.safeParse(req.body);
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
-    const application = await applicationService.createApplication(parseResult.data, 'website', null);
+    const { draft, ...fields } = parseResult.data;
+    // A signed-in student owns the application; the account's name and email are used
+    if (req.user && req.user.role !== 'student') return next(badRequest('Staff raise applications from the staff portal.'));
+    if (req.user) Object.assign(fields, { student_profile_id: req.user.id, student_email: req.user.email });
+    const application = await applicationService.createApplication(fields, 'website', req.user?.id || null, { draft });
     const secureLink = `${env.APP_URL}/status/${application.secure_token}`;
     return res.status(201).json({
-      data: { id: application.id, reference_number: application.reference_number, status: application.status, secure_link: secureLink, student_email: application.student_email, message: 'Your application has been received.' },
+      data: { id: application.id, reference_number: application.reference_number, status: application.status, secure_link: secureLink, secure_token: application.secure_token,
+        student_email: application.student_email, message: draft ? 'Your application has been started.' : 'Your application has been received.' },
     });
+  } catch (err) { return next(err); }
+}
+
+// Submits a draft after its documents are attached; the transcript is required
+export async function submitDraft(req, res, next) {
+  try {
+    const application = await applicationService.submitApplication(req.application.id, req.application.student_profile_id || null);
+    return res.status(200).json({ data: { id: application.id, reference_number: application.reference_number, status: application.status } });
+  } catch (err) { return next(err); }
+}
+
+// The signed-in student's applications with their progress, from the persisted course states
+export async function myApplications(req, res, next) {
+  try {
+    const { rows } = await query(
+      `SELECT id, reference_number, status, secure_token, transfer_from_institution, transfer_to_program, expected_start_term, submitted_at, created_at, decision_date
+       FROM applications WHERE student_profile_id = $1 ORDER BY created_at DESC`, [req.user.id]);
+    const data = [];
+    for (const a of rows) {
+      const courses = (await lifecycle.courseStates(a.id)).filter((c) => c.state !== 'withdrawn');
+      data.push({ ...a, summary: lifecycle.summarizeCourses(courses), institutions: [...new Set(courses.map((c) => c.institution))] });
+    }
+    return res.status(200).json({ data });
   } catch (err) { return next(err); }
 }
 
@@ -154,4 +183,4 @@ export async function getStudentNotifications(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };
+export default { eligibilityCheck, submitApplication, submitDraft, myApplications, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };

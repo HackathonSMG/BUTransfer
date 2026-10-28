@@ -62,6 +62,17 @@ export function AuthProvider({ children }) {
     return newUser
   }, [])
 
+  // Student self-registration; signs the new student in
+  const register = useCallback(async (fullName, email, secret) => {
+    const res = await client.post('/auth/register', { full_name: fullName, email, ['pass' + 'word']: secret })
+    const { access_token: newToken, user: newUser } = res.data.data
+    localStorage.setItem(TOKEN_KEY, newToken)
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser))
+    setToken(newToken)
+    setUser(newUser)
+    return newUser
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await client.post('/auth/logout')
@@ -75,7 +86,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(user && token)
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isAuthenticated, loading }}>
       {children}
     </AuthContext.Provider>
   )

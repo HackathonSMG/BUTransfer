@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import {
   CheckCircle, Clock, AlertCircle, Upload, Bell, ChevronDown, ChevronUp, RefreshCw, Send, CalendarClock, Info, Paperclip
 } from 'lucide-react'
@@ -16,22 +17,26 @@ import Textarea from '../../components/ui/Textarea'
 // Where the application is in the process the student knows (MyBU Student posting is the last step)
 const TIMELINE_STAGES = [
   { key: 'submitted', label: 'Submitted' },
+  { key: 'documents', label: 'Documents Processed' },
   { key: 'evaluation', label: 'Course Evaluation' },
-  { key: 'review', label: 'Department Review' },
-  { key: 'posted', label: 'Credit Posted' }
+  { key: 'review', label: 'Evaluator Review' },
+  { key: 'final', label: 'Final Review' },
+  { key: 'completed', label: 'Completed' }
 ]
 
+// The stage being worked on for each application status (every earlier stage is done)
 const STATUS_STAGE_MAP = {
-  submitted: 0,
+  draft: 0,
+  submitted: 1,
   under_evaluation: 1,
-  evaluation_completed: 1,
-  information_required: 2,
-  under_evaluator_review: 2,
-  ready_for_posting: 3,
-  credit_posted: 4,
-  approved: 4,
-  rejected: 4,
-  closed: 4
+  evaluation_completed: 2,
+  information_required: 3,
+  under_evaluator_review: 3,
+  ready_for_posting: 4,
+  credit_posted: 6,
+  approved: 6,
+  rejected: 6,
+  closed: 6
 }
 
 const DOC_TYPES = [
@@ -76,7 +81,7 @@ function Timeline({ status }) {
               }`}>
                 {done ? <CheckCircle className="w-4 h-4" /> : i + 1}
               </div>
-              <span className={`text-xs mt-1 whitespace-nowrap font-medium ${
+              <span className={`text-[11px] sm:text-xs mt-1 text-center leading-tight font-medium max-w-[4.5rem] sm:max-w-none ${
                 done || active ? 'text-gray-700' : 'text-gray-400'
               }`}>
                 {stage.label}
@@ -194,6 +199,7 @@ function CourseResult({ c, token, onChanged }) {
 
 export default function ApplicationStatus() {
   const { token } = useParams()
+  const { user } = useAuth()
   const [state, setState] = useState({ loading: true, data: null, error: null })
   const [notifications, setNotifications] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -297,6 +303,7 @@ export default function ApplicationStatus() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="mb-6">
+        {user?.role === 'student' && <Link to="/student" className="text-sm text-gray-500 hover:text-gray-700">← My Applications</Link>}
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm text-gray-500 font-mono">{app.reference_number}</p>
@@ -329,6 +336,20 @@ export default function ApplicationStatus() {
       </div>
 
       <div className="space-y-4">
+        {app.status === 'draft' && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+            <p className="font-semibold text-amber-900">This application has not been submitted</p>
+            <p className="text-sm text-amber-800 mt-1">Upload your official transcript and submit it to start the evaluation.</p>
+            <Link to={`/apply?resume=${token}`} className="inline-block mt-3 text-sm font-semibold text-primary-700 hover:text-primary-800">Finish your application →</Link>
+          </div>
+        )}
+        {app.status !== 'draft' && !evaluating && courseResults.length === 0 && app.evaluation?.status === 'completed' && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="font-semibold text-gray-900">We received your documents</p>
+            <p className="text-sm text-gray-600 mt-1">We couldn't read the courses from your transcript automatically. The Credit Evaluation Office has been notified and will follow up with you.</p>
+          </div>
+        )}
+
         {/* Requests not tied to a course */}
         {openGeneralRequests.length > 0 && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
@@ -359,7 +380,8 @@ export default function ApplicationStatus() {
           <Section title="Course Evaluation">
             <div className="text-center py-6">
               <Spinner size="lg" className="text-primary-600 mx-auto mb-3" />
-              <p className="font-medium text-gray-700">We are reading your transcript and checking each course...</p>
+              <p className="font-medium text-gray-700">We're reviewing your academic documents</p>
+              <p className="text-sm text-gray-500 mt-1">Your transcript is being processed and each course checked against BU's equivalency database.</p>
               <p className="text-sm text-gray-500 mt-1">This usually takes a few minutes. The page refreshes on its own.</p>
             </div>
           </Section>

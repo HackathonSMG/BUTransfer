@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Stamp, Inbox, Copy, CalendarClock, ArrowRight, CheckCircle2, GitCompare } from 'lucide-react'
+import { Stamp, Inbox, Copy, CalendarClock, ArrowRight, CheckCircle2, GitCompare, Flag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOfficeOverview, placeOfficeQueue, processExistingApplications } from '../../api/office'
 import { useAuth } from '../../hooks/useAuth'
@@ -79,7 +79,7 @@ export default function OfficeDashboard() {
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Ready to post" value={c.ready_for_posting} detail={`${c.applications_with_unposted} applications have decided courses to post`} accent={c.ready_for_posting > 0} />
+        <Metric label="Awaiting final review" value={c.ready_for_posting} detail={`fully decided · ${c.applications_with_unposted} applications have decided courses`} accent={c.ready_for_posting > 0} />
         <Metric label="With departments" value={c.in_department_review} detail={`${c.queued_reviews} queued for a hand-off`} />
         <Metric label="Settled without department work" value={c.established_applied + c.policy_applied} detail={`${c.established_applied} established equivalencies · ${c.policy_applied} policy outcomes`} />
         <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} applications complete`} />
@@ -89,7 +89,7 @@ export default function OfficeDashboard() {
         <div className="space-y-6">
           <Queue
             icon={Stamp}
-            title="Decided courses to post"
+            title="Final review"
             total={c.applications_with_unposted}
             empty="No decided courses are waiting to be posted."
             rows={d.ready_to_post}
@@ -127,6 +127,17 @@ export default function OfficeDashboard() {
           <section className="staff-card">
             <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Needs a decision</h2>
             <ul className="divide-y divide-staff-line2 border-t border-staff-line2 text-[14px]">
+              {d.escalations.map((e, i) => (
+                <li key={`esc-${i}`}>
+                  <Link to="/admin/conflicts" className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
+                    <Flag className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-staff-ink">Escalation: {e.institution} {e.course_code}</span>
+                      <span className="block text-[12.5px] text-staff-muted">{e.raised_by}{e.note ? `: ${e.note}` : ''}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
               {d.duplicates.map(a => (
                 <li key={a.id}>
                   <Link to={`/office/applications/${a.id}`} className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
@@ -160,8 +171,8 @@ export default function OfficeDashboard() {
                   </span>
                 </Link>
               </li>
-              {!d.duplicates.length && !d.deadlines.length && (
-                <li className="flex items-center gap-2 px-6 py-3.5 text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />No duplicates or deadline issues.</li>
+              {!d.duplicates.length && !d.deadlines.length && !d.escalations.length && (
+                <li className="flex items-center gap-2 px-6 py-3.5 text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />No escalations, duplicates or deadline issues.</li>
               )}
             </ul>
           </section>

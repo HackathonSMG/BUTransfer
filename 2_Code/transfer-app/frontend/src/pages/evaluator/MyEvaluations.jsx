@@ -126,6 +126,9 @@ export default function MyEvaluations() {
                           : <span className="text-staff-muted italic">to be determined</span>}
                       </span>
                       <span className="block text-[12.5px] text-staff-muted truncate">{r.institution}</span>
+                      {r.returned_reason && r.status === 'new'
+                        ? <span className="block text-[12px] text-amber-800 truncate">Returned by the Credit Evaluation Office: {r.returned_reason}</span>
+                        : r.assignment_reason && <span className="block text-[12px] text-staff-muted truncate" title={r.assignment_reason}>{r.assignment_reason}</span>}
                     </span>
                     <span className="hidden md:block">
                       {r.match_label ? (

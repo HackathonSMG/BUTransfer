@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2, Undo2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getOfficeApplication, postCredit, recordDeadlineException, resolveDuplicate, getEligibleEvaluators, assignReview } from '../../api/office'
+import { getOfficeApplication, postCredit, recordDeadlineException, resolveDuplicate, getEligibleEvaluators, assignReview, returnToEvaluator } from '../../api/office'
 import StatusPill from '../../components/staff/StatusPill'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -14,7 +14,7 @@ import { activityLabel, timeAgo } from '../../lib/staffFormat'
 // Course states as the office sees them (the API decides the state; this only names and colours it)
 const STATE = {
   posted: { label: 'Posted', tone: 'ok' },
-  decided: { label: 'Decided · ready to post', tone: 'info' },
+  decided: { label: 'Awaiting final review', tone: 'info' },
   information_requested: { label: 'Waiting on student', tone: 'warn' },
   information_received: { label: 'Student answered', tone: 'info' },
   department_review: { label: 'Department review', tone: 'neutral' },
@@ -32,6 +32,7 @@ export default function OfficeApplication() {
   const [busy, setBusy] = useState(null)
   const [exception, setException] = useState('')
   const [assigning, setAssigning] = useState(null) // course being assigned
+  const [returning, setReturning] = useState(null) // course whose decision goes back to the evaluator
 
   const load = useCallback(async () => {
     try {
@@ -89,7 +90,7 @@ export default function OfficeApplication() {
             disabled={!canPost || !toPost}
             title={d.blockers.map(b => b.message).join(' ') || undefined}
           >
-            <Stamp className="w-4 h-4" />Post {toPost || ''} decided course{toPost === 1 ? '' : 's'}
+            <Stamp className="w-4 h-4" />Finalize and post {toPost || ''} course{toPost === 1 ? '' : 's'}
           </Button>
         </div>
       </header>
@@ -152,12 +153,12 @@ export default function OfficeApplication() {
           <div key={institution} className="border-t border-staff-line2">
             <p className="px-6 pt-3 pb-1 staff-eyebrow">{institution}</p>
             <ul className="divide-y divide-staff-line2">
-              {list.map(c => <CourseRow key={c.id} c={c} onAssign={() => setAssigning(c)} />)}
+              {list.map(c => <CourseRow key={c.id} c={c} onAssign={() => setAssigning(c)} onReturn={() => setReturning(c)} />)}
             </ul>
           </div>
         ))}
         <p className="px-6 py-3 border-t border-staff-line2 text-[12.5px] text-staff-muted">
-          Posted courses carry a grade of {d.policy.transfer_grade}, do not count toward the BU GPA and earn no BU Hub units. Pending courses show 0 units to the student.
+          Final review: check each decision awaiting review, return any that need another look, then finalize and post. Posted courses carry a grade of {d.policy.transfer_grade}, do not count toward the BU GPA and earn no BU Hub units. Pending courses show 0 units to the student.
         </p>
       </section>
 
@@ -193,6 +194,7 @@ export default function OfficeApplication() {
       </section>
 
       <AssignDialog course={assigning} onClose={() => setAssigning(null)} onDone={() => { setAssigning(null); load() }} />
+      <ReturnDialog course={returning} onClose={() => setReturning(null)} onDone={() => { setReturning(null); load() }} />
     </div>
   )
 }
@@ -237,7 +239,7 @@ function Fold({ title, children }) {
   )
 }
 
-function CourseRow({ c, onAssign }) {
+function CourseRow({ c, onAssign, onReturn }) {
   const [open, setOpen] = useState(false)
   const st = STATE[c.state] || STATE.processing
   const who = VIA[c.decided_via] || (c.decided_by ? c.decided_by : c.evaluator_name || (c.queue === 'credit_office' ? 'Credit Evaluation Office' : null))
@@ -258,6 +260,7 @@ function CourseRow({ c, onAssign }) {
         <span><StatusPill tone={st.tone}>{st.label}</StatusPill></span>
         <span className="text-right">
           {reviewOpen && c.review_id && <Button size="sm" variant="secondary" onClick={onAssign}><UserCog className="w-3.5 h-3.5" />{c.evaluator_name ? 'Reassign' : 'Assign'}</Button>}
+          {c.can_return && <Button size="sm" variant="secondary" onClick={onReturn}><Undo2 className="w-3.5 h-3.5" />Return</Button>}
         </span>
       </div>
       {open && (
@@ -270,6 +273,7 @@ function CourseRow({ c, onAssign }) {
           {c.combined_with?.length > 0 && <p><span className="text-staff-muted">Evaluated with:</span> {c.combined_with.join(', ')}</p>}
           {c.assignment_reason && <p><span className="text-staff-muted">Assignment:</span> {c.assignment_reason}</p>}
           {c.syllabus_received_at && <p><span className="text-staff-muted">Syllabus received:</span> {formatDate(c.syllabus_received_at)}</p>}
+          {c.returned_reason && <p className="text-amber-800">Returned by the Credit Evaluation Office: {c.returned_reason}</p>}
         </div>
       )}
     </li>
@@ -330,6 +334,44 @@ function AssignDialog({ course, onClose, onDone }) {
           </div>
         </div>
       )}
+    </Modal>
+  )
+}
+
+// Final review: the decision goes back to the evaluator (or, for a course settled automatically, to an evaluator)
+function ReturnDialog({ course, onClose, onDone }) {
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setReason('') }, [course])
+  if (!course) return null
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await returnToEvaluator(course.id, reason.trim())
+      toast.success(res.data.evaluator ? `Returned to ${res.data.evaluator}` : 'Returned for evaluation')
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'The decision could not be returned')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <Modal isOpen onClose={() => !saving && onClose()} title={`Return ${course.course_code} to the evaluator`} size="sm">
+      <div className="space-y-4">
+        <div className="rounded-lg bg-staff-sunk px-4 py-3 text-[14px]">
+          <p className="font-medium text-staff-ink">{course.decision}</p>
+          <p className="text-staff-ink2">{[DECISION_LABELS[course.decision_type] || course.decision_type, course.decided_by, `${course.units} units`].filter(Boolean).join(' · ')}</p>
+          {course.decision_reason && <p className="text-staff-muted mt-1">{course.decision_reason}</p>}
+        </div>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} autoFocus className={FIELD}
+          placeholder="What should the evaluator look at again? e.g. The awarded credits exceed the BU course's credits." />
+        <p className="text-[12.5px] text-staff-muted">The decision is removed from final review and the course reopens for evaluation with your note. Academic departments still make the decision.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} loading={saving} disabled={reason.trim().length < 5}>Return decision</Button>
+        </div>
+      </div>
     </Modal>
   )
 }
