@@ -11,6 +11,9 @@ import EmptyState from '../../components/ui/EmptyState'
 import { DECISION_LABELS, formatDate } from '../../lib/reviews'
 import { activityLabel, timeAgo } from '../../lib/staffFormat'
 
+// Delivery state of an applicant email (notifications.email_status)
+const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry', sent: 'sent', logged: 'logged (email not configured)', failed: 'failed', suppressed: 'not sent (test address)' }
+
 // Course states as the office sees them (the API decides the state; this only names and colours it)
 const STATE = {
   posted: { label: 'Posted', tone: 'ok' },
@@ -94,6 +97,13 @@ export default function OfficeApplication() {
           </Button>
         </div>
       </header>
+
+      {app.applicant_comments && (
+        <section className="staff-card px-6 py-4">
+          <p className="text-[13px] font-medium text-staff-muted">Additional information from the applicant</p>
+          <p className="text-[15px] text-staff-ink mt-1 whitespace-pre-wrap">{app.applicant_comments}</p>
+        </section>
+      )}
 
       {/* Duplicate */}
       {d.duplicate?.status === 'suspected' && (
@@ -183,6 +193,18 @@ export default function OfficeApplication() {
             ))}
             {!d.documents.length && <li className="text-staff-muted">No documents.</li>}
           </ul>
+        </Fold>
+        <Fold title={`Applicant updates (${(d.applicant_updates || []).length})`}>
+          {!(d.applicant_updates || []).length ? <p className="text-[14px] text-staff-muted">No updates sent yet.</p> : (
+            <ul className="space-y-2 text-[14px]">
+              {d.applicant_updates.map((u, i) => (
+                <li key={i} className="flex justify-between gap-3">
+                  <span className="text-staff-ink">{u.title}<span className="text-staff-muted"> · email {EMAIL_STATUS[u.email_status] || u.email_status}{u.email_status === 'retry' || u.email_status === 'failed' ? ` after ${u.email_attempts} attempt${u.email_attempts === 1 ? '' : 's'}` : ''}</span></span>
+                  <span className="text-staff-muted whitespace-nowrap">{formatDate(u.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Fold>
         <Fold title="History">
           <ul className="space-y-2 text-[14px]">

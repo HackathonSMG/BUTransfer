@@ -7,8 +7,9 @@ import Layout from './components/layout/Layout'
 
 import Home from './pages/Home'
 import EligibilityCheck from './pages/student/EligibilityCheck'
-import ApplicationForm from './pages/student/ApplicationForm'
-import ApplicationConfirmation from './pages/student/ApplicationConfirmation'
+import EligibilityApplication from './pages/applicant/EligibilityApplication'
+import ApplicationSubmitted from './pages/applicant/ApplicationSubmitted'
+import TrackApplication from './pages/applicant/TrackApplication'
 import ApplicationStatus from './pages/student/ApplicationStatus'
 import Login from './pages/auth/Login'
 import EvaluatorDashboard from './pages/evaluator/Dashboard'
@@ -44,15 +45,17 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public routes */}
+        {/* Public applicant routes: no account needed */}
         <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/apply" element={<Layout><ApplicationForm /></Layout>} />
-        <Route path="/apply/confirm" element={<Layout><ApplicationConfirmation /></Layout>} />
+        <Route path="/apply" element={<Layout><EligibilityApplication /></Layout>} />
+        <Route path="/apply/submitted" element={<Layout><ApplicationSubmitted /></Layout>} />
+        <Route path="/apply/confirm" element={<Navigate to="/track" replace />} />
+        <Route path="/track" element={<Layout><TrackApplication /></Layout>} />
         <Route path="/status/:token" element={<Layout><ApplicationStatus /></Layout>} />
         <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
         <Route path="/self-check" element={<Layout><SelfCheck /></Layout>} />
 
-        {/* Student portal: the signed-in student's own applications */}
+        {/* Student portal: applications of student accounts created before applicant-first intake */}
         <Route path="/student" element={<ProtectedRoute allowedRoles={['student']}><Layout><StudentPortal /></Layout></ProtectedRoute>} />
         <Route path="/student/applications/:token" element={<ProtectedRoute allowedRoles={['student']}><Layout><ApplicationStatus /></Layout></ProtectedRoute>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />

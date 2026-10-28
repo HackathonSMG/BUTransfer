@@ -101,7 +101,7 @@ router.get('/applications/:id', async (req, res, next) => {
       `SELECT a.*, p.full_name AS evaluator_name, x.full_name AS deadline_exception_by_name FROM applications a
        LEFT JOIN profiles p ON p.id = a.assigned_evaluator_id LEFT JOIN profiles x ON x.id = a.deadline_exception_by WHERE a.id = $1`, [req.params.id]);
     if (!app) return next(notFound('Application'));
-    const [courses, documents, requests, duplicate, history] = await Promise.all([
+    const [courses, documents, requests, duplicate, history, applicantUpdates] = await Promise.all([
       lifecycle.courseStates(app.id),
       query(`SELECT d.id, d.file_name, d.document_type, d.created_at, d.upload_source, tc.course_code AS for_course
              FROM application_documents d LEFT JOIN transcript_courses tc ON tc.id = d.transcript_course_id WHERE d.application_id = $1 ORDER BY d.created_at`, [app.id]),
@@ -112,6 +112,9 @@ router.get('/applications/:id', async (req, res, next) => {
       lifecycle.duplicateComparison(app),
       query(`SELECT al.action, al.created_at, al.details, COALESCE(p.full_name, al.actor_email, 'System') AS actor FROM audit_logs al
              LEFT JOIN profiles p ON p.id = al.actor_id WHERE al.application_id = $1 ORDER BY al.created_at DESC LIMIT 25`, [app.id]),
+      // What the applicant was told, and whether the email went out
+      query(`SELECT type, title, created_at, email_status, emailed_at, email_attempts, email_error FROM notifications
+             WHERE application_id = $1 AND email_status IS NOT NULL ORDER BY created_at DESC`, [app.id]),
     ]);
     const visible = courses.filter((c) => c.state !== 'withdrawn');
     return res.status(200).json({
@@ -121,6 +124,7 @@ router.get('/applications/:id', async (req, res, next) => {
           transfer_from_institution: app.transfer_from_institution, transfer_to_program: app.transfer_to_program, expected_start_term: app.expected_start_term,
           submitted_at: app.submitted_at, posted_at: app.posted_at, evaluator_name: app.evaluator_name, secure_token: undefined,
           deadline_exception: app.deadline_exception, deadline_exception_by: app.deadline_exception_by_name,
+          applicant_comments: app.applicant_comments,
         },
         institutions: [...new Set(visible.map((c) => c.institution))],
         summary: lifecycle.summarizeCourses(visible),
@@ -141,6 +145,7 @@ router.get('/applications/:id', async (req, res, next) => {
         documents: documents.rows,
         information_requests: requests.rows,
         history: history.rows,
+        applicant_updates: applicantUpdates.rows,
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });

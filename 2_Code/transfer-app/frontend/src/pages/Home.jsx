@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   CheckSquare, FileText, Scale, Award, BookOpen,
-  ArrowRight, Search, ExternalLink, Shield
+  ArrowRight, Search, ExternalLink, Shield, Mail
 } from 'lucide-react'
 
 const PROCESS_STEPS = [
@@ -15,8 +15,8 @@ const PROCESS_STEPS = [
   {
     icon: FileText,
     step: '02',
-    title: 'Send Transcripts',
-    description: 'Apply and upload official final transcripts from every college you attended.'
+    title: 'Apply & Upload',
+    description: 'Submit your transfer credit application with transcripts from every college you attended. No account needed.'
   },
   {
     icon: Scale,
@@ -28,7 +28,7 @@ const PROCESS_STEPS = [
     icon: Award,
     step: '04',
     title: 'Credit Posted',
-    description: 'Each decided course is posted with a grade of T. Track every course on your status page.'
+    description: 'Each decided course is posted with a grade of T. Track every course with your application number.'
   }
 ]
 
@@ -36,11 +36,10 @@ export default function Home() {
   const navigate = useNavigate()
   const [trackInput, setTrackInput] = useState('')
 
+  // The tracking page asks for the email that goes with the application number
   const handleTrack = (e) => {
     e.preventDefault()
-    if (!trackInput.trim()) return
-    // Treat input as either a reference number (for search) or direct secure token
-    navigate(`/status/${trackInput.trim()}`)
+    navigate(trackInput.trim() ? `/track?application=${encodeURIComponent(trackInput.trim().toUpperCase())}` : '/track')
   }
 
   return (
@@ -56,8 +55,8 @@ export default function Home() {
             Transfer Your Credits<br />to Boston University
           </h1>
           <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
-            Start your BU transfer journey. Preview how your courses are likely to transfer, then follow
-            every course through evaluation until your credit is posted.
+            Submit your previous coursework for transfer credit evaluation. Upload your transcript, receive an
+            application number, and follow every course through evaluation until your credit is posted.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -65,7 +64,7 @@ export default function Home() {
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-brand font-semibold rounded-xl hover:bg-red-50 transition-colors shadow-lg"
             >
               <FileText className="w-5 h-5" />
-              Start Transfer Credit Evaluation
+              Start Transfer Credit Eligibility
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
@@ -76,13 +75,16 @@ export default function Home() {
               Preview Course Credit
             </Link>
             <Link
-              to="/eligibility"
+              to="/track"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
             >
-              <CheckSquare className="w-5 h-5" />
-              Check Eligibility
+              <Search className="w-5 h-5" />
+              Track Application
             </Link>
           </div>
+          <p className="mt-6 text-sm text-red-100">
+            No account needed. Not sure yet? <Link to="/eligibility" className="underline underline-offset-2 hover:text-white inline-flex items-center gap-1"><CheckSquare className="w-3.5 h-3.5" />Check eligibility</Link>
+          </p>
         </div>
       </section>
 
@@ -120,48 +122,26 @@ export default function Home() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
           <Search className="w-10 h-10 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Application</h2>
-          <p className="text-gray-500 mb-4">
-            Sign in to see every course, its status and the credits awarded.
+          <p className="text-gray-500 mb-6">
+            See every course, its evaluation status and the credits awarded. You need your application number and the email address you applied with.
           </p>
-          <Link to="/student" className="inline-flex items-center gap-2 px-6 py-3 mb-6 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition-colors">
-            Go to My Applications<ArrowRight className="w-4 h-4" />
-          </Link>
-          <p className="text-sm text-gray-500 mb-3">Or enter the secure token from your confirmation email:</p>
-          <form onSubmit={handleTrack} className="flex gap-3">
+          <form onSubmit={handleTrack} className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
-              placeholder="Enter your application token..."
+              aria-label="Application number"
+              placeholder="Application number, e.g. APP-2026-0001"
               value={trackInput}
               onChange={(e) => setTrackInput(e.target.value)}
-              className="flex-1 px-4 py-3 text-sm border border-gray-300 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              className="flex-1 px-4 py-3 text-sm font-mono border border-gray-300 rounded-xl focus:outline-none focus:border-brand focus:ring-2 focus:ring-red-100"
             />
             <button
               type="submit"
-              className="px-6 py-3 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition-colors flex-shrink-0"
+              className="px-6 py-3 bg-brand text-white font-medium rounded-xl hover:bg-brand-dark transition-colors flex-shrink-0 inline-flex items-center justify-center gap-2"
             >
-              Track
+              Track Application<ArrowRight className="w-4 h-4" />
             </button>
           </form>
-        </div>
-      </section>
-
-      {/* Info Section */}
-      <section className="py-12 bg-white border-t border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold text-brand mb-1">2.5+</div>
-              <p className="text-sm text-gray-600">Minimum GPA Required</p>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-brand mb-1">30+</div>
-              <p className="text-sm text-gray-600">Credit Hours Minimum</p>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-brand mb-1">5–10</div>
-              <p className="text-sm text-gray-600">Business Days for Decision</p>
-            </div>
-          </div>
+          <p className="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Your application number is in your confirmation email.</p>
         </div>
       </section>
 

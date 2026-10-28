@@ -7,7 +7,8 @@
 // states, the one-year deadline, and duplicate-application detection. All state is read from the database.
 import { query } from '../../config/db.js';
 import { log as auditLog } from '../audit.service.js';
-import { sendNotification, notifyStudent } from '../notification.service.js';
+import { sendNotification } from '../notification.service.js';
+import { notifyApplicant, onStatusChange } from '../notifications/applicant-notification.service.js';
 import { POLICY, transferDeadline } from '../credit/policy.js';
 import { badRequest, notFound } from '../../utils/errors.js';
 import { courseKnowledge } from './knowledge.service.js';
@@ -213,6 +214,7 @@ export async function refreshApplicationStatus(applicationId, actorId = null) {
 
   await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [next, applicationId]);
   await auditLog({ applicationId, action: 'status_changed', actorId, oldValue: { status: app.status }, newValue: { status: next }, details: { reason: 'Course progress' } });
+  await onStatusChange(applicationId, app.status, next);
   if (next === 'ready_for_posting') {
     await notifyCreditOffice({
       applicationId, type: 'ready_for_posting', title: `Ready to post: ${app.reference_number}`,
@@ -279,9 +281,8 @@ export async function postCredits(applicationId, user) {
   }
   const total = round2(posted.reduce((n, p) => n + p.units, 0));
   await auditLog({ applicationId, action: 'credit_posted', actorId: user.id, actorEmail: user.email, details: { courses: posted, units: total } });
-  await notifyStudent(app, 'credit_posted',
-    `${posted.length} course${posted.length === 1 ? ' has' : 's have'} been posted to your record (${total} BU credits, grade T).`
-    + (status === 'credit_posted' ? ' Your transfer credit evaluation is complete.' : ' Your other courses are still being evaluated.'));
+  // A complete posting is announced by the status change (decision_available); a partial one is announced here
+  if (status !== 'credit_posted' && posted.length) await notifyApplicant(applicationId, 'credit_posted', { courses: posted.length, units: total });
   return { posted: posted.length, units: total, status };
 }
 
@@ -354,8 +355,10 @@ export async function recordDeadlineException(applicationId, reason, user) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Flags an application that appears to duplicate an earlier open one from the same student (same email, or
- * same name and date of birth). Nothing is deleted; the Credit Evaluation Office decides.
+ * Flags an application that appears to duplicate an earlier active one from the same applicant (same email, or
+ * same name and date of birth). Nothing is deleted; the Credit Evaluation Office decides. An application whose
+ * evaluation is finished (posted, decided or closed) is not a duplicate candidate: applying again after a
+ * completed evaluation, e.g. with coursework taken since, is a new evaluation.
  */
 export async function detectDuplicate(applicationId) {
   const { rows: [app] } = await query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
@@ -363,7 +366,7 @@ export async function detectDuplicate(applicationId) {
   const { rows: [other] } = await query(
     `SELECT id, reference_number, transfer_from_institution, expected_start_term, submitted_at, created_at, status, LOWER(student_email) = LOWER($2) AS same_email
      FROM applications
-     WHERE id <> $1 AND status NOT IN ('closed', 'draft') AND COALESCE(duplicate_status, '') <> 'confirmed'
+     WHERE id <> $1 AND status NOT IN ('closed', 'draft', 'credit_posted', 'approved', 'rejected') AND COALESCE(duplicate_status, '') <> 'confirmed'
        AND (created_at < $5 OR (created_at = $5 AND reference_number < $6))
        AND (LOWER(student_email) = LOWER($2) OR ($3::date IS NOT NULL AND date_of_birth = $3::date AND LOWER(student_name) = LOWER($4)))
      ORDER BY created_at, reference_number LIMIT 1`,
@@ -410,6 +413,8 @@ export async function resolveDuplicate(applicationId, { action, note }, user) {
     await query(`UPDATE applications SET duplicate_status = 'confirmed', status = 'closed', updated_at = NOW() WHERE id = $1`, [applicationId]);
     await query(`UPDATE course_reviews SET status = 'withdrawn', completed_at = NOW() WHERE application_id = $1 AND status = ANY($2)`, [applicationId, OPEN_REVIEW]);
     await query(`UPDATE information_requests SET status = 'resolved', resolved_at = NOW() WHERE application_id = $1 AND status <> 'resolved'`, [applicationId]);
+    await auditLog({ applicationId, action: 'status_changed', actorId: user.id, actorEmail: user.email, oldValue: { status: app.status }, newValue: { status: 'closed' }, details: { reason: 'Closed as a duplicate' } });
+    await onStatusChange(applicationId, app.status, 'closed');
   } else {
     throw badRequest('Action must be keep_separate or close_duplicate.');
   }
@@ -440,9 +445,12 @@ function studentExplanation(c) {
       const posted = c.state === 'posted';
       const after = posted ? '' : ' The Credit Evaluation Office is completing the final review before it is posted to your record.';
       if (c.outcome === 'no_credit') {
-        return c.repeat_of_course
-          ? `You passed this course more than once; credit is awarded once, for the other attempt.${after}`
-          : `This course does not earn transfer credit. ${strip(c.decision_reason) || ''}`.trim() + after;
+        if (c.repeat_of_course) return `You passed this course more than once; credit is awarded once, for the other attempt.${after}`;
+        // A policy rule's reason is written for the applicant; an evaluator's reason is an internal note
+        const policy = c.decided_via === 'policy_rule' || c.decision_type === 'policy_rule';
+        return (policy && strip(c.decision_reason)
+          ? `This course does not earn transfer credit. ${strip(c.decision_reason)}`
+          : 'This course was reviewed by the academic department and does not meet the requirements for transfer credit at Boston University.') + after;
       }
       const what = c.outcome === 'transfer' ? `It transfers as ${c.bu_award}` : `It counts as ${/^elective credit$/i.test(c.bu_award || '') ? 'elective credit' : `elective credit (${c.bu_award})`}`;
       return `${what} with ${c.units} BU credit${c.units === 1 ? '' : 's'} and a grade of ${POLICY.transferGrade}.${after}`;
@@ -466,6 +474,18 @@ function studentExplanation(c) {
     default:
       return 'We are processing this course. Until it is evaluated it shows 0 units.';
   }
+}
+
+/** The transfer result column the applicant sees: outcome, a short result and the type of credit. */
+function applicantResult(c) {
+  if (!['posted', 'decided'].includes(c.state)) {
+    return { outcome: null, result_label: `Pending — ${POLICY.pendingUnits} BU units currently awarded`, credit_type: null };
+  }
+  if (c.outcome === 'transfer') return { outcome: 'transfer', result_label: c.bu_award, credit_type: 'BU course equivalent' };
+  if (c.outcome === 'elective') {
+    return { outcome: 'elective', result_label: c.bu_award && !/^elective credit$/i.test(c.bu_award) ? c.bu_award : 'Elective credit', credit_type: 'Elective credit' };
+  }
+  return { outcome: 'no_credit', result_label: 'Not accepted for transfer credit', credit_type: null };
 }
 
 /** Student-facing application progress and per-course results; no internal names, scores or provenance. */
@@ -495,6 +515,7 @@ export async function studentView(application) {
       status_label: STUDENT_STAGE[c.state]?.label || 'Being processed',
       tone: STUDENT_STAGE[c.state]?.tone || 'waiting',
       decision: c.decision,
+      ...applicantResult(c),
       bu_course: ['posted', 'decided'].includes(c.state) && c.outcome !== 'no_credit' ? c.bu_award : null,
       units: c.units,
       units_status: c.units_status,
