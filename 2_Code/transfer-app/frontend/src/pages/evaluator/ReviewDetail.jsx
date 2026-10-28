@@ -109,7 +109,7 @@ export default function ReviewDetail() {
         }
         const res = await decideReview(id, payload)
         toast.success(form.outcome === 'no_credit' ? 'Recorded: no credit' : 'Decision recorded')
-        if (res.data.transfer) toast(`Application handed to the next evaluator (${res.data.transfer.request_number})`)
+        if (res.data.transfer) toast(`Evaluation handed to the next evaluator (${res.data.transfer.request_number})`)
         if (res.data.application_status === 'ready_for_posting') toast('Every course on this application is decided. It is ready for posting.')
       }
       setDialog(null)
@@ -299,7 +299,7 @@ export default function ReviewDetail() {
             <>
               <p className="flex-1 text-[15px] text-staff-ink2">
                 {r.status === 'queued'
-                  ? 'This course opens for your decision once the earlier review of this application is finished.'
+                  ? 'This course opens for your decision once the earlier review of this evaluation is finished.'
                   : r.status === 'withdrawn' ? 'This course no longer needs a decision.' : 'This course has been decided.'}
               </p>
               {d.next_review_id ? (

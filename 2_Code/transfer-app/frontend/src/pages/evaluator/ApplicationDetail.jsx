@@ -84,7 +84,7 @@ export default function ApplicationDetail() {
       const data = await getApplication(id)
       setState({ loading: false, data, error: null })
     } catch (err) {
-      setState({ loading: false, data: null, error: err.response?.data?.message || 'Application not found' })
+      setState({ loading: false, data: null, error: err.response?.data?.message || 'Evaluation not found' })
     }
   }, [id])
 

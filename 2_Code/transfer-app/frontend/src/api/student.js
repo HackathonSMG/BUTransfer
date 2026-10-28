@@ -83,3 +83,10 @@ export const uploadApplicationDocument = (token, file, documentType, onProgress)
 
 export const submitApplicationForEvaluation = (token, applicantComments) =>
   client.post(`/student/applications/${token}/submit`, { applicant_comments: applicantComments || null }).then(r => r.data)
+
+// Reads one transcript before submission (nothing is stored): institution, courses and the header details
+export const readTranscriptFile = (file) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return client.post('/student/transcripts/read', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+}

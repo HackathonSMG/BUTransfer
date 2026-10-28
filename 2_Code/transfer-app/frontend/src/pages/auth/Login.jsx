@@ -110,7 +110,7 @@ export default function Login() {
 
           <div className="mt-6 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-600 flex items-start gap-3">
             <Search className="w-4 h-4 mt-0.5 text-gray-400 flex-shrink-0" />
-            <span>Submitting transcripts for credit evaluation? You don't need an account. <Link to="/track" className="font-semibold text-brand hover:underline">Track your application</Link> or <Link to="/apply" className="font-semibold text-brand hover:underline">start one</Link>.</span>
+            <span>Submitting transcripts for credit evaluation? You don't need an account. <Link to="/track" className="font-semibold text-brand hover:underline">Track your transfer credit</Link> or <Link to="/apply" className="font-semibold text-brand hover:underline">submit transcripts</Link>.</span>
           </div>
         </div>
       </main>

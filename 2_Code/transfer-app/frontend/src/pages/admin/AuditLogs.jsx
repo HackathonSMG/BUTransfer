@@ -16,7 +16,7 @@ const ACTION_TYPES = [
   { value: 'info_request', label: 'Info Request' },
   { value: 'document_upload', label: 'Document Upload' },
   { value: 'note', label: 'Note Added' },
-  { value: 'create', label: 'Application Created' },
+  { value: 'create', label: 'Evaluation Created' },
   { value: 'login', label: 'User Login' }
 ]
 
@@ -79,7 +79,7 @@ function ExpandableRow({ entry }) {
 }
 
 function downloadCSV(entries) {
-  const headers = ['Timestamp', 'Application', 'Action', 'Actor', 'Role', 'Details']
+  const headers = ['Timestamp', 'Transfer Credit ID', 'Action', 'Actor', 'Role', 'Details']
   const rows = entries.map(e => [
     formatDate(e.created_at || e.timestamp),
     e.reference_number || e.application_id || '',
@@ -134,7 +134,7 @@ export default function AuditLogs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Audit Logs</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Complete history of all application actions</p>
+          <p className="text-sm text-gray-500 mt-0.5">Complete history of all evaluation actions</p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => downloadCSV(entries)} disabled={entries.length === 0}>
           <Download className="w-4 h-4" />
@@ -149,7 +149,7 @@ export default function AuditLogs() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Application reference..."
+              placeholder="Transfer Credit ID..."
               value={filters.reference || ''}
               onChange={e => update('reference', e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
@@ -219,7 +219,7 @@ export default function AuditLogs() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-5 py-3 font-semibold text-gray-600 whitespace-nowrap">Timestamp</th>
-                    <th className="text-left px-5 py-3 font-semibold text-gray-600 whitespace-nowrap">Application</th>
+                    <th className="text-left px-5 py-3 font-semibold text-gray-600 whitespace-nowrap">Transfer Credit ID</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Action</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600">Actor</th>
                     <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Role</th>

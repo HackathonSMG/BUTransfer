@@ -1,6 +1,7 @@
 // Reads course rows from a transcript PDF. First tries the structured column-layout parser for the
 // hackathon sample format; falls back to an AI-based extraction (via Azure OpenAI) for any other layout.
-// Student identity is not extracted.
+// The structured parser also reads the header block (student name, student ID, BU major, BU start term) so the
+// student can confirm it instead of typing it; the AI fallback never extracts identity.
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const TERM = /^(Winter|Spring|Summer|Fall)\s+\d{4}$/;
@@ -37,6 +38,40 @@ export async function extractText(buffer) {
   return (await readLines(buffer)).map((l) => l.text).join('\n').trim();
 }
 
+// Header labels of the sample format -> field (null: a label we recognise but do not use)
+const HEADER_LABELS = {
+  STUDENT: 'name', 'STUDENT NAME': 'name', NAME: 'name', 'STUDENT ID': 'student_id', ID: 'student_id',
+  'INTENDED BU MAJOR': 'program', 'BU MAJOR': 'program', MAJOR: 'program', PROGRAM: 'program',
+  'BU START': 'start_term', 'START TERM': 'start_term', INSTITUTION: null, 'DATE PREPARED': null,
+};
+
+// Watermark-style tags printed next to header values in the sample files; never part of a value
+const HEADER_BADGES = new Set(['SYNTHETIC', 'WORKSHEET', 'TEST', 'SAMPLE', 'UNOFFICIAL']);
+const labelKey = (text) => text.toUpperCase().replace(/\s*\(.*\)\s*$/, '').trim();
+
+/**
+ * The header block: a row of labels with their values just below, matched by column position. Values are taken
+ * from the text within one line-height below the labels, so a tag printed slightly off the baseline is ignored.
+ * @returns {{ name?, student_id?, program?, start_term? }} only the fields found
+ */
+function parseHeader(lines) {
+  const out = {};
+  for (let i = 0; i < lines.length - 1; i++) {
+    const row = lines[i];
+    const isLabel = (it) => it.s === it.s.toUpperCase() && Object.prototype.hasOwnProperty.call(HEADER_LABELS, labelKey(it.s));
+    if (!row.items.length || !row.items.every(isLabel)) continue; // a label row holds labels only
+    const below = lines.slice(i + 1).filter((l) => l.page === row.page && l.y < row.y && row.y - l.y <= 20);
+    const values = below.flatMap((l) => l.items).filter((v) => !HEADER_BADGES.has(v.s.toUpperCase()));
+    row.items.forEach((label, j) => {
+      const key = HEADER_LABELS[labelKey(label.s)];
+      const next = row.items[j + 1];
+      const text = values.filter((v) => v.x >= label.x - 3 && (!next || v.x < next.x - 3)).map((v) => v.s).join(' ').trim();
+      if (key && text && !out[key]) out[key] = text;
+    });
+  }
+  return out;
+}
+
 /**
  * Structured-layout parser for the hackathon sample transcript format.
  * @returns {{ institution, credit_system, courses }} — courses is empty if layout not recognised
@@ -70,7 +105,7 @@ function parseStructured(lines) {
     if (!code || !GRADE.test(grade) || (attempted !== null && !Number.isFinite(attempted))) continue;
     courses.push({ course_code: code, title: cells.TITLE.join(' ').trim(), term, source_credits: attempted, grade });
   }
-  return { institution, credit_system, courses };
+  return { institution, credit_system, courses, student: parseHeader(lines) };
 }
 
 const AI_SYSTEM_PROMPT = `Extract transcript data from the text and return ONLY valid JSON with this exact structure:

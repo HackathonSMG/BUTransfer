@@ -63,7 +63,7 @@ export default function OfficeApplication() {
   }
 
   if (state.loading) return <div className="flex justify-center py-24"><Spinner size="lg" className="text-primary-600" /></div>
-  if (state.error) return <div className="max-w-3xl mx-auto space-y-4"><BackLink /><div className="staff-card"><EmptyState title="Application unavailable" description={state.error} /></div></div>
+  if (state.error) return <div className="max-w-3xl mx-auto space-y-4"><BackLink /><div className="staff-card"><EmptyState title="Evaluation unavailable" description={state.error} /></div></div>
 
   const d = state.data
   const app = d.application
@@ -113,7 +113,7 @@ export default function OfficeApplication() {
       {/* Duplicate */}
       {d.duplicate?.status === 'suspected' && (
         <section className="rounded-xl border border-amber-300 bg-amber-50/70 px-5 py-4">
-          <p className="flex items-center gap-2 font-semibold text-staff-ink"><Copy className="w-4 h-4 text-amber-700" />Potential duplicate application</p>
+          <p className="flex items-center gap-2 font-semibold text-staff-ink"><Copy className="w-4 h-4 text-amber-700" />Potential duplicate evaluation</p>
           <p className="text-[14px] text-staff-ink2 mt-1">{d.duplicate.reason}</p>
           <div className="grid sm:grid-cols-2 gap-3 mt-3 text-[13.5px]">
             <Compare title="This application" rows={[[app.reference_number, app.transfer_from_institution], ['Start term', app.expected_start_term], ['Courses', d.courses.length]]} />

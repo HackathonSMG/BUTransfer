@@ -31,7 +31,7 @@ export default function DecisionForm({ applicationId, onSuccess, onClose, isOpen
     setLoading(true)
     try {
       await submitDecision(applicationId, { decision, comments })
-      toast.success(`Application ${decision === 'approved' ? 'approved' : 'rejected'} successfully`)
+      toast.success(`Evaluation ${decision === 'approved' ? 'approved' : 'rejected'}`)
       onSuccess && onSuccess({ decision, comments })
       onClose()
     } catch (err) {
@@ -56,7 +56,7 @@ export default function DecisionForm({ applicationId, onSuccess, onClose, isOpen
           <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-amber-800">
             <strong>This decision is final</strong> and will immediately notify the student via email.
-            Please review the application thoroughly before proceeding.
+            Please review the evaluation thoroughly before proceeding.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export default function DecisionForm({ applicationId, onSuccess, onClose, isOpen
                 <p className={`font-semibold text-sm ${decision === 'rejected' ? 'text-red-800' : 'text-gray-700'}`}>
                   Reject
                 </p>
-                <p className="text-xs text-gray-500">Application is denied</p>
+                <p className="text-xs text-gray-500">No transfer credit is awarded</p>
               </div>
             </label>
           </div>

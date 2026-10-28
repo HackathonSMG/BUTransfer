@@ -16,7 +16,7 @@ const PROCESS_STEPS = [
     icon: FileText,
     step: '02',
     title: 'Apply & Upload',
-    description: 'Submit your transfer credit application with transcripts from every college you attended. No account needed.'
+    description: 'Submit the final transcript from every college you attended for credit evaluation. No account needed.'
   },
   {
     icon: Scale,
@@ -28,7 +28,7 @@ const PROCESS_STEPS = [
     icon: Award,
     step: '04',
     title: 'Credit Posted',
-    description: 'Each decided course is posted with a grade of T. Track every course with your application number.'
+    description: 'Each decided course is posted with a grade of T. Track every course with your Transfer Credit ID.'
   }
 ]
 
@@ -39,7 +39,7 @@ export default function Home() {
   // The tracking page asks for the email that goes with the application number
   const handleTrack = (e) => {
     e.preventDefault()
-    navigate(trackInput.trim() ? `/track?application=${encodeURIComponent(trackInput.trim().toUpperCase())}` : '/track')
+    navigate(trackInput.trim() ? `/track?id=${encodeURIComponent(trackInput.trim().toUpperCase())}` : '/track')
   }
 
   return (
@@ -56,7 +56,7 @@ export default function Home() {
           </h1>
           <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
             For admitted transfer students: submit final transcripts from every college you attended, receive an
-            application number, and follow every course through evaluation until your credit is posted.
+            Transfer Credit ID, and follow every course through evaluation until your credit is posted.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -79,7 +79,7 @@ export default function Home() {
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
             >
               <Search className="w-5 h-5" />
-              Track Application
+              Track Transfer Credit
             </Link>
           </div>
           <p className="mt-6 text-sm text-red-100">
@@ -121,15 +121,15 @@ export default function Home() {
       <section className="py-16 bg-gray-50">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
           <Search className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Application</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Transfer Credit</h2>
           <p className="text-gray-500 mb-6">
-            See every course, its evaluation status and the credits awarded. You need your application number and the email address you applied with.
+            See every course, its evaluation status and the credits awarded. You need your Transfer Credit ID and the email address you submitted with.
           </p>
           <form onSubmit={handleTrack} className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
-              aria-label="Application number"
-              placeholder="Application number, e.g. APP-2026-0001"
+              aria-label="Transfer Credit ID"
+              placeholder="Transfer Credit ID, e.g. TC-2026-0001"
               value={trackInput}
               onChange={(e) => setTrackInput(e.target.value)}
               className="flex-1 px-4 py-3 text-sm font-mono border border-gray-300 rounded-xl focus:outline-none focus:border-brand focus:ring-2 focus:ring-red-100"
@@ -138,10 +138,10 @@ export default function Home() {
               type="submit"
               className="px-6 py-3 bg-brand text-white font-medium rounded-xl hover:bg-brand-dark transition-colors flex-shrink-0 inline-flex items-center justify-center gap-2"
             >
-              Track Application<ArrowRight className="w-4 h-4" />
+              Track Transfer Credit<ArrowRight className="w-4 h-4" />
             </button>
           </form>
-          <p className="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Your application number is in your confirmation email.</p>
+          <p className="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Your Transfer Credit ID is in your confirmation email.</p>
         </div>
       </section>
 

@@ -23,7 +23,7 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" subtitle="The measured outcome, where applications stand and how work is spread across evaluators." />
+      <PageHeader title="Reports" subtitle="The measured outcome, where evaluations stand and how work is spread across evaluators." />
       {error ? <p className="text-sm text-red-700">{error}</p> : !d ? (
         <div className="flex justify-center py-20"><Spinner size="lg" className="text-primary-600" /></div>
       ) : (
@@ -31,19 +31,19 @@ export default function Reports() {
           <ImpactPanel impact={d.impact} />
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <section className="staff-card p-6">
-              <h2 className="text-[17px] font-semibold text-staff-ink mb-4">Applications by status</h2>
+              <h2 className="text-[17px] font-semibold text-staff-ink mb-4">Evaluations by status</h2>
               <BarList
                 rows={STATUS_ORDER.filter(s => d.by_status[s]).map(s => ({
                   key: s, label: STATUS_LABELS[s] || s, value: d.by_status[s],
                   onClick: () => navigate(`/admin/applications?status=${s}`)
                 }))}
-                unit="applications"
-                emptyText="No applications yet"
+                unit="evaluations"
+                emptyText="No evaluations yet"
               />
             </section>
             <section className="staff-card p-6">
-              <h2 className="text-[17px] font-semibold text-staff-ink mb-4">Applications by BU program</h2>
-              <BarList rows={d.by_program.map(p => ({ key: p.program, label: p.program, value: p.count }))} unit="applications" emptyText="No applications yet" />
+              <h2 className="text-[17px] font-semibold text-staff-ink mb-4">Evaluations by BU program</h2>
+              <BarList rows={d.by_program.map(p => ({ key: p.program, label: p.program, value: p.count }))} unit="evaluations" emptyText="No evaluations yet" />
             </section>
           </div>
           <section className="staff-card p-6">

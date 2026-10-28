@@ -6,6 +6,7 @@ import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import * as informationService from '../services/workflow/information.service.js';
 import * as selfCheckService from '../services/selfcheck.service.js';
 import * as tracking from '../services/applicant/tracking.service.js';
+import { readTranscript as readTranscriptFile } from '../services/credit/credit.service.js';
 import { applicantStatus } from '../services/applicant/applicant-status.js';
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
@@ -52,7 +53,7 @@ export async function submitApplication(req, res, next) {
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
     const { draft, ...fields } = parseResult.data;
     // A signed-in student owns the application; the account's name and email are used
-    if (req.user && req.user.role !== 'student') return next(badRequest('Staff raise applications from the staff portal.'));
+    if (req.user && req.user.role !== 'student') return next(badRequest('Staff create credit evaluations from the staff portal.'));
     if (req.user) Object.assign(fields, { student_profile_id: req.user.id, student_email: req.user.email });
     const application = await applicationService.createApplication(fields, 'website', req.user?.id || null, { draft });
     const secureLink = `${env.APP_URL}/status/${application.secure_token}`;
@@ -105,7 +106,29 @@ export async function removeDraftDocument(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-// -- Public applicant access (no account) ----------------------------------------------------------------
+// Reads one transcript before submission so the student can confirm what was found. Nothing is stored.
+export async function readTranscript(req, res, next) {
+  try {
+    if (!req.file) return next(badRequest('No file was uploaded'));
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(200).json({ data: { file_name: req.file.originalname, readable: false, reason: 'Only PDF transcripts can be read automatically.' } });
+    }
+    let r;
+    try { r = await readTranscriptFile(req.file.buffer); } catch (err) {
+      console.error('[Transcript] Read failed:', err.message);
+      return res.status(200).json({ data: { file_name: req.file.originalname, readable: false, reason: 'The file could not be read as a transcript.' } });
+    }
+    const readable = Boolean(r.institution) && r.courses.length > 0;
+    return res.status(200).json({ data: {
+      file_name: req.file.originalname, readable,
+      reason: readable ? null : 'No courses could be read from this file. Upload the official transcript PDF issued by the college.',
+      institution: r.institution, credit_system: r.credit_system, student: r.student,
+      courses: r.courses.map((c) => ({ course_code: c.course_code, title: c.title, term: c.term, credits: c.source_credits, grade: c.grade })),
+    } });
+  } catch (err) { return next(err); }
+}
+
+// -- Public student access (no account) ----------------------------------------------------------------
 
 const emailSchema = z.object({ email: z.string().trim().email().max(320) });
 const trackSchema = z.object({ application_number: z.string().trim().min(4).max(40), email: z.string().trim().email().max(320) });
@@ -125,7 +148,7 @@ export async function emailApplicationNumbers(req, res, next) {
     const parsed = emailSchema.safeParse(req.body || {});
     if (!parsed.success) return next(badRequest('Enter a valid email address'));
     await tracking.emailApplicationNumbers(parsed.data.email);
-    return res.status(200).json({ data: { message: 'If there are applications for this email address, their numbers have been sent to it.' } });
+    return res.status(200).json({ data: { message: 'If there are transfer credit evaluations for this email address, their Transfer Credit IDs have been sent to it.' } });
   } catch (err) { return next(err); }
 }
 
@@ -133,7 +156,7 @@ export async function emailApplicationNumbers(req, res, next) {
 export async function trackApplication(req, res, next) {
   try {
     const parsed = trackSchema.safeParse(req.body || {});
-    if (!parsed.success) return next(badRequest('Enter your application number and the email address you applied with.'));
+    if (!parsed.success) return next(badRequest('Enter your Transfer Credit ID and the email address you submitted with.'));
     const app = await tracking.findForTracking(parsed.data.application_number, parsed.data.email);
     if (!app) return next(notFound('Application'));
     return res.status(200).json({ data: { reference_number: app.reference_number, access_token: app.secure_token } });
@@ -253,4 +276,4 @@ export async function getStudentNotifications(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { eligibilityCheck, submitApplication, submitDraft, updateDraft, removeDraftDocument, checkExistingApplications, emailApplicationNumbers, trackApplication, myApplications, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };
+export default { eligibilityCheck, readTranscript, submitApplication, submitDraft, updateDraft, removeDraftDocument, checkExistingApplications, emailApplicationNumbers, trackApplication, myApplications, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };

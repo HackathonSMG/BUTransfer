@@ -21,7 +21,7 @@ export default function ImpactPanel({ impact: m, compact = false }) {
       <div className="px-6 pt-5 pb-4 flex flex-wrap items-end justify-between gap-4 border-b border-staff-line2">
         <div>
           <h2 id={compact ? undefined : 'impact'} className="flex items-center gap-2 text-[17px] font-semibold text-staff-ink">
-            <Gauge className="w-[18px] h-[18px] text-staff-ink2" />{compact ? 'Evaluation impact for this application' : 'Transfer Credit Evaluation Impact'}
+            <Gauge className="w-[18px] h-[18px] text-staff-ink2" />{compact ? 'Evaluation impact for this student' : 'Transfer Credit Evaluation Impact'}
           </h2>
           <p className="text-[13px] text-staff-muted mt-0.5">Courses settled without department work, from recorded decisions.</p>
         </div>

@@ -11,7 +11,7 @@ export default function ApplicationStatus() {
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        {user?.role === 'student' && <Link to="/student" className="inline-block text-sm text-gray-500 hover:text-gray-800 mb-4">← My Applications</Link>}
+        {user?.role === 'student' && <Link to="/student" className="inline-block text-sm text-gray-500 hover:text-gray-800 mb-4">← My Transfer Credit</Link>}
         <ApplicationTracker token={token} />
       </div>
     </div>
