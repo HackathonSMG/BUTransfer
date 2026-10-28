@@ -5,3 +5,5 @@ playwright-report/
 playwright/.auth/
 qa-report.md
 qa-summary.json
+tests/generated/ai-tests.spec.js
+tests/generated/ai-status.json

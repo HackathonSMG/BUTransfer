@@ -30,8 +30,10 @@ module.exports = defineConfig({
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.js/ },
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /(admin|mobile)\.spec\.js/ },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile\.spec\.js/ },
-    { name: 'staff', use: { ...devices['Desktop Chrome'] }, testMatch: /admin\.spec\.js/, dependencies: ['setup'] },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: [/(admin|mobile)\.spec\.js/, /generated\//] },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile\.spec\.js/, testIgnore: /generated\// },
+    { name: 'staff', use: { ...devices['Desktop Chrome'] }, testMatch: /admin\.spec\.js/, testIgnore: /generated\//, dependencies: ['setup'] },
+    // Tests written by the Foundry agent for this build (tests/generated/ai-tests.spec.js, read-only via guard.js)
+    { name: 'ai-generated', use: { ...devices['Desktop Chrome'] }, testDir: './tests/generated', testMatch: /ai-.*\.spec\.js/ },
   ],
 });

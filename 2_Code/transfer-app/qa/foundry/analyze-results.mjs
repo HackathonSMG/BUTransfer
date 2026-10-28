@@ -31,6 +31,7 @@ function collect(suite, file, out) {
         duration_ms: last.duration ?? 0,
         requirements: [...new Set(title.match(/R\d+/g) || [])],
         known_bug: bug ? Number(bug[1]) : null,
+        ai_generated: t.projectName === 'ai-generated' || title.includes('[AI]'),
         skip_reason: status === 'skipped' ? (t.annotations || []).map((a) => a.description).filter(Boolean).join('; ') || undefined : undefined,
         error: status === 'failed'
           ? String(last.error?.message || '').replace(/\u001b\[[0-9;]*m/g, '').split('\n').slice(0, 6).join('\n').slice(0, 600)
@@ -55,10 +56,16 @@ for (const s of raw.suites || []) collect(s, s.file, tests);
 
 const count = (st) => tests.filter((t) => t.status === st).length;
 const failed = tests.filter((t) => t.status === 'failed');
-const regressions = failed.filter((t) => !t.known_bug);
+// AI-written tests may themselves be wrong, so their failures are reported separately, never as regressions
+const regressions = failed.filter((t) => !t.known_bug && !t.ai_generated);
+const aiTests = tests.filter((t) => t.ai_generated);
+let aiStatus = null;
+try { aiStatus = JSON.parse(fs.readFileSync('tests/generated/ai-status.json', 'utf8')); } catch {}
 const summary = {
   total: tests.length, passed: count('passed'), failed: failed.length, flaky: count('flaky'), skipped: count('skipped'),
-  regressions: regressions.length, known_bug_failures: failed.length - regressions.length,
+  regressions: regressions.length, known_bug_failures: failed.filter((t) => t.known_bug).length,
+  ai_tests: { generated: aiStatus?.generated ?? false, note: aiStatus?.reason || null, total: aiTests.length,
+    passed: aiTests.filter((t) => t.status === 'passed').length, failed: aiTests.filter((t) => t.status === 'failed').length },
 };
 
 const runUrl = env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : null;
@@ -101,6 +108,9 @@ function fallbackReport(reason) {
     '', `_AI analysis unavailable (${reason}); showing the plain summary._`, '',
     '### New regressions',
     regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n')[0]).slice(0, 160)} |`)].join('\n') : 'None',
+    '', '### AI-written tests for this build',
+    aiTests.length ? aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')
+      : `None (${summary.ai_tests.note || 'not generated'})`,
     '', '### Known bugs still failing',
     failed.filter((t) => t.known_bug).map((t) => `- #${t.known_bug} ${t.title}`).join('\n') || 'None',
   ].join('\n');
