@@ -6,7 +6,7 @@ import StatusPill from '../../components/staff/StatusPill'
 import PageHeader from '../../components/staff/PageHeader'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchLabelClass } from '../../lib/reviews'
+import { REVIEW_STATUS, matchLabelClass, matchDisplay } from '../../lib/reviews'
 
 const TABS = [
   ['open', 'Open'],
@@ -130,7 +130,7 @@ export default function MyEvaluations() {
                     <span className="hidden md:block">
                       {r.match_label ? (
                         <>
-                          <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{Math.round(r.match_score * 100)}%</span>
+                          {matchDisplay(r).value && <span className="block text-[15px] font-semibold text-staff-ink tabular-nums">{matchDisplay(r).value}</span>}
                           <span className={`block text-[12px] font-medium ${matchLabelClass(r.match_label)}`}>{r.match_label}</span>
                         </>
                       ) : <span className="text-[13px] text-staff-muted">Not scored</span>}

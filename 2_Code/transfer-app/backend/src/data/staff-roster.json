@@ -1,7 +1,10 @@
 {
-  "description": "Development staff roster: one administrator and the evaluator master data. data_source 'sponsor' means the evaluator's program and BU courses come from the sponsor workbook (3_Data/sponsor, BU Courses sheet); the people are fictional. 'synthetic' evaluators exist to test routing edge cases. Passwords are not stored here; the importer sets one initial password for new accounts.",
+  "description": "Development staff roster: one administrator, Credit Evaluation Office staff and the evaluator master data. data_source 'sponsor' means the evaluator's program and BU courses come from the sponsor workbook (3_Data/sponsor, BU Courses sheet); the people are fictional. 'synthetic' evaluators exist to test routing edge cases. Passwords are not stored here; the importer sets one initial password for new accounts.",
   "admins": [
     { "email": "admin@bu-transfer.local", "full_name": "Avery Collins" }
+  ],
+  "credit_office": [
+    { "email": "credit.office@bu-transfer.local", "full_name": "Jordan Ellis", "title": "Transfer Credit Coordinator" }
   ],
   "evaluators": [
     {

@@ -10,6 +10,9 @@ const STATUS_COLORS = {
   approved: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   closed: 'bg-gray-100 text-gray-600',
+  validation_failed: 'bg-red-100 text-red-800',
+  ready_for_posting: 'bg-sky-100 text-sky-800',
+  credit_posted: 'bg-green-100 text-green-800',
   // Generic
   success: 'bg-green-100 text-green-800',
   warning: 'bg-yellow-100 text-yellow-800',

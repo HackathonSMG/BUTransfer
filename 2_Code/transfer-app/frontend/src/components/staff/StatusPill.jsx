@@ -19,6 +19,8 @@ export const STATUS_TONES = {
   evaluation_completed: 'info',
   under_evaluator_review: 'warn',
   validation_failed: 'bad',
+  ready_for_posting: 'info',
+  credit_posted: 'ok',
   approved: 'ok',
   rejected: 'bad',
   closed: 'neutral'

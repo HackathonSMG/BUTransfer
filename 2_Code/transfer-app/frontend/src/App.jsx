@@ -26,12 +26,16 @@ import ReviewDetail from './pages/evaluator/ReviewDetail'
 import Reports from './pages/admin/Reports'
 import Conflicts from './pages/admin/Conflicts'
 import NotFound from './pages/NotFound'
+import SelfCheck from './pages/student/SelfCheck'
+import OfficeDashboard from './pages/office/OfficeDashboard'
+import OfficeApplication from './pages/office/OfficeApplication'
 
 // /evaluator is the evaluator's dashboard; older links that sent admins here now go to the applications list
 function EvaluatorHome() {
   const { user } = useAuth()
   const { search } = useLocation()
   if (user?.role === 'admin') return <Navigate to={`/admin/applications${search}`} replace />
+  if (user?.role === 'credit_office') return <Navigate to="/office" replace />
   return <Layout><MyDashboard /></Layout>
 }
 
@@ -45,13 +49,14 @@ export default function App() {
         <Route path="/apply/confirm" element={<Layout><ApplicationConfirmation /></Layout>} />
         <Route path="/status/:token" element={<Layout><ApplicationStatus /></Layout>} />
         <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
+        <Route path="/self-check" element={<Layout><SelfCheck /></Layout>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
 
         {/* Evaluator workspace; admins who land on /evaluator go to the admin applications list */}
         <Route
           path="/evaluator"
           element={
-            <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+            <ProtectedRoute allowedRoles={['evaluator', 'admin', 'credit_office']}>
               <EvaluatorHome />
             </ProtectedRoute>
           }
@@ -99,7 +104,7 @@ export default function App() {
         <Route
           path="/evaluator/equivalencies"
           element={
-            <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+            <ProtectedRoute allowedRoles={['evaluator', 'admin', 'credit_office']}>
               <Layout>
                 <Equivalencies />
               </Layout>
@@ -109,9 +114,31 @@ export default function App() {
         <Route
           path="/evaluator/applications/:id"
           element={
-            <ProtectedRoute allowedRoles={['evaluator', 'admin']}>
+            <ProtectedRoute allowedRoles={['evaluator', 'admin', 'credit_office']}>
               <Layout>
                 <ApplicationDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Credit Evaluation Office (credit office staff and administrators) */}
+        <Route
+          path="/office"
+          element={
+            <ProtectedRoute allowedRoles={['credit_office', 'admin']}>
+              <Layout>
+                <OfficeDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/office/applications/:id"
+          element={
+            <ProtectedRoute allowedRoles={['credit_office', 'admin']}>
+              <Layout>
+                <OfficeApplication />
               </Layout>
             </ProtectedRoute>
           }
@@ -121,7 +148,7 @@ export default function App() {
         <Route
           path="/admin/conflicts"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'credit_office']}>
               <Layout>
                 <Conflicts />
               </Layout>
@@ -141,7 +168,7 @@ export default function App() {
         <Route
           path="/admin/applications"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'credit_office']}>
               <Layout>
                 <EvaluatorDashboard />
               </Layout>

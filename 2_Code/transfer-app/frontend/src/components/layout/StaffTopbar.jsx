@@ -7,7 +7,8 @@ import { initials } from '../../lib/reviews'
 
 const ROLE_LABELS = {
   evaluator: 'Evaluator',
-  admin: 'Administrator'
+  admin: 'Administrator',
+  credit_office: 'Credit Evaluation Office'
 }
 
 // Breadcrumb trail for each staff route
@@ -16,12 +17,14 @@ function crumbsFor(pathname, role) {
   if (pathname === '/evaluator/my-evaluations') return ['My Workspace', 'My Evaluations']
   if (pathname === '/evaluator/profile') return ['My Workspace', 'My Profile']
   if (pathname.startsWith('/evaluator/reviews/')) return ['My Workspace', 'My Evaluations', 'Course Review']
+  if (pathname === '/office') return ['Credit Evaluation Office', 'Dashboard']
+  if (pathname.startsWith('/office/applications/')) return ['Credit Evaluation Office', 'Applications', 'Application']
   if (pathname === '/admin/reports') return ['Administration', 'Reports']
   if (pathname === '/admin/conflicts') return ['Course Mapping', 'Equivalency Conflicts']
-  if (pathname === '/admin/applications') return ['Administration', 'Applications']
+  if (pathname === '/admin/applications') return role === 'credit_office' ? ['Credit Evaluation Office', 'Applications'] : ['Administration', 'Applications']
   if (pathname === '/evaluator/applications/new') return ['Administration', 'Applications', 'New Application']
   if (pathname.startsWith('/evaluator/applications/')) {
-    return role === 'admin' ? ['Administration', 'Applications', 'Application Review'] : ['My Workspace', 'My Evaluations', 'Application Review']
+    return role === 'admin' ? ['Administration', 'Applications', 'Application Review'] : role === 'credit_office' ? ['Credit Evaluation Office', 'Applications', 'Evaluation Report'] : ['My Workspace', 'My Evaluations', 'Application Review']
   }
   if (pathname === '/evaluator/equivalencies') return ['Course Mapping', 'Course Equivalencies']
   if (pathname === '/admin') return ['Administration', 'Dashboard']
@@ -87,7 +90,7 @@ export default function StaffTopbar({ onOpenNav }) {
   }
 
   // Admins search all applications; evaluators search their own evaluations. Both pages read ?search=
-  const searchPage = user?.role === 'admin' ? '/admin/applications' : '/evaluator/my-evaluations'
+  const searchPage = ['admin', 'credit_office'].includes(user?.role) ? '/admin/applications' : '/evaluator/my-evaluations'
   const handleSearch = (e) => {
     e.preventDefault()
     const q = search.trim()
@@ -124,7 +127,7 @@ export default function StaffTopbar({ onOpenNav }) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={user?.role === 'admin' ? 'Search students, references, institutions' : 'Search my evaluations'}
+          placeholder={['admin', 'credit_office'].includes(user?.role) ? 'Search students, references, institutions' : 'Search my evaluations'}
           className="w-full pl-9 pr-3 py-2 text-sm bg-staff-sunk border border-transparent rounded-lg placeholder:text-staff-muted focus:outline-none focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
         />
       </form>

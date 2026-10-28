@@ -91,10 +91,11 @@ async function seedScenario(s) {
   }
   await applicationService.triggerEvaluation(app.id, null);
   await waitForEvaluations(app.id);
-  // Assignment runs just after the evaluation is marked completed
-  for (let i = 0; i < 40; i++) {
-    const { rows } = await query(`SELECT COUNT(*)::int AS n FROM course_reviews WHERE application_id = $1`, [app.id]);
-    if (rows[0].n > 0) break;
+  // Established equivalencies are applied and the rest assigned just after the evaluation is marked completed;
+  // that ends by moving the application on from 'evaluation_completed'
+  for (let i = 0; i < 60; i++) {
+    const { rows } = await query(`SELECT status FROM applications WHERE id = $1`, [app.id]);
+    if (!['evaluation_completed', 'under_evaluation', 'submitted'].includes(rows[0].status)) break;
     await sleep(250);
   }
 

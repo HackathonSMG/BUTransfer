@@ -7,36 +7,23 @@ import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import Spinner from '../ui/Spinner'
 
-function ConfidenceBar({ score }) {
-  const pct = Math.round((score || 0) * 100)
-  const colorClass = score >= 0.8
-    ? 'bg-green-500'
-    : score >= 0.6
-    ? 'bg-yellow-400'
-    : 'bg-red-500'
-  const textColor = score >= 0.8
-    ? 'text-green-700'
-    : score >= 0.6
-    ? 'text-yellow-700'
-    : 'text-red-700'
+// The eligibility check's score and its wording both come from the API (score_label); the browser adds no
+// thresholds of its own. It describes the initial eligibility criteria, not a course match.
+const LABEL_TONES = { ok: ['bg-green-500', 'text-green-700'], warn: ['bg-yellow-400', 'text-yellow-700'], bad: ['bg-red-500', 'text-red-700'] }
 
+function EligibilityScore({ score, label }) {
+  const pct = Math.round((score || 0) * 100)
+  const [bar, text] = LABEL_TONES[label?.tone] || ['bg-gray-400', 'text-gray-700']
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">Overall Confidence Score</span>
-        <span className={`text-lg font-bold ${textColor}`}>{pct}%</span>
+        <span className="text-sm font-medium text-gray-700">Initial eligibility criteria met</span>
+        <span className={`text-lg font-bold ${text}`}>{pct}%</span>
       </div>
       <div className="w-full bg-gray-100 rounded-full h-3">
-        <div
-          className={`h-3 rounded-full transition-all duration-500 ${colorClass}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-3 rounded-full transition-all duration-500 ${bar}`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-gray-500 mt-1">
-        {score >= 0.8 ? 'High confidence — application meets most criteria' :
-         score >= 0.6 ? 'Moderate confidence — some criteria need review' :
-         'Low confidence — significant concerns identified'}
-      </p>
+      {label?.text && <p className="text-xs text-gray-500 mt-1">{label.text}</p>}
     </div>
   )
 }
@@ -134,9 +121,9 @@ export default function AIEvaluationReport({ evaluation, onTrigger, triggering =
 
   return (
     <div className="space-y-5">
-      {/* Confidence Score */}
+      {/* Eligibility criteria */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <ConfidenceBar score={evaluation.confidence_score || evaluation.overall_score} />
+        <EligibilityScore score={evaluation.confidence_score || evaluation.overall_score} label={evaluation.score_label} />
         {evaluatedAt && (
           <p className="text-xs text-gray-400 mt-2">
             Evaluated: {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evaluatedAt))}

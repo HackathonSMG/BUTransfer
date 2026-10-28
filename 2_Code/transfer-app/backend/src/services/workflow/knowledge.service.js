@@ -8,9 +8,9 @@
 //   different_outcome     one decision grants a BU course while another grants only elective or no credit
 //   match_divergence      open reviews of the same source course whose course-match scores differ by
 //                         MATCH_DIVERGENCE or more (0.25 = 25 points; small differences are not flagged)
-// A conflict is resolved once an administrator records a standard equivalency on or after the latest
-// conflicting decision. Resolving never changes an evaluator's decision; it sets the equivalency that
-// applies to future transcripts.
+// A conflict is resolved once an administrator or the Credit Evaluation Office records a standard equivalency
+// on or after the latest conflicting decision, or marks the conflict resolved (conflict_resolutions) after it.
+// Resolving never changes an evaluator's decision; it sets the equivalency that applies to future transcripts.
 import { query } from '../../config/db.js';
 import { log as auditLog } from '../audit.service.js';
 import { invalidateEngine } from '../credit/credit.service.js';
@@ -31,10 +31,12 @@ export function matchLabel(score) {
   return score >= 0.85 ? 'Strong match' : score >= 0.65 ? 'Partial match' : 'Weak match';
 }
 
-function detect(decisions, equivalency, scores = []) {
-  const relevant = equivalency?.approved_on
+function detect(decisions, equivalency, scores = [], resolvedAt = null) {
+  let relevant = equivalency?.approved_on
     ? decisions.filter((d) => !d.decided_on || d.decided_on > equivalency.approved_on)
     : decisions;
+  // Marked resolved: only decisions recorded after the resolution can re-open the conflict
+  if (resolvedAt) relevant = relevant.filter((d) => d.recorded_at && new Date(d.recorded_at) > new Date(resolvedAt));
   const conflicts = [];
 
   const awards = [...new Set(relevant.filter(grantsBuCourse).map((d) => buCourses(d.bu_awarded)))];
@@ -52,44 +54,54 @@ function detect(decisions, equivalency, scores = []) {
   }
 
   const numeric = scores.map(Number).filter((s) => !Number.isNaN(s));
-  if (numeric.length > 1 && Math.max(...numeric) - Math.min(...numeric) >= MATCH_DIVERGENCE) {
+  if (!resolvedAt && numeric.length > 1 && Math.max(...numeric) - Math.min(...numeric) >= MATCH_DIVERGENCE) {
     conflicts.push({ type: 'match_divergence', summary: `Course-match scores range from ${Math.round(Math.min(...numeric) * 100)}% to ${Math.round(Math.max(...numeric) * 100)}%.` });
   }
   return conflicts;
 }
 
 const DECISION_COLUMNS = `pd.decision_id, pd.decision, pd.bu_awarded, pd.reason, TO_CHAR(pd.decided_on, 'YYYY-MM-DD') AS decided_on, pd.source,
-  CASE WHEN pd.source = 'evaluator' THEN COALESCE(p.full_name, pd.evaluator) ELSE NULL END AS evaluator`;
+  pd.created_at AS recorded_at, CASE WHEN pd.source = 'evaluator' THEN COALESCE(p.full_name, pd.evaluator) ELSE pd.evaluator END AS evaluator`;
 
 /**
  * Everything known about one transfer course, for the evaluator reviewing it.
  * @param {{institution, courseCode, targetBuCourse?}} course
  */
 export async function courseKnowledge({ institution, courseCode, targetBuCourse }) {
-  const [eq, decisions, similar, scores, escalations] = await Promise.all([
-    query(`SELECT eq_id, bu_course, outcome, TO_CHAR(approved_on, 'YYYY-MM-DD') AS approved_on, source, evaluator, COALESCE(array_length(promoted_from, 1), 0) AS from_decisions
-           FROM equivalencies WHERE institution = $1 AND course_code = $2 AND status = 'active'`, [institution, courseCode]),
+  // A combined award ("CAS CH 101 + CAS CH 102") is looked up by its first BU course
+  const target = buCourses(targetBuCourse).split(' + ')[0] || targetBuCourse || null;
+  const [eq, decisions, similar, scores, escalations, resolution] = await Promise.all([
+    query(`SELECT e.eq_id, e.bu_course, e.outcome, TO_CHAR(e.approved_on, 'YYYY-MM-DD') AS approved_on, e.source, e.evaluator,
+                  COALESCE(array_length(e.promoted_from, 1), 0) AS from_decisions,
+                  (SELECT COUNT(DISTINCT ce.transcript_course_id)::int FROM course_evaluations ce WHERE ce.equivalency_id = e.eq_id) AS times_applied
+           FROM equivalencies e WHERE e.institution = $1 AND e.course_code = $2 AND e.status = 'active'`, [institution, courseCode]),
     query(`SELECT ${DECISION_COLUMNS} FROM past_decisions pd LEFT JOIN profiles p ON p.id = pd.decided_by
            WHERE pd.institution = $1 AND pd.course_code = $2 AND pd.status = 'active' ORDER BY pd.decided_on DESC NULLS LAST`, [institution, courseCode]),
-    targetBuCourse
+    target
       ? query(`SELECT pd.institution, pd.course_code, pd.decision, pd.bu_awarded, TO_CHAR(pd.decided_on, 'YYYY-MM-DD') AS decided_on
                FROM past_decisions pd WHERE pd.status = 'active' AND pd.bu_awarded LIKE '%' || $1 || '%'
                  AND NOT (pd.institution = $2 AND pd.course_code = $3)
                UNION ALL
                SELECT e.institution, e.course_code, 'Established equivalency', e.bu_course, TO_CHAR(e.approved_on, 'YYYY-MM-DD')
                FROM equivalencies e WHERE e.status = 'active' AND e.bu_course = $1 AND NOT (e.institution = $2 AND e.course_code = $3)
-               ORDER BY decided_on DESC NULLS LAST LIMIT 6`, [targetBuCourse, institution, courseCode])
+               ORDER BY decided_on DESC NULLS LAST LIMIT 6`, [target, institution, courseCode])
       : { rows: [] },
     query(`SELECT r.match_score FROM course_reviews r JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-           WHERE tc.institution = $1 AND tc.course_code = $2 AND r.status IN ('new', 'in_progress', 'info_requested') AND r.match_score IS NOT NULL`,
+           WHERE tc.institution = $1 AND COALESCE(tc.catalog_code, tc.course_code) = $2 AND r.status IN ('new', 'in_progress', 'info_requested')
+             AND r.match_score IS NOT NULL AND r.match_basis = 'similarity'`,
       [institution, courseCode]),
     query(`SELECT al.created_at, COALESCE(p.full_name, al.actor_email) AS actor, al.details->>'note' AS note FROM audit_logs al
            LEFT JOIN profiles p ON p.id = al.actor_id
            WHERE al.action = 'conflict_escalated' AND al.details->>'institution' = $1 AND al.details->>'course_code' = $2
            ORDER BY al.created_at DESC LIMIT 3`, [institution, courseCode]),
+    query(`SELECT cr.action, cr.note, cr.created_at, COALESCE(p.full_name, 'Staff') AS resolved_by FROM conflict_resolutions cr
+           LEFT JOIN profiles p ON p.id = cr.resolved_by
+           WHERE cr.institution = $1 AND cr.course_code = $2 AND cr.action IN ('resolved', 'use_established')
+           ORDER BY cr.created_at DESC LIMIT 1`, [institution, courseCode]),
   ]);
 
   const established = eq.rows[0] || null;
+  const resolved = resolution.rows[0] || null;
   const rows = decisions.rows;
   const byAward = new Map();
   for (const d of rows) {
@@ -110,9 +122,27 @@ export async function courseKnowledge({ institution, courseCode, targetBuCourse 
       decisions: rows,
     },
     similar: similar.rows,
-    conflicts: detect(rows, established, scores.rows.map((s) => s.match_score)),
+    conflicts: detect(rows, established, scores.rows.map((s) => s.match_score), resolved?.created_at),
     escalations: escalations.rows,
+    resolution: resolved,
   };
+}
+
+/**
+ * Records what was done about a potential equivalency conflict. 'resolved' (Credit Evaluation Office or
+ * administrator) closes the conflict until a newer decision disagrees again; 'use_established', 'override' and
+ * 'additional_review' are recorded from the evaluator's review of a course.
+ */
+export async function recordResolution({ institution, courseCode, action, buCourse = null, note = null, reviewId = null }, user) {
+  if (!institution || !courseCode) throw badRequest('Choose the source course.');
+  const { rows: [row] } = await query(
+    `INSERT INTO conflict_resolutions (institution, course_code, action, bu_course, note, review_id, resolved_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, action, created_at`,
+    [institution, courseCode, action, buCourse, note ? String(note).trim() : null, reviewId, user.id]
+  );
+  await auditLog({ action: `conflict_${action}`, actorId: user.id, actorEmail: user.email,
+    details: { institution, course_code: courseCode, bu_course: buCourse, note, review_id: reviewId } });
+  return row;
 }
 
 /** Every source course with an unresolved conflict, for administrators. */
@@ -125,9 +155,9 @@ export async function listConflicts() {
          JOIN equivalencies e ON e.institution = pd.institution AND e.course_code = pd.course_code AND e.status = 'active'
          WHERE pd.status = 'active' AND (e.approved_on IS NULL OR pd.decided_on > e.approved_on)
        UNION
-       SELECT tc.institution, tc.course_code FROM course_reviews r JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-         WHERE r.status IN ('new', 'in_progress', 'info_requested') AND r.match_score IS NOT NULL
-         GROUP BY tc.institution, tc.course_code HAVING MAX(r.match_score) - MIN(r.match_score) >= $1
+       SELECT tc.institution, COALESCE(tc.catalog_code, tc.course_code) FROM course_reviews r JOIN transcript_courses tc ON tc.id = r.transcript_course_id
+         WHERE r.status IN ('new', 'in_progress', 'info_requested') AND r.match_score IS NOT NULL AND r.match_basis = 'similarity'
+         GROUP BY tc.institution, COALESCE(tc.catalog_code, tc.course_code) HAVING MAX(r.match_score) - MIN(r.match_score) >= $1
      ) c ORDER BY institution, course_code`,
     [MATCH_DIVERGENCE]
   );
@@ -138,7 +168,7 @@ export async function listConflicts() {
     const { rows: [catalog] } = await query(`SELECT title FROM catalog_courses WHERE institution = $1 AND course_code = $2`, [c.institution, c.course_code]);
     const { rows: [open] } = await query(
       `SELECT COUNT(*)::int AS n FROM course_reviews r JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-       WHERE tc.institution = $1 AND tc.course_code = $2 AND r.status IN ('queued', 'new', 'in_progress', 'info_requested')`,
+       WHERE tc.institution = $1 AND COALESCE(tc.catalog_code, tc.course_code) = $2 AND r.status IN ('queued', 'new', 'in_progress', 'info_requested')`,
       [c.institution, c.course_code]
     );
     results.push({ institution: c.institution, course_code: c.course_code, title: catalog?.title || null, open_reviews: open.n, ...k });
@@ -171,4 +201,4 @@ export async function recordStandard({ institution, courseCode, buCourse, outcom
   return eq;
 }
 
-export default { courseKnowledge, listConflicts, recordStandard, matchLabel, MATCH_DIVERGENCE };
+export default { courseKnowledge, listConflicts, recordStandard, recordResolution, matchLabel, MATCH_DIVERGENCE };

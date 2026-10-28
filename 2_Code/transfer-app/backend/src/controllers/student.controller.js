@@ -2,6 +2,9 @@
 import * as eligibilityService from '../services/eligibility.service.js';
 import * as applicationService from '../services/application.service.js';
 import * as documentService from '../services/document.service.js';
+import * as lifecycle from '../services/workflow/lifecycle.service.js';
+import * as informationService from '../services/workflow/information.service.js';
+import * as selfCheckService from '../services/selfcheck.service.js';
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
 import { badRequest, notFound } from '../utils/errors.js';
@@ -64,12 +67,16 @@ export async function uploadDocument(req, res, next) {
 export async function getApplicationStatus(req, res, next) {
   try {
     const application = req.application;
-    const [docsResult, infoResult, evalResult, coursesResult] = await Promise.all([
+    const [docsResult, infoResult, evalResult, coursesResult, results] = await Promise.all([
       query(`SELECT id, document_type, file_name, file_size, mime_type, created_at FROM application_documents WHERE application_id = $1 ORDER BY created_at ASC`, [application.id]),
-      query(`SELECT id, items, message, status, student_response, created_at FROM information_requests WHERE application_id = $1 ORDER BY created_at DESC`, [application.id]),
-      query(`SELECT id, status, confidence_score, missing_documents, completed_at FROM ai_evaluations WHERE application_id = $1 ORDER BY created_at DESC LIMIT 1`, [application.id]),
-      // Courses read from the transcript only; per-course recommendations stay internal until an evaluator decides
+      query(`SELECT ir.id, ir.items, ir.message, ir.status, ir.student_response, ir.created_at, ir.kind, ir.responded_at, ir.transcript_course_id,
+                    tc.course_code, tc.title AS course_title, tc.institution AS course_institution
+             FROM information_requests ir LEFT JOIN transcript_courses tc ON tc.id = ir.transcript_course_id
+             WHERE ir.application_id = $1 ORDER BY ir.created_at DESC`, [application.id]),
+      query(`SELECT id, status, missing_documents, completed_at FROM ai_evaluations WHERE application_id = $1 ORDER BY created_at DESC LIMIT 1`, [application.id]),
       query(`SELECT id, institution, course_code, title, term FROM transcript_courses WHERE application_id = $1 ORDER BY position`, [application.id]),
+      // Per-course status, decision and units from the persisted workflow state (lifecycle.studentView)
+      lifecycle.studentView(application),
     ]);
     const isDecided = ['approved', 'rejected'].includes(application.status);
     const evalRow = evalResult.rows[0] || null;
@@ -88,10 +95,10 @@ export async function getApplicationStatus(req, res, next) {
       evaluator_comments: isDecided ? application.evaluator_comments : null,
       documents: docsResult.rows,
       courses: coursesResult.rows,
+      results,
       info_requests: infoResult.rows,
       evaluation: evalRow ? {
         id: evalRow.id, status: evalRow.status,
-        confidence_score: evalRow.confidence_score,
         missing_documents: evalRow.missing_documents,
         completed_at: evalRow.completed_at,
       } : null,
@@ -101,18 +108,38 @@ export async function getApplicationStatus(req, res, next) {
   } catch (err) { return next(err); }
 }
 
+// A written reply, or (multipart) a file such as the syllabus with an optional note. The reply is linked to the
+// request's course, the evaluator is notified and the course returns to their queue (information.service).
 export async function respondToInfoRequest(req, res, next) {
   try {
-    const application = req.application;
-    const { requestId } = req.params;
-    const { response: studentResponse } = req.body;
-    if (!studentResponse || !studentResponse.trim()) return next(badRequest('Response text is required'));
-    const result = await query(
-      `UPDATE information_requests SET student_response = $1, status = 'responded', resolved_at = NOW() WHERE id = $2 AND application_id = $3 RETURNING *`,
-      [studentResponse.trim(), requestId, application.id]
-    );
-    if (result.rows.length === 0) return next(notFound('Information request'));
-    return res.status(200).json({ data: result.rows[0] });
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.requestId)) return next(notFound('Information request'));
+    const result = await informationService.receiveInformation(req.application, req.params.requestId, {
+      response: req.body?.response, file: req.file || null,
+    });
+    return res.status(200).json({ data: result });
+  } catch (err) { return next(err); }
+}
+
+export async function selfCheckInstitutions(_req, res, next) {
+  try { return res.status(200).json({ data: await selfCheckService.selfCheckInstitutions() }); } catch (err) { return next(err); }
+}
+
+const selfCheckSchema = z.object({
+  institution: z.string().min(2).max(255),
+  courses: z.array(z.object({
+    course_code: z.string().trim().min(2).max(40),
+    title: z.string().max(255).optional().nullable(),
+    credits: z.coerce.number().min(0).max(30).optional().nullable(),
+    credit_system: z.enum(['Semester', 'Quarter']).optional().nullable(),
+    grade: z.string().max(10).optional().nullable(),
+  })).min(1).max(20),
+});
+
+export async function selfCheck(req, res, next) {
+  try {
+    const parsed = selfCheckSchema.safeParse(req.body);
+    if (!parsed.success) return next(badRequest('Validation failed', parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
+    return res.status(200).json({ data: await selfCheckService.selfCheck(parsed.data) });
   } catch (err) { return next(err); }
 }
 
@@ -127,4 +154,4 @@ export async function getStudentNotifications(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest };
+export default { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };

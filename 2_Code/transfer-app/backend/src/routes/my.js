@@ -7,8 +7,14 @@ import { badRequest } from '../utils/errors.js';
 import * as reviewService from '../services/workflow/review.service.js';
 import { matchLabel } from '../services/workflow/knowledge.service.js';
 
-// The match label is decided here, not in the browser
-const withLabel = (rows) => rows.map((r) => ({ ...r, match_label: matchLabel(r.match_score) }));
+// The match label is decided here, not in the browser. Catalog levels and approved equivalencies are named
+// levels (no percentage); only a computed content similarity carries a score.
+const withLabel = (rows) => rows.map((r) => {
+  if (r.match_basis === 'sponsor_match') return { ...r, match_label: r.sponsor_match_level, match_kind: 'level', match_percent: null };
+  if (r.match_basis === 'equivalency') return { ...r, match_label: 'Approved equivalency', match_kind: 'level', match_percent: null };
+  return { ...r, match_label: matchLabel(r.match_score), match_kind: r.match_score == null ? 'none' : 'score',
+    match_percent: r.match_score == null ? null : Math.round(Number(r.match_score) * 100) };
+});
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,7 +44,7 @@ const REVIEW_SELECT = `
   FROM course_reviews r
   JOIN applications a ON a.id = r.application_id
   JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-  LEFT JOIN catalog_courses src ON src.institution = tc.institution AND src.course_code = tc.course_code
+  LEFT JOIN catalog_courses src ON src.institution = tc.institution AND src.course_code = COALESCE(tc.catalog_code, tc.course_code)
   LEFT JOIN catalog_courses bu ON bu.institution = 'Boston University' AND bu.course_code = r.target_bu_course`;
 
 router.get('/dashboard', async (req, res, next) => {
@@ -56,7 +62,8 @@ router.get('/dashboard', async (req, res, next) => {
              LEFT JOIN transfer_requests tr ON tr.id = r.transfer_request_id
              LEFT JOIN profiles fp ON fp.id = tr.from_evaluator_id
              WHERE r.evaluator_id = $1 AND r.status = ANY($2) AND (r.status <> 'info_requested' OR ir.status = 'responded')
-             ORDER BY (ir.status = 'responded') DESC NULLS LAST, (r.priority = 'high') DESC, (r.status = 'new') DESC, r.assigned_at ASC NULLS LAST
+             ORDER BY (ir.status = 'responded') DESC NULLS LAST, (r.priority = 'high') DESC,
+                      (r.status = 'new' AND r.transfer_request_id IS NOT NULL) DESC, (r.status = 'new') DESC, r.assigned_at ASC NULLS LAST
              LIMIT 6`, [me, OPEN]),
       query(`${REVIEW_SELECT} WHERE r.evaluator_id = $1 AND r.status IN ('approved', 'rejected')
              ORDER BY r.completed_at DESC NULLS LAST LIMIT 5`, [me]),
@@ -136,15 +143,19 @@ router.post('/reviews/:id/start', async (req, res, next) => {
 });
 
 const decisionSchema = z.object({
-  decision: z.enum(['accept', 'reject']),
+  decision: z.enum(reviewService.DECISIONS),
   reason: z.string().max(2000).optional().nullable(),
+  bu_course: z.string().max(200).optional().nullable(),
+  elective_label: z.string().max(120).optional().nullable(),
+  units: z.union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)]).optional().nullable(),
+  conflict_action: z.enum(['use_established', 'override']).optional().nullable(),
 });
 
 router.post('/reviews/:id/decision', async (req, res, next) => {
   try {
     if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
     const parsed = decisionSchema.safeParse(req.body);
-    if (!parsed.success) return next(badRequest('Decision must be accept or reject'));
+    if (!parsed.success) return next(badRequest(`Decision must be one of: ${reviewService.DECISIONS.join(', ')}`));
     return res.status(200).json({ data: await reviewService.decideReview(req.params.id, parsed.data, req.user) });
   } catch (err) { return next(err); }
 });
@@ -152,9 +163,24 @@ router.post('/reviews/:id/decision', async (req, res, next) => {
 router.post('/reviews/:id/request-info', async (req, res, next) => {
   try {
     if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
-    const parsed = z.object({ message: z.string().trim().min(1, 'Describe the information you need').max(2000) }).safeParse(req.body);
+    const parsed = z.object({
+      kind: z.enum(['syllabus', 'information']).optional().default('information'),
+      message: z.string().trim().max(2000).optional().default(''),
+    }).refine((v) => v.kind === 'syllabus' || v.message, { message: 'Describe the information you need' }).safeParse(req.body);
     if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
     return res.status(200).json({ data: await reviewService.requestInformation(req.params.id, parsed.data, req.user) });
+  } catch (err) { return next(err); }
+});
+
+// BU catalog search for choosing a different BU course
+router.get('/bu-courses', async (req, res, next) => {
+  try {
+    const q = String(req.query.search || '').trim().slice(0, 60);
+    const { rows } = await query(
+      `SELECT course_code, title, credits, program FROM catalog_courses
+       WHERE institution = 'Boston University' AND ($1 = '' OR course_code ILIKE $2 OR title ILIKE $2)
+       ORDER BY course_code LIMIT 25`, [q, `%${q}%`]);
+    return res.status(200).json({ data: rows });
   } catch (err) { return next(err); }
 });
 

@@ -47,9 +47,11 @@ function scrubReason(reason, application) {
 
 /**
  * Records an evaluator's decision on one transcript course and updates the memory.
- * @param {{ applicationId, courseId, action: 'approve'|'change'|'reject', outcome?, buAward?, reason?, user }} input
+ * decisionType: equivalent_course | different_course | elective | no_credit (derived from action/outcome when omitted).
+ * units: BU units awarded; defaults to the converted transcript credits and is required when those are missing.
+ * @param {{ applicationId, courseId, action: 'approve'|'change'|'reject', outcome?, buAward?, reason?, decisionType?, units?, conflictAction?, user }} input
  */
-export async function recordCourseDecision({ applicationId, courseId, action, outcome, buAward, reason, user }) {
+export async function recordCourseDecision({ applicationId, courseId, action, outcome, buAward, reason, decisionType, units, conflictAction = null, user }) {
   const { rows: [course] } = await query(
     `SELECT tc.*, a.student_name, a.student_email, a.student_phone
      FROM transcript_courses tc JOIN applications a ON a.id = tc.application_id
@@ -57,6 +59,8 @@ export async function recordCourseDecision({ applicationId, courseId, action, ou
     [courseId, applicationId]
   );
   if (!course) throw notFound('Transcript course');
+  const { rows: [posted] } = await query(`SELECT 1 FROM credit_postings WHERE transcript_course_id = $1`, [courseId]);
+  if (posted) throw badRequest('This course has already been posted to the student record; its decision can no longer change.');
 
   const { rows: [ev] } = await query(
     `SELECT ce.* FROM course_evaluations ce
@@ -85,10 +89,24 @@ export async function recordCourseDecision({ applicationId, courseId, action, ou
   const matched = !!rec && rec.outcome === decision.outcome && (rec.award || null) === (decision.award || null);
   const cleanReason = scrubReason(reason, course) || null;
   const recommendationText = rec ? (rec.award || 'No credit') : null;
+  const type = decisionType || (decision.outcome === 'no_credit' ? 'no_credit' : decision.outcome === 'elective' ? 'elective'
+    : action === 'change' && !matched ? 'different_course' : 'equivalent_course');
+
+  // BU units: none for no credit; otherwise what the evaluator entered, else the converted transcript credits
+  let buUnits = 0;
+  if (decision.outcome !== 'no_credit') {
+    const entered = units != null && units !== '' ? Number(units) : null;
+    if (entered != null && (Number.isNaN(entered) || entered <= 0 || entered > 24)) throw badRequest('BU units must be a number between 0 and 24.');
+    buUnits = entered ?? (ev?.bu_credits != null ? Number(ev.bu_credits) : null);
+    if (buUnits == null) throw badRequest('The transcript does not show credits for this course. Enter the BU units to award.');
+  }
 
   // Course-level knowledge becomes a precedent; rule outcomes (grade, withdrawal, caps) are about this student only,
-  // and approving an existing equivalency adds nothing new
-  const teachesMemory = ev && ev.path !== 'rule' && !(ev.path === 'equivalency' && action === 'approve');
+  // and approving an existing equivalency adds nothing new. A no-credit decision on a course held for its grade
+  // (Pass, missing or unreadable grade) is also about this student, not the course.
+  const gradeHold = (ev?.rules || []).some((r) => ['PASS', 'GRADE'].includes(r));
+  const teachesMemory = ev && ev.path !== 'rule' && !(ev.path === 'equivalency' && action === 'approve')
+    && !(gradeHold && decision.outcome === 'no_credit');
 
   const client = await getClient();
   let pastDecisionId = null;
@@ -121,13 +139,15 @@ export async function recordCourseDecision({ applicationId, courseId, action, ou
 
     await client.query(
       `INSERT INTO course_decisions (application_id, transcript_course_id, course_evaluation_id, action, outcome, bu_award, reason, recommendation,
-         matched_recommendation, past_decision_id, decided_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         matched_recommendation, past_decision_id, decided_by, decision_type, bu_units, decided_via, conflict_action)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'evaluator', $14)
        ON CONFLICT (transcript_course_id) DO UPDATE SET course_evaluation_id = EXCLUDED.course_evaluation_id, action = EXCLUDED.action,
          outcome = EXCLUDED.outcome, bu_award = EXCLUDED.bu_award, reason = EXCLUDED.reason, recommendation = EXCLUDED.recommendation,
          matched_recommendation = EXCLUDED.matched_recommendation, past_decision_id = EXCLUDED.past_decision_id,
-         decided_by = EXCLUDED.decided_by, decided_at = NOW()`,
-      [applicationId, courseId, ev?.id || null, action, decision.outcome, decision.award, cleanReason, recommendationText, matched, pastDecisionId, user.id]
+         decided_by = EXCLUDED.decided_by, decided_at = NOW(), decision_type = EXCLUDED.decision_type, bu_units = EXCLUDED.bu_units,
+         decided_via = 'evaluator', conflict_action = EXCLUDED.conflict_action`,
+      [applicationId, courseId, ev?.id || null, action, decision.outcome, decision.award, cleanReason, recommendationText, matched, pastDecisionId, user.id,
+        type, buUnits, conflictAction]
     );
 
     if (pastDecisionId && decision.outcome === 'transfer' && SINGLE_BU_COURSE.test(decision.award)) {
@@ -158,9 +178,9 @@ export async function recordCourseDecision({ applicationId, courseId, action, ou
   await auditLog({
     applicationId, action: 'course_decision', actorId: user.id, actorEmail: user.email,
     details: { course_code: course.course_code, institution: course.institution, action, outcome: decision.outcome, bu_award: decision.award,
-      matched_recommendation: matched, past_decision_id: pastDecisionId, promoted_equivalency: promoted?.eq_id || null },
+      matched_recommendation: matched, past_decision_id: pastDecisionId, promoted_equivalency: promoted?.eq_id || null, decision_type: type, bu_units: buUnits },
   });
-  return { outcome: decision.outcome, bu_award: decision.award, matched_recommendation: matched, past_decision_id: pastDecisionId, promoted_equivalency: promoted };
+  return { outcome: decision.outcome, bu_award: decision.award, bu_units: buUnits, decision_type: type, matched_recommendation: matched, past_decision_id: pastDecisionId, promoted_equivalency: promoted };
 }
 
 // Promote to an equivalency once enough different evaluators awarded the same BU course and no active precedent disagrees

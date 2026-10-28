@@ -2,6 +2,7 @@
 import * as applicationService from '../services/application.service.js';
 import * as auditService from '../services/audit.service.js';
 import * as memoryService from '../services/credit/memory.service.js';
+import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import { badRequest, notFound } from '../utils/errors.js';
 import { query } from '../config/db.js';
 
@@ -44,7 +45,7 @@ const decisionSchema = z.object({
 });
 
 const statusUpdateSchema = z.object({
-  status: z.enum(['draft','submitted','information_required','under_evaluation','evaluation_completed','under_evaluator_review','validation_failed','approved','rejected','closed']),
+  status: z.enum(['draft','submitted','information_required','under_evaluation','evaluation_completed','under_evaluator_review','validation_failed','ready_for_posting','credit_posted','approved','rejected','closed']),
   reason: z.string().max(500).optional().default('Manual status update'),
 });
 
@@ -53,11 +54,22 @@ export async function listApplications(req, res, next) {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) return next(badRequest('Invalid query parameters'));
     const { status, source, search, assigned_evaluator_id, date_from, date_to, page, limit, sort, order } = parseResult.data;
+    const reviewerId = req.user.role === 'evaluator' ? req.user.id : undefined;
     const [result, stats] = await Promise.all([
-      applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, dateFrom: date_from, dateTo: date_to, page, limit, sort, order }),
+      applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, reviewerId, dateFrom: date_from, dateTo: date_to, page, limit, sort, order }),
       applicationService.getApplicationStats(),
     ]);
     return res.status(200).json({ data: result.applications, meta: { total: result.total, page: result.page, limit: result.limit, pages: result.pages }, stats });
+  } catch (err) { return next(err); }
+}
+
+/** Evaluators may open an application only when one of its courses is assigned to them. */
+export async function requireApplicationAccess(req, _res, next) {
+  try {
+    if (req.user.role !== 'evaluator') return next();
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return next(notFound('Application'));
+    const { rows } = await query(`SELECT 1 FROM course_reviews WHERE application_id = $1 AND evaluator_id = $2 LIMIT 1`, [req.params.id, req.user.id]);
+    return rows.length ? next() : next(notFound('Application'));
   } catch (err) { return next(err); }
 }
 
@@ -149,8 +161,9 @@ export async function decideCourse(req, res, next) {
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
     const { action, outcome, bu_award, reason } = parseResult.data;
     const result = await memoryService.recordCourseDecision({
-      applicationId: req.params.id, courseId: req.params.courseId, action, outcome, buAward: bu_award, reason, user: req.user,
+      applicationId: req.params.id, courseId: req.params.courseId, action, outcome, buAward: bu_award, reason, units: req.body?.units, user: req.user,
     });
+    await lifecycle.refreshApplicationStatus(req.params.id, req.user.id);
     return res.status(200).json({ data: result });
   } catch (err) { return next(err); }
 }
@@ -158,6 +171,7 @@ export async function decideCourse(req, res, next) {
 export async function approveAutomaticCourses(req, res, next) {
   try {
     const result = await memoryService.approveAutomatic(req.params.id, req.user);
+    await lifecycle.refreshApplicationStatus(req.params.id, req.user.id);
     return res.status(200).json({ data: result });
   } catch (err) { return next(err); }
 }

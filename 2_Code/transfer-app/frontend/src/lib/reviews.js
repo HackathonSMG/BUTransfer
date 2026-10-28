@@ -6,7 +6,8 @@ export const REVIEW_STATUS = {
   in_progress: { label: 'In Progress', tone: 'neutral' },
   info_requested: { label: 'Waiting on Student', tone: 'warn' },
   approved: { label: 'Approved', tone: 'ok' },
-  rejected: { label: 'Rejected', tone: 'bad' }
+  rejected: { label: 'No Credit', tone: 'bad' },
+  withdrawn: { label: 'Withdrawn', tone: 'neutral' }
 }
 
 // Where the recommended BU course came from, in the evaluator's terms
@@ -25,7 +26,29 @@ export function matchBasisLabel(review) {
 
 // Colour for the match label the API returns (presentation only)
 export function matchLabelClass(label) {
-  return label === 'Strong match' ? 'text-emerald-700' : label === 'Partial match' ? 'text-amber-700' : label ? 'text-rose-700' : 'text-staff-muted'
+  if (['Strong match', 'Likely equivalent', 'Approved equivalency'].includes(label)) return 'text-emerald-700'
+  if (['Partial match', 'Partial - syllabus review'].includes(label)) return 'text-amber-700'
+  return label ? 'text-rose-700' : 'text-staff-muted'
+}
+
+// How a review's match reads: a percentage only for a computed content similarity; catalog levels and
+// approved equivalencies are named levels (the API sets match_kind / match_percent)
+export function matchDisplay(r) {
+  if (r.match_kind === 'level') return { value: null, label: r.match_label }
+  if (r.match_kind === 'score' || (r.match_kind === undefined && r.match_score != null)) {
+    return { value: `${r.match_percent ?? Math.round(r.match_score * 100)}%`, label: r.match_label }
+  }
+  return { value: null, label: null }
+}
+
+// The evaluator's possible decisions on a course (Problem 1, step 6)
+export const DECISION_LABELS = {
+  equivalent_course: 'BU equivalent course',
+  different_course: 'Different BU course',
+  elective: 'Elective credit',
+  no_credit: 'No credit',
+  established_equivalency: 'Established equivalency',
+  policy_rule: 'Transfer credit policy'
 }
 
 export function formatDate(d) {

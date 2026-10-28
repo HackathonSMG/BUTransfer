@@ -31,6 +31,11 @@ async function readLines(buffer) {
   return lines;
 }
 
+/** The text of a PDF (e.g. a syllabus), line by line; empty when the PDF has no text layer. */
+export async function extractText(buffer) {
+  return (await readLines(buffer)).map((l) => l.text).join('\n').trim();
+}
+
 /**
  * Structured-layout parser for the hackathon sample transcript format.
  * @returns {{ institution, credit_system, courses }} — courses is empty if layout not recognised

@@ -30,7 +30,7 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
             You do not have permission to access this page.
           </p>
           <a
-            href={user.role === 'admin' ? '/admin' : user.role === 'evaluator' ? '/evaluator' : '/'}
+            href={user.role === 'admin' ? '/admin' : user.role === 'credit_office' ? '/office' : user.role === 'evaluator' ? '/evaluator' : '/'}
             className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
           >
             Back to my dashboard

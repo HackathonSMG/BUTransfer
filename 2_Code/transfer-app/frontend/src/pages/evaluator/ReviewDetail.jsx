@@ -1,19 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, X, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getReview, startReview, decideReview, requestReviewInfo, escalateReview } from '../../api/my'
+import { getReview, startReview, decideReview, requestReviewInfo, escalateReview, searchBuCourses, getDocumentLink } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
 import TranscriptDrawer from '../../components/evaluator/TranscriptDrawer'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { REVIEW_STATUS, matchLabelClass, formatDate } from '../../lib/reviews'
+import { REVIEW_STATUS, DECISION_LABELS, matchLabelClass, formatDate } from '../../lib/reviews'
 import { activityLabel } from '../../lib/staffFormat'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
-const INFO_SUGGESTIONS = ['Course syllabus', 'Detailed course description', 'Learning outcomes', 'Official transcript']
+const INFO_SUGGESTIONS = ['Detailed course description', 'Learning outcomes', 'Contact hours', 'Lab component']
+const FIELD = 'w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
+
+// The evaluator's outcomes for a course (Problem 1, step 6); fields appear only for the chosen one
+const OUTCOMES = [
+  { key: 'equivalent', label: 'Equivalent BU course', hint: 'Award the proposed BU course.' },
+  { key: 'different_course', label: 'Different BU course', hint: 'Award another course from the BU catalog.' },
+  { key: 'elective', label: 'Elective credit', hint: 'Counts as units without a specific BU course.' },
+  { key: 'no_credit', label: 'No credit', hint: '0 units. A reason is required.' }
+]
 
 // One sentence on where the proposed BU course came from
 function basisSentence(review) {
@@ -35,8 +44,10 @@ export default function ReviewDetail() {
   const navigate = useNavigate()
   const [state, setState] = useState({ loading: true, data: null, error: null })
   const [transcriptOpen, setTranscriptOpen] = useState(false)
-  const [dialog, setDialog] = useState(null) // 'accept' | 'reject' | 'info'
+  const [dialog, setDialog] = useState(null) // 'decide' | 'info' | 'escalate'
   const [text, setText] = useState('')
+  const [infoKind, setInfoKind] = useState('syllabus')
+  const [form, setForm] = useState({ outcome: 'equivalent', courses: [], elective: '', units: '', conflictAction: null })
   const [submitting, setSubmitting] = useState(false)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
   const [openSections, setOpenSections] = useState({})
@@ -65,26 +76,41 @@ export default function ReviewDetail() {
     })
   }, [id, load])
 
-  const openDialog = (kind) => { setText(''); setDialog(kind) }
+  const openDecision = (preset = {}) => {
+    const d = state.data
+    setText('')
+    setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, ...preset })
+    setDialog('decide')
+  }
+  const openDialog = (kind) => { setText(''); setInfoKind('syllabus'); setDialog(kind) }
 
   const submit = async () => {
     setSubmitting(true)
     try {
       if (dialog === 'info') {
-        await requestReviewInfo(id, text)
-        toast.success('Information requested from the student')
+        await requestReviewInfo(id, text, infoKind)
+        toast.success(infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else if (dialog === 'escalate') {
         await escalateReview(id, text)
-        toast.success('Sent to the transfer credit administrators')
+        toast.success('Sent to the Credit Evaluation Office')
       } else {
-        const res = await decideReview(id, dialog, text)
-        toast.success(dialog === 'accept' ? 'Equivalency approved' : 'Course rejected')
+        const payload = {
+          decision: form.outcome,
+          reason: text || null,
+          bu_course: form.outcome === 'different_course' ? form.courses.join(' + ') : null,
+          elective_label: form.outcome === 'elective' ? form.elective || null : null,
+          units: form.units !== '' ? Number(form.units) : null,
+          conflict_action: form.conflictAction
+        }
+        const res = await decideReview(id, payload)
+        toast.success(form.outcome === 'no_credit' ? 'Recorded: no credit' : 'Decision recorded')
         if (res.data.transfer) toast(`Application handed to the next evaluator (${res.data.transfer.request_number})`)
+        if (res.data.application_status === 'ready_for_posting') toast('Every course on this application is decided. It is ready for posting.')
       }
       setDialog(null)
       await load()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The decision could not be saved')
+      toast.error(err.response?.data?.message || err.response?.data?.error?.message || 'The decision could not be saved')
     } finally {
       setSubmitting(false)
     }
@@ -101,13 +127,21 @@ export default function ReviewDetail() {
   }
 
   const d = state.data
-  const { review: r, application: app, source_course: src, target_course: bu, proposed, evidence, knowledge: k } = d
+  const { review: r, application: app, source_course: src, target_courses: buCourses = [], proposed, evidence, knowledge: k, units } = d
+  const bu = buCourses[0] || null
   const conflicts = k?.conflicts || []
   const previous = k?.previous
   const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }
   const isOpen = OPEN.includes(r.status)
-  const pct = r.match_score != null ? Math.round(r.match_score * 100) : null
   const mapping = `${src?.course_code} → ${proposed?.award || r.target_bu_course || 'no BU course'}`
+  const canSubmit = (() => {
+    if (dialog === 'escalate') return true
+    if (dialog === 'info') return infoKind === 'syllabus' || text.trim()
+    if (units?.required && form.outcome !== 'no_credit' && !(Number(form.units) > 0)) return false
+    if (form.outcome === 'different_course') return form.courses.length > 0 && text.trim()
+    if (form.outcome === 'no_credit') return text.trim()
+    return true
+  })()
 
   return (
     <div className="max-w-5xl mx-auto pb-32">
@@ -123,19 +157,23 @@ export default function ReviewDetail() {
           </p>
           <h1 className="text-[30px] leading-tight text-staff-ink mt-1">{app.student_name}</h1>
           <p className="text-[15px] text-staff-ink2 mt-1">{app.transfer_to_program} · transferring from {app.transfer_from_institution}</p>
-          {r.assignment_reason && (
+          {r.assignment_context?.length > 0 && (
             <p className="text-[13px] text-staff-muted mt-2">
-              <span className="font-medium text-staff-ink2">Assignment context:</span> {r.assignment_reason}
+              <span className="font-medium text-staff-ink2">Assignment context:</span> {r.assignment_context.join(' · ')}
             </p>
           )}
         </div>
-        <Button variant="secondary" onClick={() => setTranscriptOpen(true)}>
-          <FileText className="w-4 h-4" />
-          View transcript
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {d.syllabus && <DocumentButton id={d.syllabus.document_id} label="View syllabus" icon={Paperclip} />}
+          <Button variant="secondary" onClick={() => setTranscriptOpen(true)}>
+            <FileText className="w-4 h-4" />
+            View transcript
+          </Button>
+        </div>
       </header>
 
       <StatusBanner d={d} />
+      <AttentionNotes d={d} />
 
       {/* The evaluation */}
       <section className="staff-card p-6 sm:p-8">
@@ -145,7 +183,7 @@ export default function ReviewDetail() {
             label="Transfer course"
             code={src?.course_code}
             title={src?.title}
-            meta={[src?.institution, src?.source_credits != null && `${Number(src.source_credits)} credits`, src?.term, src?.grade && `Grade ${src.grade}`]}
+            meta={[src?.institution, src?.source_credits != null ? `${Number(src.source_credits)} ${src.credit_system === 'Quarter' ? 'quarter ' : ''}credits` : 'Credits not on transcript', src?.term, src?.grade && `Grade ${src.grade}`]}
           />
           <span className="grid place-items-center text-staff-muted">
             <ArrowRight className="hidden md:block w-6 h-6" />
@@ -155,8 +193,8 @@ export default function ReviewDetail() {
             <CourseBox
               label="Boston University course"
               code={r.target_bu_course}
-              title={bu?.title}
-              meta={['Boston University', bu?.credits != null && `${Number(bu.credits)} credits`, bu?.program]}
+              title={buCourses.map(c => c.title).join(' + ') || null}
+              meta={['Boston University', buCourses.length ? `${buCourses.reduce((n, c) => n + Number(c.credits || 0), 0)} credits` : null, bu?.program]}
               emphasis
             />
           ) : (
@@ -167,17 +205,7 @@ export default function ReviewDetail() {
         </div>
 
         <div className="mt-6 pt-6 border-t border-staff-line2 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4 items-center">
-          <div className="text-center sm:text-left">
-            <p className="text-[13px] font-medium text-staff-ink2">Course match</p>
-            {pct != null ? (
-              <>
-                <p className="text-[44px] leading-none font-semibold text-staff-ink tabular-nums mt-1">{pct}%</p>
-                <p className={`text-[14px] font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
-              </>
-            ) : (
-              <p className="text-[20px] font-semibold text-staff-muted mt-2">Not scored</p>
-            )}
-          </div>
+          <MatchSummary r={r} />
           <div className="min-w-0">
             <p className="text-[13px] font-medium text-staff-ink2">Recommendation</p>
             <p className="text-[18px] font-semibold text-staff-ink mt-1">{proposed?.label || 'Evaluator to decide'}</p>
@@ -188,7 +216,7 @@ export default function ReviewDetail() {
               onClick={() => { setEvidenceOpen(true); document.getElementById('matching-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
               className="mt-2 text-[13px] font-semibold text-primary-700 hover:text-primary-800"
             >
-              View matching details
+              View matching evidence
             </button>
           </div>
         </div>
@@ -199,11 +227,13 @@ export default function ReviewDetail() {
         <Disclosure title="Transfer course details">
           <CourseDetails c={src} institution={src?.institution} />
         </Disclosure>
-        <Disclosure title="BU course details">
-          {bu ? <CourseDetails c={bu} institution="Boston University" /> : <p className="text-[14px] text-staff-muted">No BU course has been proposed for this course.</p>}
+        <Disclosure title={buCourses.length > 1 ? 'BU course details (combined award)' : 'BU course details'}>
+          {buCourses.length ? (
+            <div className="space-y-6">{buCourses.map(c => <CourseDetails key={c.course_code} c={c} institution="Boston University" heading={buCourses.length > 1 ? c.course_code : null} />)}</div>
+          ) : <p className="text-[14px] text-staff-muted">No BU course has been proposed for this course.</p>}
         </Disclosure>
-        <Disclosure id="matching-details" title="Matching details" open={evidenceOpen} onToggle={setEvidenceOpen}>
-          <Evidence evidence={evidence} src={src} bu={bu} />
+        <Disclosure id="matching-details" title="Matching evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
+          <Evidence evidence={evidence} src={src} buCourses={buCourses} syllabus={d.syllabus} />
         </Disclosure>
         {previous && (
           <Disclosure {...sectionProps('previous')} title={`Previous decisions (${previous.total + (k.similar?.length || 0)})`}>
@@ -211,8 +241,22 @@ export default function ReviewDetail() {
           </Disclosure>
         )}
         {conflicts.length > 0 && (
-          <Disclosure {...sectionProps('conflicts')} title={<span className="flex items-center gap-2">Equivalency conflicts ({conflicts.length})<span className="w-2 h-2 rounded-full bg-amber-500" /></span>}>
-            <Conflicts k={k} canEscalate={isOpen} onEscalate={() => openDialog('escalate')} />
+          <Disclosure {...sectionProps('conflicts')} title={<span className="flex items-center gap-2">Potential equivalency conflict<span className="w-2 h-2 rounded-full bg-amber-500" /></span>}>
+            <Conflicts
+              k={k}
+              src={src}
+              canAct={isOpen}
+              onUseEstablished={() => openDecision(proposed?.award === k.established?.bu_course
+                ? { outcome: 'equivalent', conflictAction: 'use_established' }
+                : { outcome: 'different_course', courses: (k.established?.bu_course || '').match(/CAS [A-Z]{2} \d{3}/g) || [], conflictAction: 'use_established' })}
+              onOverride={() => openDecision({ conflictAction: 'override' })}
+              onEscalate={() => openDialog('escalate')}
+            />
+          </Disclosure>
+        )}
+        {d.info_requests?.length > 0 && (
+          <Disclosure title={`Requests to the student (${d.info_requests.length})`}>
+            <InfoRequests requests={d.info_requests} />
           </Disclosure>
         )}
         <Disclosure title="Evaluation history">
@@ -226,7 +270,7 @@ export default function ReviewDetail() {
           {isOpen ? (
             <>
               <div className="hidden sm:block min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-staff-muted">Decision</p>
+                <p className="text-[13px] font-medium text-staff-muted">Recommendation</p>
                 <p className="text-[15px] font-semibold text-staff-ink truncate font-mono">{mapping}</p>
               </div>
               <span className="sm:hidden flex-1" />
@@ -234,11 +278,8 @@ export default function ReviewDetail() {
                 <MessageSquare className="w-4 h-4" />
                 <span className="hidden sm:inline">Request information</span><span className="sm:hidden">Request info</span>
               </Button>
-              <Button variant="secondary" onClick={() => openDialog('reject')} className="!text-red-700 !border-red-200 hover:!bg-red-50">
-                <X className="w-4 h-4" />Reject
-              </Button>
-              <Button variant="success" onClick={() => openDialog('accept')} disabled={!proposed} title={proposed ? undefined : 'No BU course has been proposed'}>
-                <Check className="w-4 h-4" />Accept equivalency
+              <Button variant="success" onClick={() => openDecision()}>
+                <Check className="w-4 h-4" />Record decision
               </Button>
             </>
           ) : (
@@ -246,7 +287,7 @@ export default function ReviewDetail() {
               <p className="flex-1 text-[15px] text-staff-ink2">
                 {r.status === 'queued'
                   ? 'This course opens for your decision once the earlier review of this application is finished.'
-                  : 'This course has been decided.'}
+                  : r.status === 'withdrawn' ? 'This course no longer needs a decision.' : 'This course has been decided.'}
               </p>
               {d.next_review_id ? (
                 <Button onClick={() => navigate(`/evaluator/reviews/${d.next_review_id}`)}>Next evaluation<ArrowRight className="w-4 h-4" /></Button>
@@ -271,56 +312,49 @@ export default function ReviewDetail() {
       <Modal
         isOpen={dialog !== null}
         onClose={() => !submitting && setDialog(null)}
-        title={dialog === 'accept' ? 'Approve course equivalency?' : dialog === 'reject' ? 'Reject equivalency' : dialog === 'escalate' ? 'Ask an administrator to review' : 'Additional information required'}
-        size="sm"
+        title={dialog === 'decide' ? 'Evaluation decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
+        size={dialog === 'decide' ? 'md' : 'sm'}
       >
         <div className="space-y-4">
-          {dialog === 'accept' && (
-            <div className="rounded-lg bg-staff-sunk px-4 py-3">
-              <p className="font-mono text-[15px] font-semibold text-staff-ink">{mapping}</p>
-              <p className="text-[13px] text-staff-ink2 mt-0.5">{proposed?.label}</p>
-            </div>
-          )}
-          {dialog === 'reject' && (
-            <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1.5">Reason <span className="text-red-500">*</span></span>
-              <textarea
-                value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
-                placeholder="e.g. Content does not cover the data structures required for CAS CS 112."
-                className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-              />
-            </label>
+          {dialog === 'decide' && (
+            <DecisionForm d={d} form={form} setForm={setForm} text={text} setText={setText} />
           )}
           {dialog === 'escalate' && (
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1.5">Note for the administrators</span>
-              <textarea
-                value={text} onChange={e => setText(e.target.value)} rows={3} autoFocus
-                placeholder="e.g. Earlier decisions award different BU courses. Which should be the standard?"
-                className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-              />
-              <span className="block text-[12.5px] text-staff-muted mt-1.5">Administrators can record a standard equivalency for future transcripts. Your decision on this course stays yours.</span>
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">Note for the Credit Evaluation Office</span>
+              <textarea value={text} onChange={e => setText(e.target.value)} rows={3} autoFocus className={FIELD}
+                placeholder="e.g. Earlier decisions award different BU courses. Which should be the standard?" />
+              <span className="block text-[12.5px] text-staff-muted mt-1.5">The office can record a standard equivalency for future transcripts. Your decision on this course stays yours.</span>
             </label>
           )}
           {dialog === 'info' && (
             <>
-              <label className="block">
-                <span className="block text-sm font-medium text-gray-700 mb-1.5">What information is needed? <span className="text-red-500">*</span></span>
-                <textarea
-                  value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
-                  placeholder="e.g. Please upload the course syllabus with weekly topics."
-                  className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                />
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {INFO_SUGGESTIONS.map(s => (
-                  <button key={s} type="button" onClick={() => setText(t => (t ? `${t}${t.endsWith('.') ? '' : ';'} ${s}` : s))}
-                    className="text-[12.5px] px-2.5 py-1 rounded-full border border-staff-line text-staff-ink2 hover:bg-staff-sunk">
-                    + {s}
+              <div className="grid grid-cols-2 gap-2">
+                {[['syllabus', 'Course syllabus'], ['information', 'Other information']].map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setInfoKind(k)}
+                    className={`rounded-lg border px-3 py-2.5 text-left text-[14px] ${infoKind === k ? 'border-primary-500 bg-primary-50/60 text-primary-800 font-semibold' : 'border-staff-line text-staff-ink2 hover:bg-staff-sunk'}`}>
+                    {label}
                   </button>
                 ))}
               </div>
-              <p className="text-[12.5px] text-staff-muted">The student is notified and can reply from their status page.</p>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {infoKind === 'syllabus' ? 'Note to the student (optional)' : <>What information is needed? <span className="text-red-500">*</span></>}
+                </span>
+                <textarea value={text} onChange={e => setText(e.target.value)} rows={3} autoFocus className={FIELD}
+                  placeholder={infoKind === 'syllabus' ? 'e.g. Please include the weekly topics and lab hours.' : 'e.g. Please confirm the number of contact hours.'} />
+              </label>
+              {infoKind === 'information' && (
+                <div className="flex flex-wrap gap-1.5">
+                  {INFO_SUGGESTIONS.map(s => (
+                    <button key={s} type="button" onClick={() => setText(t => (t ? `${t}${t.endsWith('.') ? '' : ';'} ${s}` : s))}
+                      className="text-[12.5px] px-2.5 py-1 rounded-full border border-staff-line text-staff-ink2 hover:bg-staff-sunk">
+                      + {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="text-[12.5px] text-staff-muted">The student is notified and answers from their status page. The course returns to you when they do.</p>
             </>
           )}
           <div className="flex justify-end gap-2 pt-1">
@@ -328,10 +362,10 @@ export default function ReviewDetail() {
             <Button
               onClick={submit}
               loading={submitting}
-              disabled={!['accept', 'escalate'].includes(dialog) && !text.trim()}
-              variant={dialog === 'reject' ? 'danger' : dialog === 'accept' ? 'success' : 'primary'}
+              disabled={!canSubmit}
+              variant={dialog === 'decide' ? (form.outcome === 'no_credit' ? 'danger' : 'success') : 'primary'}
             >
-              {dialog === 'accept' ? 'Confirm approval' : dialog === 'reject' ? 'Reject' : dialog === 'escalate' ? 'Send to administrators' : 'Send request'}
+              {dialog === 'decide' ? 'Confirm decision' : dialog === 'escalate' ? 'Send to the office' : 'Send request'}
             </Button>
           </div>
         </div>
@@ -348,6 +382,155 @@ function BackLink() {
   )
 }
 
+// Opens an uploaded document (syllabus) in a new tab through a short-lived link
+function DocumentButton({ id, label, icon: Icon = FileText }) {
+  const [busy, setBusy] = useState(false)
+  const open = async () => {
+    setBusy(true)
+    try {
+      const res = await getDocumentLink(id)
+      window.open(res.data.download_url, '_blank', 'noopener')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'The document could not be opened')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <Button variant="secondary" onClick={open} loading={busy}><Icon className="w-4 h-4" />{label}</Button>
+}
+
+// The match as the API describes it: a percentage only for a computed content similarity
+function MatchSummary({ r }) {
+  return (
+    <div className="text-center sm:text-left">
+      <p className="text-[13px] font-medium text-staff-ink2">Course match</p>
+      {r.match_kind === 'score' ? (
+        <>
+          <p className="text-[44px] leading-none font-semibold text-staff-ink tabular-nums mt-1">{r.match_percent}%</p>
+          <p className={`text-[14px] font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
+          <p className="text-[12px] text-staff-muted mt-0.5">Content similarity</p>
+        </>
+      ) : r.match_kind === 'level' ? (
+        <>
+          <p className={`text-[22px] leading-tight font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
+          <p className="text-[12px] text-staff-muted mt-1">{r.match_basis === 'equivalency' ? 'Established equivalency' : 'Match level in the BU course-match catalog'}</p>
+        </>
+      ) : (
+        <p className="text-[20px] font-semibold text-staff-muted mt-2">Not scored</p>
+      )}
+    </div>
+  )
+}
+
+function DecisionForm({ d, form, setForm, text, setText }) {
+  const { proposed, units, source_course: src } = d
+  const set = (patch) => setForm(f => ({ ...f, ...patch }))
+  const needsReason = form.outcome === 'different_course' || form.outcome === 'no_credit'
+  const defaultUnits = units?.default
+  return (
+    <>
+      {form.conflictAction && (
+        <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[13px] text-amber-900">
+          {form.conflictAction === 'use_established'
+            ? 'Recorded as following the established equivalency.'
+            : 'Recorded as overriding earlier decisions. The Credit Evaluation Office is told so it can review the standard.'}
+        </p>
+      )}
+      <fieldset className="space-y-2">
+        <legend className="sr-only">Outcome</legend>
+        {OUTCOMES.map(o => {
+          const disabled = o.key === 'equivalent' && !proposed
+          const active = form.outcome === o.key
+          return (
+            <label key={o.key} className={`flex gap-3 rounded-lg border px-3.5 py-3 cursor-pointer ${active ? 'border-primary-500 bg-primary-50/50' : 'border-staff-line hover:bg-staff-bg'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input type="radio" name="outcome" className="mt-1 accent-current text-primary-600" checked={active} disabled={disabled} onChange={() => set({ outcome: o.key })} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14.5px] font-semibold text-staff-ink">{o.label}</span>
+                <span className="block text-[12.5px] text-staff-muted">
+                  {o.key === 'equivalent' && proposed ? proposed.label : o.hint}
+                </span>
+              </span>
+            </label>
+          )
+        })}
+      </fieldset>
+
+      {form.outcome === 'different_course' && <BuCoursePicker selected={form.courses} onChange={(courses) => set({ courses })} />}
+      {form.outcome === 'elective' && (
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1.5">Elective (optional)</span>
+          <input value={form.elective} onChange={e => set({ elective: e.target.value })} className={FIELD} placeholder="e.g. CS elective (CAS CS 1XX)" maxLength={120} />
+        </label>
+      )}
+
+      {form.outcome !== 'no_credit' && (
+        units?.required ? (
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1.5">BU units <span className="text-red-500">*</span></span>
+            <input type="number" min="0.5" max="24" step="0.01" value={form.units} onChange={e => set({ units: e.target.value })} className={`${FIELD} max-w-[10rem]`} />
+            <span className="block text-[12.5px] text-amber-800 mt-1">The transcript does not show credits for {src?.course_code}. Confirm them before awarding units.</span>
+          </label>
+        ) : (
+          <p className="text-[13px] text-staff-ink2">
+            <span className="font-medium text-staff-ink">{defaultUnits} BU units</span>
+            {units?.quarter ? ` (${Number(src?.source_credits)} quarter credits × 2/3)` : ' from the transcript'} · posted with a grade of {d.policy?.transfer_grade || 'T'}
+          </p>
+        )
+      )}
+
+      <label className="block">
+        <span className="block text-sm font-medium text-gray-700 mb-1.5">Reason {needsReason ? <span className="text-red-500">*</span> : <span className="text-staff-muted font-normal">(optional)</span>}</span>
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
+          placeholder={form.outcome === 'no_credit' ? 'e.g. Content does not cover the data structures required for CAS CS 112.' : form.outcome === 'different_course' ? 'e.g. The syllabus covers discrete mathematics, not programming.' : 'Anything the next evaluator should know.'} />
+      </label>
+    </>
+  )
+}
+
+// Search the BU catalog and pick one or more courses (several for a combined award, e.g. lecture + lab)
+function BuCoursePicker({ selected, onChange }) {
+  const [q, setQ] = useState('')
+  const [rows, setRows] = useState([])
+  useEffect(() => {
+    const t = setTimeout(() => {
+      searchBuCourses(q).then(res => setRows(res.data || [])).catch(() => setRows([]))
+    }, 200)
+    return () => clearTimeout(t)
+  }, [q])
+  const toggle = (code) => onChange(selected.includes(code) ? selected.filter(c => c !== code) : [...selected, code].slice(0, 3))
+  return (
+    <div>
+      <span className="block text-sm font-medium text-gray-700 mb-1.5">BU course <span className="text-red-500">*</span></span>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selected.map(c => (
+            <button key={c} type="button" onClick={() => toggle(c)} className="inline-flex items-center gap-1 rounded-full bg-primary-50 border border-primary-200 text-primary-800 text-[12.5px] font-mono font-semibold px-2.5 py-1">
+              {c}<X className="w-3 h-3" />
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search className="w-4 h-4 text-staff-muted absolute left-3 top-1/2 -translate-y-1/2" />
+        <input value={q} onChange={e => setQ(e.target.value)} className={`${FIELD} pl-9`} placeholder="Search by code or title, e.g. CS 112 or data structures" />
+      </div>
+      <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-staff-line divide-y divide-staff-line2">
+        {rows.map(c => (
+          <li key={c.course_code}>
+            <button type="button" onClick={() => toggle(c.course_code)} className={`w-full text-left px-3 py-2 text-[13.5px] hover:bg-staff-bg flex gap-2 ${selected.includes(c.course_code) ? 'bg-primary-50/60' : ''}`}>
+              <span className="font-mono font-semibold text-staff-ink w-[6.5rem] flex-shrink-0">{c.course_code}</span>
+              <span className="text-staff-ink2 truncate">{c.title}</span>
+              {c.credits != null && <span className="ml-auto text-staff-muted">{Number(c.credits)} cr</span>}
+            </button>
+          </li>
+        ))}
+        {!rows.length && <li className="px-3 py-2 text-[13px] text-staff-muted">No BU courses match.</li>}
+      </ul>
+      <span className="block text-[12px] text-staff-muted mt-1">Choose two for a combined award, e.g. a lecture and its lab.</span>
+    </div>
+  )
+}
+
 function CourseBox({ label, code, title, meta, emphasis = false }) {
   return (
     <div className={`rounded-xl p-5 ${emphasis ? 'bg-primary-50/60 border border-primary-100' : 'bg-staff-bg border border-staff-line2'}`}>
@@ -360,15 +543,17 @@ function CourseBox({ label, code, title, meta, emphasis = false }) {
 }
 
 function StatusBanner({ d }) {
-  const { review: r, decision, info_request: info } = d
+  const { review: r, decision, info_request: info, syllabus } = d
   if (decision && ['approved', 'rejected'].includes(r.status)) {
-    const approved = r.status === 'approved'
+    const approved = decision.outcome !== 'no_credit'
     return (
       <div className={`flex gap-3 rounded-xl px-5 py-4 mb-6 border ${approved ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
         {approved ? <CheckCircle2 className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" /> : <XCircle className="w-5 h-5 text-red-700 flex-shrink-0 mt-0.5" />}
         <div className="text-[14px]">
           <p className="font-semibold text-staff-ink">
-            {approved ? `Approved${decision.bu_award ? `: ${decision.bu_award}` : ''}` : 'Rejected: no credit'}
+            {DECISION_LABELS[decision.decision_type] || (approved ? 'Approved' : 'No credit')}
+            {decision.bu_award ? `: ${decision.bu_award}` : ''}
+            {decision.bu_units != null && approved ? ` · ${Number(decision.bu_units)} BU units` : ''}
           </p>
           <p className="text-staff-ink2">{[decision.decided_by, formatDate(decision.decided_at)].filter(Boolean).join(' · ')}</p>
           {decision.reason && <p className="text-staff-ink2 mt-1">{decision.reason}</p>}
@@ -376,14 +561,20 @@ function StatusBanner({ d }) {
       </div>
     )
   }
-  if (r.status === 'info_requested' && info) {
+  if (info && (r.status === 'info_requested' || info.status === 'responded')) {
+    const replied = info.status === 'responded'
     return (
-      <div className="flex gap-3 rounded-xl px-5 py-4 mb-6 border bg-amber-50 border-amber-200">
-        <Clock className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+      <div className={`flex gap-3 rounded-xl px-5 py-4 mb-6 border ${replied ? 'bg-sky-50 border-sky-200' : 'bg-amber-50 border-amber-200'}`}>
+        <Clock className={`w-5 h-5 flex-shrink-0 mt-0.5 ${replied ? 'text-sky-700' : 'text-amber-700'}`} />
         <div className="text-[14px]">
-          <p className="font-semibold text-staff-ink">{info.status === 'responded' ? 'The student has replied' : 'Waiting on the student'}</p>
-          <p className="text-staff-ink2">Requested {formatDate(info.created_at)}: {info.message}</p>
+          <p className="font-semibold text-staff-ink">
+            {replied
+              ? `${info.kind === 'syllabus' ? 'Syllabus received' : 'The student replied'} ${formatDate(info.responded_at)}`
+              : `Waiting on the student for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
+          </p>
+          <p className="text-staff-ink2">Requested {formatDate(info.created_at)}{info.message ? `: ${info.message}` : ''}</p>
           {info.student_response && <p className="text-staff-ink mt-1"><span className="font-medium">Reply:</span> {info.student_response}</p>}
+          {replied && syllabus?.compared && <p className="text-staff-ink2 mt-1">The syllabus was compared with the BU catalog; the matching evidence below reflects it.</p>}
         </div>
       </div>
     )
@@ -391,7 +582,28 @@ function StatusBanner({ d }) {
   return null
 }
 
-// Collapsible section; open state can be controlled (Matching details opens from the summary link)
+// Things the evaluator must not miss: missing credits, a held grade, a course evaluated with another
+function AttentionNotes({ d }) {
+  const notes = []
+  const src = d.source_course
+  if (d.units?.required) notes.push(`Credits are not shown on the transcript for ${src?.course_code}. Record the BU units with your decision.`)
+  const rules = d.evidence?.rules || []
+  if (rules.includes('PASS')) notes.push(`Graded Pass. Confirm it meets the ${d.policy?.minimum_grade || 'C'} minimum before awarding credit.`)
+  if (rules.includes('GRADE')) notes.push('The final grade is missing or unreadable. Credit needs a confirmed grade.')
+  if (d.combined_with?.length) notes.push(`Evaluated together with ${d.combined_with.map(c => `${c.course_code} ${c.title || ''}`.trim()).join(', ')} from the same transcript.`)
+  if (!notes.length) return null
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-5 py-3.5 mb-6 space-y-1.5">
+      {notes.map((n, i) => (
+        <p key={i} className="flex gap-2 text-[14px] text-amber-900">
+          {n.startsWith('Evaluated together') ? <Link2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />}{n}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+// Collapsible section; open state can be controlled (Matching evidence opens from the summary link)
 function Disclosure({ id, title, open, onToggle, children }) {
   const [inner, setInner] = useState(false)
   const isOpen = open ?? inner
@@ -407,7 +619,7 @@ function Disclosure({ id, title, open, onToggle, children }) {
   )
 }
 
-function CourseDetails({ c, institution }) {
+function CourseDetails({ c, institution, heading = null }) {
   if (!c) return <p className="text-[14px] text-staff-muted">No catalog entry on file.</p>
   const rows = [
     ['Institution', institution],
@@ -419,6 +631,7 @@ function CourseDetails({ c, institution }) {
   ].filter(([, v]) => v != null && v !== '')
   return (
     <div className="space-y-4 text-[14px]">
+      {heading && <p className="font-mono font-semibold text-staff-ink">{heading}</p>}
       <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-y-1.5">
         {rows.map(([k, v]) => (
           <React.Fragment key={k}><dt className="text-staff-muted">{k}</dt><dd className="text-staff-ink">{String(v)}</dd></React.Fragment>
@@ -439,7 +652,7 @@ function CourseDetails({ c, institution }) {
 }
 
 // Only evidence the system actually holds: catalog matches, equivalencies, past decisions, policy notes, alternatives
-function Evidence({ evidence: e, src, bu }) {
+function Evidence({ evidence: e, src, buCourses, syllabus }) {
   const items = []
   for (const m of e.sponsor_matches) {
     items.push({ title: `BU course-match catalog: ${m.match_level}`, body: `${src?.course_code} is listed against ${m.bu_course}.${m.notes ? ` ${m.notes}` : ''}` })
@@ -450,10 +663,11 @@ function Evidence({ evidence: e, src, bu }) {
   for (const p of e.precedents) {
     items.push({ title: `Past decision ${p.decision_id}: ${p.decision}`, body: `${p.bu_awarded ? `Awarded ${p.bu_awarded}. ` : ''}${p.reason || ''}${p.decided_on ? ` (${formatDate(p.decided_on)})` : ''}` })
   }
-  if (src && bu) {
+  if (syllabus) items.push({ title: 'Syllabus from the student', body: `${syllabus.file_name}, received ${formatDate(syllabus.received_at)}${syllabus.compared ? '; compared with the BU catalog.' : '; the file has no readable text, so open it to review.'}` })
+  if (src && buCourses.length) {
     const s = Number(src.source_credits ?? src.catalog_credits)
-    const b = Number(bu.credits)
-    if (s && b) items.push({ title: 'Credits', body: `${s} ${src.credit_system ? src.credit_system.toLowerCase() + ' ' : ''}credits at ${src.institution}; ${b} credits at BU.` })
+    const b = buCourses.reduce((n, c) => n + Number(c.credits || 0), 0)
+    if (s && b) items.push({ title: 'Credits', body: `${s} ${src.credit_system ? src.credit_system.toLowerCase() + ' ' : ''}credits at ${src.institution}${src.bu_credits != null && src.bu_credits !== s ? ` (${src.bu_credits} BU units)` : ''}; ${b} credits at BU.` })
   }
   return (
     <div className="space-y-5 text-[14px]">
@@ -507,6 +721,7 @@ function KnowledgeCues({ k, onConflicts, onPrevious }) {
     cues.push(
       <span key="est" className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
         <BadgeCheck className="w-3.5 h-3.5" />Established equivalency: {k.established.bu_course}
+        {k.established.times_applied > 0 && <span className="font-normal"> · applied {k.established.times_applied}×</span>}
       </span>
     )
   }
@@ -514,14 +729,14 @@ function KnowledgeCues({ k, onConflicts, onPrevious }) {
     const mc = k.previous.most_common
     cues.push(
       <button key="prev" type="button" onClick={onPrevious} className="inline-flex items-center gap-1.5 text-staff-ink2 bg-staff-sunk border border-staff-line rounded-full px-2.5 py-0.5 hover:border-slate-300">
-        <HistoryIcon className="w-3.5 h-3.5" />Evaluated {k.previous.total} time{k.previous.total === 1 ? '' : 's'} before{mc ? ` · most often ${mc.award}` : ''}
+        <HistoryIcon className="w-3.5 h-3.5" />Previously evaluated {k.previous.total} time{k.previous.total === 1 ? '' : 's'}{mc ? ` · most often ${mc.award}` : ''}
       </button>
     )
   }
   if (k.conflicts.length) {
     cues.push(
       <button key="conf" type="button" onClick={onConflicts} className="inline-flex items-center gap-1.5 text-amber-900 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 hover:border-amber-300">
-        <AlertTriangle className="w-3.5 h-3.5" />Earlier decisions disagree
+        <AlertTriangle className="w-3.5 h-3.5" />Potential equivalency conflict
       </button>
     )
   }
@@ -533,11 +748,14 @@ function PreviousDecisions({ k, src, target }) {
   return (
     <div className="space-y-5 text-[14px]">
       {k.established && (
-        <p className="text-staff-ink2">
-          <span className="font-medium text-staff-ink">Established equivalency:</span> {k.established.bu_course || k.established.outcome}
-          {k.established.approved_on && <span className="text-staff-muted"> · since {formatDate(k.established.approved_on)}</span>}
-          {k.established.from_decisions > 0 && <span className="text-staff-muted"> · from {k.established.from_decisions} decisions</span>}
-        </p>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-3">
+          <p className="font-medium text-staff-ink">Established equivalency: {k.established.bu_course || k.established.outcome}</p>
+          <p className="text-[13px] text-staff-ink2 mt-0.5">
+            {[k.established.approved_on && `Since ${formatDate(k.established.approved_on)}`,
+              k.established.from_decisions > 0 && `from ${k.established.from_decisions} decisions`,
+              k.established.times_applied > 0 && `applied to ${k.established.times_applied} transcript course${k.established.times_applied === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+          </p>
+        </div>
       )}
       {p.total === 0 ? (
         <p className="text-staff-muted">{src?.course_code} has not been evaluated before.</p>
@@ -552,18 +770,7 @@ function PreviousDecisions({ k, src, target }) {
               </span>
             ))}
           </div>
-          <ul className="divide-y divide-staff-line2 border-y border-staff-line2">
-            {p.decisions.map(d => (
-              <li key={d.decision_id} className="py-2.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
-                <span className="text-staff-muted tabular-nums">{formatDate(d.decided_on)}</span>
-                <span>
-                  <span className="text-staff-ink">{d.decision}{d.bu_awarded && d.bu_awarded !== '—' ? `: ${d.bu_awarded}` : ''}</span>
-                  <span className="text-staff-muted"> · {d.source === 'evaluator' ? d.evaluator || 'Evaluator' : 'Reference record'}</span>
-                  {d.reason && <span className="block text-[13px] text-staff-ink2">{d.reason}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <DecisionList decisions={p.decisions} />
         </div>
       )}
       {k.similar?.length > 0 && (
@@ -584,15 +791,37 @@ function PreviousDecisions({ k, src, target }) {
   )
 }
 
+function DecisionList({ decisions }) {
+  return (
+    <ul className="divide-y divide-staff-line2 border-y border-staff-line2">
+      {decisions.map(d => (
+        <li key={d.decision_id} className="py-2.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
+          <span className="text-staff-muted tabular-nums">{formatDate(d.decided_on)}</span>
+          <span>
+            <span className="text-staff-ink">{d.decision}{d.bu_awarded && d.bu_awarded !== '—' ? `: ${d.bu_awarded}` : ''}</span>
+            <span className="text-staff-muted"> · {d.evaluator || 'Reference record'}</span>
+            {d.reason && <span className="block text-[13px] text-staff-ink2">{d.reason}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 const CONFLICT_TITLES = {
   different_bu_course: 'Different BU courses awarded',
   different_outcome: 'Different outcomes',
   match_divergence: 'Very different course-match scores'
 }
 
-function Conflicts({ k, canEscalate, onEscalate }) {
+function Conflicts({ k, src, canAct, onUseEstablished, onOverride, onEscalate }) {
   return (
     <div className="space-y-4 text-[14px]">
+      <p className="text-staff-ink2">
+        <span className="font-medium text-staff-ink">{src?.institution} · {src?.course_code}</span>
+        {k.established?.bu_course && <> · established equivalency <span className="font-mono">{k.established.bu_course}</span></>}
+        {' · '}{k.previous.total} earlier decision{k.previous.total === 1 ? '' : 's'}
+      </p>
       <ul className="space-y-3">
         {k.conflicts.map(c => (
           <li key={c.type} className="flex gap-3">
@@ -601,22 +830,51 @@ function Conflicts({ k, canEscalate, onEscalate }) {
           </li>
         ))}
       </ul>
-      <p className="text-[13px] text-staff-muted">The decisions behind this are listed under Previous decisions. You remain the decision-maker for this course; an administrator can record a standard equivalency for future transcripts.</p>
+      {k.previous.decisions.length > 0 && <DecisionList decisions={k.previous.decisions} />}
       {k.escalations?.length > 0 && (
-        <p className="text-[13px] text-staff-ink2">Already sent to administrators by {k.escalations[0].actor} on {formatDate(k.escalations[0].created_at)}.</p>
+        <p className="text-[13px] text-staff-ink2">Additional review requested by {k.escalations[0].actor} on {formatDate(k.escalations[0].created_at)}.</p>
       )}
-      {canEscalate && (
-        <Button size="sm" variant="secondary" onClick={onEscalate}><Flag className="w-3.5 h-3.5" />Ask an administrator to review</Button>
+      {canAct && (
+        <div className="flex flex-wrap gap-2">
+          {k.established?.bu_course && (
+            <Button size="sm" variant="secondary" onClick={onUseEstablished}><BadgeCheck className="w-3.5 h-3.5" />Use established equivalency</Button>
+          )}
+          <Button size="sm" variant="secondary" onClick={onOverride}>Override earlier decisions</Button>
+          <Button size="sm" variant="secondary" onClick={onEscalate}><Flag className="w-3.5 h-3.5" />Request additional review</Button>
+        </div>
       )}
+      <p className="text-[12.5px] text-staff-muted">You decide this course. The Credit Evaluation Office marks the conflict resolved or records a standard equivalency for future transcripts.</p>
     </div>
+  )
+}
+
+function InfoRequests({ requests }) {
+  return (
+    <ul className="space-y-3 text-[14px]">
+      {requests.map(q => (
+        <li key={q.id} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
+          <span className="text-staff-muted tabular-nums">{formatDate(q.created_at)}</span>
+          <span>
+            <span className="text-staff-ink">{q.kind === 'syllabus' ? 'Syllabus requested' : 'Information requested'}</span>
+            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the student' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
+            {q.message && <span className="block text-[13px] text-staff-ink2">{q.message}</span>}
+            {q.student_response && <span className="block text-[13px] text-staff-ink"><span className="font-medium">Reply:</span> {q.student_response}</span>}
+            {q.document_id && <span className="inline-block mt-1"><DocumentButton id={q.document_id} label={q.document_name || 'Open file'} icon={Paperclip} /></span>}
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
 function History({ d }) {
   const r = d.review
+  const reassigned = (d.assignments || []).length > 1
   const rows = [
     ...d.history.map(h => ({ when: h.created_at, label: activityLabel(h.action), who: h.actor, note: h.details?.reason })),
-    ...(r.assigned_at ? [{ when: r.assigned_at, label: 'Assigned to you', who: null, note: r.assignment_reason }] : [])
+    ...(reassigned
+      ? d.assignments.map(a => ({ when: a.assigned_at, label: `Assigned to ${a.evaluator}`, who: null, note: a.reason }))
+      : r.assigned_at ? [{ when: r.assigned_at, label: 'Assigned to you', who: null, note: r.assignment_context?.join(' · ') }] : [])
   ].sort((a, b) => new Date(a.when) - new Date(b.when))
   if (rows.length === 0) return <p className="text-[14px] text-staff-muted">No history yet.</p>
   return (
