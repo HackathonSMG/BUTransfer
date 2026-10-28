@@ -307,7 +307,8 @@ export function assertNoStudentDetails(payload, application) {
  */
 export async function runAgent(agentCase, { client = getProjectClient().getOpenAIClient(), agentName = env.FOUNDRY_AGENT_NAME, ref } = {}) {
   const reference = ref || await loadReference();
-  const agentRef = { body: { agent_reference: { name: agentName } } };
+  // agent_reference requires type field per the Responses API schema
+  const agentRef = { body: { agent_reference: { type: 'agent_reference', name: agentName } } };
 
   log(`runAgent START — case_id=${agentCase.case_id} courses=${agentCase.courses?.length ?? 0} validation_only=${!!agentCase.validation_only}`);
   log(`  Agent name      : ${agentName}`);
@@ -325,11 +326,10 @@ export async function runAgent(agentCase, { client = getProjectClient().getOpenA
 
   try {
     const caseText = JSON.stringify(agentCase);
-    // Responses API requires content as an array of typed parts, not a plain string
-    const initialInput = [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: caseText }] }];
+    // Try plain string — the simplest input form the Responses API accepts
     log(`  Sending initial message (${caseText.length} bytes)...`);
-    log(`  Input format: ${JSON.stringify(initialInput[0]).slice(0, 200)}`);
-    let response = await client.responses.create({ conversation: conversation.id, input: initialInput }, agentRef);
+    log(`  agentRef body: ${JSON.stringify(agentRef.body)}`);
+    let response = await client.responses.create({ conversation: conversation.id, input: caseText }, agentRef);
     log(`  Initial response received — output items: ${response.output?.length ?? 0}`);
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
