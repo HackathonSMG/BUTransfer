@@ -137,15 +137,30 @@ const ValidationError = z.object({
   details: z.string(),
 });
 
+const log = (msg, ...rest) => console.log(`[Agent] ${msg}`, ...rest);
+const logErr = (msg, err) => {
+  console.error(`[Agent] ${msg}`, err?.message || err);
+  if (err?.status)    console.error(`[Agent]   HTTP status  : ${err.status}`);
+  if (err?.code)      console.error(`[Agent]   Error code   : ${err.code}`);
+  if (err?.body)      console.error(`[Agent]   Response body:`, JSON.stringify(err.body).slice(0, 500));
+  if (err?.stack)     console.error(`[Agent]   Stack        :`, err.stack.split('\n').slice(0, 6).join('\n'));
+};
+
 export const isAgentConfigured = () => Boolean(env.FOUNDRY_PROJECT_ENDPOINT && env.FOUNDRY_AGENT_NAME);
 
 let projectClient = null;
 export function getProjectClient() {
   if (!projectClient) {
+    const authType = env.FOUNDRY_API_KEY ? 'API key (Bearer token)' : 'DefaultAzureCredential (Managed Identity)';
+    log(`Initialising AIProjectClient`);
+    log(`  Endpoint  : ${env.FOUNDRY_PROJECT_ENDPOINT}`);
+    log(`  Agent     : ${env.FOUNDRY_AGENT_NAME}`);
+    log(`  Auth      : ${authType}`);
     const credential = env.FOUNDRY_API_KEY
       ? { getToken: async () => ({ token: env.FOUNDRY_API_KEY, expiresOnTimestamp: Date.now() + 3_600_000 }) }
       : new DefaultAzureCredential();
     projectClient = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, credential);
+    log(`  Client created OK`);
   }
   return projectClient;
 }
@@ -293,35 +308,76 @@ export function assertNoStudentDetails(payload, application) {
 export async function runAgent(agentCase, { client = getProjectClient().getOpenAIClient(), agentName = env.FOUNDRY_AGENT_NAME, ref } = {}) {
   const reference = ref || await loadReference();
   const agentRef = { body: { agent_reference: { name: agentName } } };
-  const conversation = await client.conversations.create();
+
+  log(`runAgent START — case_id=${agentCase.case_id} courses=${agentCase.courses?.length ?? 0} validation_only=${!!agentCase.validation_only}`);
+  log(`  Agent name      : ${agentName}`);
+  log(`  agentRef body   : ${JSON.stringify(agentRef.body)}`);
+
+  let conversation;
   try {
-    let response = await client.responses.create(
-      { conversation: conversation.id, input: [{ type: 'message', role: 'user', content: JSON.stringify(agentCase) }] },
-      agentRef,
-    );
+    log(`  Creating conversation...`);
+    conversation = await client.conversations.create();
+    log(`  Conversation created: ${conversation.id}`);
+  } catch (err) {
+    logErr(`conversations.create() failed`, err);
+    throw err;
+  }
+
+  try {
+    const initialInput = [{ type: 'message', role: 'user', content: JSON.stringify(agentCase) }];
+    log(`  Sending initial message (${JSON.stringify(agentCase).length} bytes)...`);
+    let response = await client.responses.create({ conversation: conversation.id, input: initialInput }, agentRef);
+    log(`  Initial response received — output items: ${response.output?.length ?? 0}`);
+
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const calls = (response.output || []).filter((item) => item.type === 'function_call');
+      const allItems = response.output || [];
+      const calls = allItems.filter((item) => item.type === 'function_call');
+      const textItems = allItems.filter((item) => item.type === 'message');
+
+      log(`  Round ${round}: output items=${allItems.length} function_calls=${calls.length} messages=${textItems.length}`);
+      if (calls.length) log(`    Tool calls: ${calls.map((c) => c.name).join(', ')}`);
+      if (textItems.length) log(`    Agent text: ${textItems.map((t) => String(t.content).slice(0, 120)).join(' | ')}`);
 
       const validationCall = calls.find((c) => c.name === 'submit_validation_error');
       if (validationCall) {
+        log(`  submit_validation_error called — args: ${validationCall.arguments}`);
         const vErr = ValidationError.parse(JSON.parse(validationCall.arguments));
+        log(`  Validation failed: reason=${vErr.reason}`);
         return { type: 'validation_error', reason: vErr.reason, details: vErr.details };
       }
 
       const final = calls.find((c) => c.name === 'submit_recommendations');
-      if (final) return { type: 'recommendations', data: parseSubmission(final.arguments, agentCase, reference) };
+      if (final) {
+        log(`  submit_recommendations called — parsing results...`);
+        const data = parseSubmission(final.arguments, agentCase, reference);
+        log(`  Parsed ${data.length} course recommendation(s)`);
+        data.forEach((r) => log(`    ${r.course_ref}: outcome=${r.outcome} bu_course=${r.bu_course} confidence=${r.confidence}`));
+        return { type: 'recommendations', data };
+      }
 
       if (calls.length === 0) throw new Error('The agent finished without submitting recommendations');
 
       const outputs = [];
       for (const c of calls) {
-        outputs.push({ type: 'function_call_output', call_id: c.call_id, output: JSON.stringify(await callTool(reference, c.name, c.arguments)) });
+        log(`    Executing tool: ${c.name}  args=${c.arguments?.slice(0, 200)}`);
+        const toolResult = await callTool(reference, c.name, c.arguments);
+        log(`    Tool ${c.name} returned: ${JSON.stringify(toolResult).slice(0, 200)}`);
+        outputs.push({ type: 'function_call_output', call_id: c.call_id, output: JSON.stringify(toolResult) });
       }
+
+      log(`  Sending ${outputs.length} tool result(s) back to agent...`);
       response = await client.responses.create({ conversation: conversation.id, input: outputs }, agentRef);
+      log(`  Response received — output items: ${response.output?.length ?? 0}`);
     }
     throw new Error(`The agent used more than ${MAX_TOOL_ROUNDS} tool rounds without finishing`);
+  } catch (err) {
+    logErr(`runAgent conversation ${conversation?.id} failed at round`, err);
+    throw err;
   } finally {
-    await client.conversations.delete(conversation.id).catch(() => {});
+    if (conversation?.id) {
+      await client.conversations.delete(conversation.id).catch((e) => log(`  Warning: could not delete conversation ${conversation.id}: ${e?.message}`));
+      log(`  Conversation ${conversation.id} deleted`);
+    }
   }
 }
 
@@ -330,86 +386,116 @@ export async function runAgent(agentCase, { client = getProjectClient().getOpenA
  * Also handles Phase 1 validation — sets application status to validation_failed if the agent rejects it.
  */
 export async function reviewWithAgent(application, credit, opts = {}) {
+  const appId = application.reference_number || application.id;
+  log(`reviewWithAgent START — app=${appId} program=${application.transfer_to_program}`);
+  log(`  isAgentConfigured: ${isAgentConfigured()}`);
+  log(`  FOUNDRY_PROJECT_ENDPOINT: ${env.FOUNDRY_PROJECT_ENDPOINT}`);
+  log(`  FOUNDRY_AGENT_NAME      : ${env.FOUNDRY_AGENT_NAME}`);
+  log(`  FOUNDRY_API_KEY present : ${Boolean(env.FOUNDRY_API_KEY)}`);
+
   const pending = credit.results
     .map((result, i) => ({ result, course: credit.courses[i], evaluationId: credit.evaluationIds[i] }))
     .filter(({ result }) => result.path === 'review' || result.path === 'needs_information');
 
+  log(`  Total courses : ${credit.courses.length}  Pending for agent: ${pending.length}`);
+
   const ref = await loadReference();
   const accuracyMap = await loadAccuracyByInstitution();
 
-  // Build the institution set from this application's courses for validation
   const institutions = [...new Set(credit.courses.map((c) => c.institution))];
   const allCourseCodes = credit.courses.map((c) => c.course_code);
+  log(`  Institutions  : ${institutions.join(', ')}`);
+  log(`  Course codes  : ${allCourseCodes.join(', ')}`);
 
-  if (pending.length === 0) {
-    // Still run Phase 1 validation even when the engine resolved everything
-    const validationCase = {
+  try {
+    if (pending.length === 0) {
+      log(`  No pending courses — running Phase 1 validation only`);
+      const validationCase = {
+        case_id: crypto.randomUUID(),
+        target_program: application.transfer_to_program,
+        validation_only: true,
+        institutions,
+        courses: credit.courses.map((c) => ({ course_ref: c.id, institution: c.institution, course_code: c.course_code, title: c.title })),
+      };
+      assertNoStudentDetails(validationCase, application);
+      log(`  Validation case built — case_id=${validationCase.case_id}`);
+      let timer;
+      const result = await Promise.race([
+        runAgent(validationCase, { ...opts, ref }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Agent validation timed out')), RUN_TIMEOUT_MS); }),
+      ]).finally(() => clearTimeout(timer));
+
+      log(`  Validation result: ${result.type}`);
+      if (result.type === 'validation_error') {
+        log(`  Validation FAILED — reason=${result.reason} details=${result.details}`);
+        return { status: 'validation_failed', reason: result.reason, details: result.details };
+      }
+      log(`  Validation passed — returning skipped`);
+      return { status: 'skipped', reviewed: 0 };
+    }
+
+    const catalogOf = new Map(ref.catalog.map((c) => [keyOf(c.institution, c.course_code), c]));
+    const agentCase = {
       case_id: crypto.randomUUID(),
       target_program: application.transfer_to_program,
-      validation_only: true,
       institutions,
-      courses: credit.courses.map((c) => ({ course_ref: c.id, institution: c.institution, course_code: c.course_code, title: c.title })),
+      all_course_codes: allCourseCodes,
+      historical_accuracy: Object.fromEntries(
+        institutions.map((inst) => [inst, accuracyMap[inst.toUpperCase()] ?? null])
+      ),
+      courses: pending.map(({ result, course }) => {
+        const cat = catalogOf.get(keyOf(course.institution, course.course_code)) || {};
+        return {
+          course_ref: course.id,
+          institution: course.institution,
+          course_code: course.course_code,
+          title: cat.title || course.title,
+          credits: Number(course.source_credits),
+          credit_system: course.credit_system,
+          bu_credits: result.bu_credits,
+          level: cat.level || null,
+          description: cat.description || null,
+          syllabus: cat.syllabus || null,
+          engine_suggestion: result.suggestion,
+          engine_reasons: result.reasons,
+        };
+      }),
     };
-    assertNoStudentDetails(validationCase, application);
+    assertNoStudentDetails(agentCase, application);
+    log(`  Full evaluation case built — case_id=${agentCase.case_id} courses=${agentCase.courses.length}`);
+    agentCase.courses.forEach((c) => log(`    Course: ${c.institution} / ${c.course_code} — ${c.title}`));
+
     let timer;
     const result = await Promise.race([
-      runAgent(validationCase, { ...opts, ref }),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Agent validation timed out')), RUN_TIMEOUT_MS); }),
+      runAgent(agentCase, { ...opts, ref }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The agent did not finish within 3 minutes')), RUN_TIMEOUT_MS); }),
     ]).finally(() => clearTimeout(timer));
 
-    if (result.type === 'validation_error') return { status: 'validation_failed', reason: result.reason, details: result.details };
-    return { status: 'skipped', reviewed: 0 };
+    log(`  runAgent returned: ${result.type}`);
+
+    if (result.type === 'validation_error') {
+      log(`  Validation FAILED — reason=${result.reason}`);
+      return { status: 'validation_failed', reason: result.reason, details: result.details };
+    }
+
+    const recommendations = result.data;
+    log(`  Saving ${recommendations.length} recommendation(s) to DB...`);
+    const evaluationOf = new Map(pending.map((p) => [p.course.id, p.evaluationId]));
+    for (const r of recommendations) {
+      log(`    ${r.course_ref}: outcome=${r.outcome} bu_course=${r.bu_course} confidence=${r.confidence}`);
+      await query(
+        `UPDATE course_evaluations SET agent_outcome = $1, agent_bu_course = $2, agent_confidence = $3, agent_rationale = $4,
+           agent_precedent_ids = $5, agent_missing = $6 WHERE id = $7`,
+        [r.outcome, r.bu_course, r.confidence, r.rationale, r.precedent_ids, r.missing, evaluationOf.get(r.course_ref)]
+      );
+    }
+    log(`  reviewWithAgent DONE — reviewed=${recommendations.length}`);
+    return { status: 'completed', reviewed: recommendations.length, sent: pending.length };
+
+  } catch (err) {
+    logErr(`reviewWithAgent FAILED for app=${appId}`, err);
+    throw err;
   }
-
-  const catalogOf = new Map(ref.catalog.map((c) => [keyOf(c.institution, c.course_code), c]));
-  const agentCase = {
-    case_id: crypto.randomUUID(),
-    target_program: application.transfer_to_program,
-    institutions,
-    all_course_codes: allCourseCodes,
-    historical_accuracy: Object.fromEntries(
-      institutions.map((inst) => [inst, accuracyMap[inst.toUpperCase()] ?? null])
-    ),
-    courses: pending.map(({ result, course }) => {
-      const cat = catalogOf.get(keyOf(course.institution, course.course_code)) || {};
-      return {
-        course_ref: course.id,
-        institution: course.institution,
-        course_code: course.course_code,
-        title: cat.title || course.title,
-        credits: Number(course.source_credits),
-        credit_system: course.credit_system,
-        bu_credits: result.bu_credits,
-        level: cat.level || null,
-        description: cat.description || null,
-        syllabus: cat.syllabus || null,
-        engine_suggestion: result.suggestion,
-        engine_reasons: result.reasons,
-      };
-    }),
-  };
-  assertNoStudentDetails(agentCase, application);
-
-  let timer;
-  const result = await Promise.race([
-    runAgent(agentCase, { ...opts, ref }),
-    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The agent did not finish within 3 minutes')), RUN_TIMEOUT_MS); }),
-  ]).finally(() => clearTimeout(timer));
-
-  if (result.type === 'validation_error') {
-    return { status: 'validation_failed', reason: result.reason, details: result.details };
-  }
-
-  const recommendations = result.data;
-  const evaluationOf = new Map(pending.map((p) => [p.course.id, p.evaluationId]));
-  for (const r of recommendations) {
-    await query(
-      `UPDATE course_evaluations SET agent_outcome = $1, agent_bu_course = $2, agent_confidence = $3, agent_rationale = $4,
-         agent_precedent_ids = $5, agent_missing = $6 WHERE id = $7`,
-      [r.outcome, r.bu_course, r.confidence, r.rationale, r.precedent_ids, r.missing, evaluationOf.get(r.course_ref)]
-    );
-  }
-  return { status: 'completed', reviewed: recommendations.length, sent: pending.length };
 }
 
 export default { AGENT_INSTRUCTIONS, AGENT_TOOLS, isAgentConfigured, runAgent, reviewWithAgent, assertNoStudentDetails };

@@ -8,6 +8,7 @@ let enginePromise = null;
 /** Builds the engine from the reference tables once, then reuses it. */
 async function getEngine() {
   if (!enginePromise) {
+    console.log(`[Credit] Building credit engine from reference tables...`);
     enginePromise = (async () => {
       const [catalog, equivalencies, decisions] = await Promise.all([
         query(`SELECT institution, course_code, title, program, level, description, learning_outcomes, syllabus FROM catalog_courses`),
@@ -15,14 +16,19 @@ async function getEngine() {
         query(`SELECT decision_id, institution, course_code, proposed_bu, decision, bu_awarded, reason, TO_CHAR(decided_on, 'YYYY-MM-DD') AS decided_on
                FROM past_decisions WHERE status = 'active'`),
       ]);
+      console.log(`[Credit]   catalog_courses=${catalog.rows.length} equivalencies=${equivalencies.rows.length} past_decisions=${decisions.rows.length}`);
       if (catalog.rows.length === 0) throw new Error('Transfer credit reference data is not loaded. Run `npm run db:seed:credit`.');
-      return createEngine({
+      const engine = createEngine({
         catalog: catalog.rows,
         equivalencies: equivalencies.rows,
         pastDecisions: decisions.rows,
         syllabi: catalog.rows.filter((c) => c.syllabus).map((c) => ({ institution: c.institution, course_code: c.course_code, syllabus: c.syllabus })),
       });
+      console.log(`[Credit]   Engine v${engine.version} built and cached`);
+      return engine;
     })().catch((err) => { enginePromise = null; throw err; });
+  } else {
+    console.log(`[Credit] Using cached credit engine`);
   }
   return enginePromise;
 }
@@ -64,16 +70,33 @@ export async function importTranscript(applicationId, documentId, buffer) {
  * @returns {Promise<{summary, results}|null>} null when no transcript courses have been read yet
  */
 export async function evaluateApplicationCredits(application, evaluationId) {
+  console.log(`[Credit] evaluateApplicationCredits — app=${application.reference_number} eval=${evaluationId}`);
   const { rows: courses } = await query(`SELECT * FROM transcript_courses WHERE application_id = $1 ORDER BY position`, [application.id]);
-  if (courses.length === 0) return null;
+  console.log(`[Credit]   Transcript courses found: ${courses.length}`);
+  if (courses.length === 0) {
+    console.log(`[Credit]   No courses — returning null`);
+    return null;
+  }
 
+  courses.forEach((c, i) => console.log(`[Credit]   [${i+1}] ${c.institution} ${c.course_code} "${c.title}" ${c.source_credits}cr ${c.grade}`));
+
+  console.log(`[Credit]   Loading engine...`);
   const engine = await getEngine();
+  console.log(`[Credit]   Running evaluateTranscript for program="${application.transfer_to_program}"...`);
   const { results, summary } = engine.evaluateTranscript(
     // Missing credits stay missing (null), never 0
     courses.map((c) => ({ ...c, source_credits: c.source_credits == null ? null : Number(c.source_credits) })),
     { major: application.transfer_to_program },
   );
+  console.log(`[Credit]   Engine done — ${results.length} results`);
+  results.forEach((r, i) => {
+    const c = courses[i];
+    console.log(`[Credit]     [${i+1}] ${c.course_code}: path=${r.path} outcome=${r.outcome} award=${r.award || '-'} suggestion=${r.suggestion || '-'} confidence=${r.confidence}`);
+    if (r.rules?.length)  console.log(`[Credit]          rules=${r.rules.join(',')}`);
+    if (r.reasons?.length) console.log(`[Credit]          reasons=${r.reasons.slice(0,3).join(' | ')}`);
+  });
 
+  console.log(`[Credit]   Inserting course_evaluations rows...`);
   const evaluationIds = [];
   for (let i = 0; i < courses.length; i++) {
     const r = results[i];
@@ -91,6 +114,7 @@ export async function evaluateApplicationCredits(application, evaluationId) {
       [r.matched_code && r.matched_code !== courses[i].course_code ? r.matched_code : null,
         r.repeat_of != null ? courses[r.repeat_of].id : null, courses[i].id]);
   }
+  console.log(`[Credit]   Inserted ${evaluationIds.length} course_evaluations rows: [${evaluationIds.join(', ')}]`);
   return { summary, results, courses, evaluationIds };
 }
 

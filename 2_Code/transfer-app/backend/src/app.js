@@ -40,6 +40,8 @@ export function createApp() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests. Please try again after 15 minutes.' } },
+    // Azure App Service forwards IP as IP:PORT — strip the port so the rate limiter key is valid
+    keyGenerator: (req) => (req.ip || req.socket.remoteAddress || 'unknown').replace(/:\d+$/, ''),
     // Skipped in development: every local request shares one IP, and the SPA makes several calls per page
     skip: (req) => req.path === '/health' || env.NODE_ENV === 'development',
   });

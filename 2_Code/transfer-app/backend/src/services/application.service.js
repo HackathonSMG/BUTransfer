@@ -165,23 +165,29 @@ export async function getApplicationStats() {
 }
 
 export async function triggerEvaluation(applicationId, triggeredBy) {
+  console.log(`[Eval] triggerEvaluation called — applicationId=${applicationId} triggeredBy=${triggeredBy}`);
   const appResult = await query(`SELECT * FROM applications WHERE id = $1 LIMIT 1`, [applicationId]);
   if (appResult.rows.length === 0) throw notFound('Application');
+
+  const app = appResult.rows[0];
+  console.log(`[Eval]   Application: ${app.reference_number} — ${app.transfer_from_institution} → ${app.transfer_to_program}`);
 
   const evalResult = await query(
     `INSERT INTO ai_evaluations (application_id, status, policy_version, attempt_number) VALUES ($1, 'pending', '1.0', 1) RETURNING *`,
     [applicationId]
   );
   const evaluation = evalResult.rows[0];
+  console.log(`[Eval]   Evaluation record created: eval_id=${evaluation.id}`);
 
   await updateApplicationStatus(applicationId, 'under_evaluation', triggeredBy, 'Course evaluation started');
   // Applications loaded in bulk or raised by staff get the same duplicate check as website submissions
   await lifecycle.detectDuplicate(applicationId).catch((err) => console.error('[Duplicate] Check failed:', err.message));
   await auditLog({ applicationId, action: 'evaluation_triggered', actorId: triggeredBy, details: { evaluation_id: evaluation.id } });
 
+  console.log(`[Eval]   Queuing background runEvaluation(${evaluation.id}) via setImmediate`);
   setImmediate(() => {
     runEvaluation(evaluation.id).catch((err) => {
-      console.error(`[AI] Background evaluation failed for eval ${evaluation.id}:`, err.message);
+      console.error(`[AI] Background evaluation failed for eval ${evaluation.id}:`, err.message, err.stack);
     });
   });
 
@@ -262,6 +268,8 @@ function buildEvaluationResult(application, documents, eligibility, credit, cred
 }
 
 export async function runEvaluation(evaluationId) {
+  console.log(`[Eval] ══════════════════════════════════════════`);
+  console.log(`[Eval] runEvaluation START — eval_id=${evaluationId}`);
   await query(`UPDATE ai_evaluations SET status = 'running', started_at = NOW() WHERE id = $1`, [evaluationId]);
   let applicationId;
 
@@ -269,6 +277,7 @@ export async function runEvaluation(evaluationId) {
     const evalRow = await query(`SELECT * FROM ai_evaluations WHERE id = $1 LIMIT 1`, [evaluationId]);
     if (evalRow.rows.length === 0) throw new Error(`Evaluation record ${evaluationId} not found`);
     applicationId = evalRow.rows[0].application_id;
+    console.log(`[Eval]   application_id=${applicationId}`);
 
     const [appResult, docsResult] = await Promise.all([
       query(`SELECT * FROM applications WHERE id = $1 LIMIT 1`, [applicationId]),
@@ -277,7 +286,15 @@ export async function runEvaluation(evaluationId) {
 
     const application = appResult.rows[0];
     const documents = docsResult.rows;
+    console.log(`[Eval]   Application : ${application.reference_number}`);
+    console.log(`[Eval]   Institution : ${application.transfer_from_institution}`);
+    console.log(`[Eval]   Program     : ${application.transfer_to_program}`);
+    console.log(`[Eval]   Documents   : ${documents.length} (types: ${documents.map(d => d.document_type).join(', ') || 'none'})`);
+
+    // ── Step 1: Eligibility ──────────────────────────────────────────────────
+    console.log(`[Eval] STEP 1: Eligibility check`);
     const history = application.academic_history || {};
+    console.log(`[Eval]   GPA=${history.gpa} credits=${history.credits_completed} hasTranscripts=${documents.some(d => d.document_type === 'transcript')}`);
     const eligibility = await eligibilityService.checkEligibility({
       gpa: history.gpa,
       credits: history.credits_completed,
@@ -285,21 +302,50 @@ export async function runEvaluation(evaluationId) {
       program: application.transfer_to_program,
       hasTranscripts: documents.some((d) => d.document_type === 'transcript'),
     });
+    console.log(`[Eval]   Eligibility result: eligible=${eligibility.eligible} score=${eligibility.score}`);
+    if (eligibility.reasons?.length) console.log(`[Eval]   Reasons: ${eligibility.reasons.join('; ')}`);
+
+    // ── Step 2: Credit Engine ────────────────────────────────────────────────
+    console.log(`[Eval] STEP 2: Credit engine evaluation`);
     let credit = null;
     let creditError = null;
     try {
       credit = await creditService.evaluateApplicationCredits(application, evaluationId);
+      if (credit) {
+        const s = credit.summary;
+        console.log(`[Eval]   Credit result: ${credit.courses.length} courses`);
+        console.log(`[Eval]   Transferred=${s.transferred_credits} elective=${s.elective_credits} pending=${s.pending_credits} no_credit=${s.no_credit_courses}`);
+        console.log(`[Eval]   By path: ${JSON.stringify(s.by_path)}`);
+        credit.results.forEach((r, i) => {
+          const c = credit.courses[i];
+          console.log(`[Eval]     [${i+1}] ${c.course_code} "${c.title}" → path=${r.path} outcome=${r.outcome} award=${r.award || '-'} confidence=${r.confidence}`);
+        });
+      } else {
+        console.log(`[Eval]   No transcript courses found — credit evaluation skipped`);
+      }
     } catch (err) {
-      console.error(`[Credit] Course evaluation failed for ${application.reference_number}:`, err.message);
+      console.error(`[Eval] STEP 2 FAILED: Credit engine error — ${err.message}`, err.stack);
       creditError = err.message;
     }
 
-    // The agent runs Phase 1 validation + Phase 2 review; validation failure short-circuits the evaluation
+    // ── Step 3: Agent ────────────────────────────────────────────────────────
+    console.log(`[Eval] STEP 3: Agent evaluation`);
+    console.log(`[Eval]   isAgentConfigured() = ${isAgentConfigured()}`);
+    console.log(`[Eval]   credit available    = ${Boolean(credit)}`);
     let agent = { status: 'off' };
-    if (credit && isAgentConfigured()) {
+
+    if (!credit) {
+      console.log(`[Eval]   Skipping agent — no credit data`);
+    } else if (!isAgentConfigured()) {
+      console.log(`[Eval]   Skipping agent — not configured (FOUNDRY_PROJECT_ENDPOINT or FOUNDRY_AGENT_NAME missing)`);
+    } else {
+      console.log(`[Eval]   Calling reviewWithAgent...`);
       try {
         agent = await reviewWithAgent(application, credit);
+        console.log(`[Eval]   reviewWithAgent returned: status=${agent.status} reviewed=${agent.reviewed ?? '-'} sent=${agent.sent ?? '-'}`);
+
         if (agent.status === 'validation_failed') {
+          console.log(`[Eval]   Validation FAILED — halting evaluation. reason=${agent.reason} details=${agent.details}`);
           await query(
             `UPDATE ai_evaluations SET status = 'completed', validation_status = 'failed',
                validation_result = $1, completed_at = NOW() WHERE id = $2`,
@@ -312,12 +358,22 @@ export async function runEvaluation(evaluationId) {
           return;
         }
       } catch (err) {
-        console.error(`[Agent] Review failed for ${application.reference_number}:`, err.message);
+        console.error(`[Eval] STEP 3 FAILED: Agent error — ${err.message}`);
+        console.error(`[Eval]   HTTP status : ${err.status || 'n/a'}`);
+        console.error(`[Eval]   Error code  : ${err.code || 'n/a'}`);
+        console.error(`[Eval]   Body        : ${err.body ? JSON.stringify(err.body).slice(0, 400) : 'n/a'}`);
+        console.error(`[Eval]   Stack       :`, err.stack?.split('\n').slice(0, 5).join('\n'));
         agent = { status: 'failed', error: err.message };
       }
     }
-    const result = buildEvaluationResult(application, documents, eligibility, credit, creditError, agent);
 
+    // ── Step 4: Build result ─────────────────────────────────────────────────
+    console.log(`[Eval] STEP 4: Building evaluation result`);
+    const result = buildEvaluationResult(application, documents, eligibility, credit, creditError, agent);
+    console.log(`[Eval]   confidence_score=${result.confidence_score} flags=${result.flags.length} missing_docs=${result.missing_documents.length}`);
+
+    // ── Step 5: Persist ──────────────────────────────────────────────────────
+    console.log(`[Eval] STEP 5: Persisting to DB — agent_status=${agent.status}`);
     await query(
       `UPDATE ai_evaluations SET status = 'completed', criteria_results = $1, missing_documents = $2, flags = $3, recommendations = $4, evaluation_report = $5,
          confidence_score = $6, credit_summary = $7, agent_status = $8, agent_error = $9,
@@ -326,23 +382,31 @@ export async function runEvaluation(evaluationId) {
         result.confidence_score, credit ? JSON.stringify(credit.summary) : null, agent.status, agent.error || null,
         isAgentConfigured() ? 'passed' : 'skipped', evaluationId]
     );
+    console.log(`[Eval]   ai_evaluations record updated`);
 
-    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'Course evaluation completed');
+    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'AI evaluation completed');
+    console.log(`[Eval]   Application status → evaluation_completed`);
+
     await notificationService.evaluationComplete(application, evaluationId);
+    console.log(`[Eval]   Notification sent`);
 
-    // Step 4: established equivalencies are applied without department work; then the remaining courses go to
-    // evaluators. A routing problem must not fail the evaluation itself.
+    // ── Step 6: Apply established equivalencies then assign to evaluators ────
     if (credit) {
+      console.log(`[Eval] STEP 6: Assigning application to evaluators`);
       try {
         const { held } = await lifecycle.applyEstablished(applicationId);
         await assignmentService.assignApplication(applicationId, { held });
+        console.log(`[Eval]   Assignment complete`);
       } catch (err) {
-        console.error(`[Assignment] Could not assign ${application.reference_number}:`, err.message);
+        console.error(`[Eval] STEP 6 FAILED: Assignment error — ${err.message}`);
       }
     }
+
     console.log(`[AI] Evaluation ${evaluationId} completed successfully`);
+    console.log(`[Eval] ══════════════════════════════════════════`);
   } catch (err) {
-    console.error(`[AI] Evaluation ${evaluationId} failed:`, err.message);
+    console.error(`[Eval] runEvaluation FAILED — eval_id=${evaluationId}: ${err.message}`);
+    console.error(`[Eval]   Stack:`, err.stack?.split('\n').slice(0, 8).join('\n'));
     await query(`UPDATE ai_evaluations SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2`, [err.message, evaluationId]);
     if (applicationId) await auditLog({ applicationId, action: 'evaluation_failed', details: { evaluation_id: evaluationId, error: err.message } });
   }
