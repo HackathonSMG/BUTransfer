@@ -2,7 +2,7 @@
 
 This walks through the Boston University transfer credit process (Problem 1), from the applicant's first click to posted credit:
 
-> An applicant opens the landing page and starts a **Transfer Credit Eligibility** application. No account is needed. They enter their details, upload their transcripts and any supporting documents, and submit. They receive an **application number** on screen and by email.
+> An admitted transfer student opens the landing page and clicks **Submit Transcripts for Evaluation**. No account is needed. They enter their details, upload their transcripts and any supporting documents, and submit. They receive an **application number** on screen and by email.
 >
 > The system reads the courses and checks each against BU's equivalency records. Established equivalencies are applied straight away; the other courses go to department evaluators, who may ask for a syllabus. The Credit Evaluation Office does the final review and posts the credit.
 >
@@ -23,18 +23,18 @@ The public site has two actions and needs no account:
 
 | Page | Route | Purpose |
 |---|---|---|
-| Landing | `/` | **Start Transfer Credit Eligibility** (primary) and **Track Application** |
-| Application | `/apply` | Four-step Transfer Credit Eligibility Application |
+| Landing | `/` | **Submit Transcripts for Evaluation** (primary) and **Track Application** |
+| Application | `/apply` | Four-step Transfer Credit Evaluation submission (for admitted students) |
 | Confirmation | `/apply/submitted` | Application number, email, status, Track Application |
 | Track Application | `/track` (optionally `?application=APP-2026-0012`) | Application number + email, then the tracking page |
-| Self-check / eligibility (unchanged) | `/self-check`, `/eligibility` | Previews before applying; nothing is stored |
+| Self-check | `/self-check` | Preview likely equivalencies (problem step 1); nothing is stored. `/eligibility` redirects here: admission eligibility is not part of this process |
 | Older private links | `/status/:token` | Redirect to Track Application: the number and email are always required |
 
 The top bar on public pages offers **Start Application**, **Track Application** and **Staff Sign In**. Applicants are never asked to create an account or sign in.
 
-## 2. Start Transfer Credit Eligibility
+## 2. Submit Transcripts for Evaluation
 
-Clicking **Start Transfer Credit Eligibility** opens `/apply` directly, with no login. The page explains:
+Clicking **Submit Transcripts for Evaluation** opens `/apply` directly, with no login. The page explains:
 - what the service is ("Submit your previous coursework for transfer credit evaluation");
 - that the applicant uploads a transcript and supporting documents;
 - that they track the application with the number they receive after submitting.
@@ -43,7 +43,7 @@ Clicking **Start Transfer Credit Eligibility** opens `/apply` directly, with no 
 
 | Step | Content |
 |---|---|
-| 1. Applicant Information | First and last name, email address and confirmation, previous college or university, intended BU program, intended start term |
+| 1. Student Information | First and last name, email address and confirmation, previous college or university, intended BU program, intended start term |
 | 2. Academic Documents | **Academic Transcript** (required, one or more) and **Supporting Documents** (optional, multiple) |
 | 3. Additional Information | "Is there anything else you would like the transfer credit team to know?" (optional, up to 5,000 characters) |
 | 4. Review & Submit | Summary with **Edit** links per section, "what happens next", confirmation checkbox, **Submit Application** |
@@ -351,7 +351,7 @@ One-time setup on the deployed app:
 Files: `4_Sample_Transcripts/Transcript_STU-001_*.pdf` (two files) and `5_Demo_Documents/CSC_220_Syllabus_Riverside.pdf`.
 
 **Applicant**
-1. Open `/`. Click **Start Transfer Credit Eligibility**. The application opens with no sign-in.
+1. Open `/`. Click **Submit Transcripts for Evaluation**. The form opens with no sign-in.
 2. Step 1: enter your name, **a real email address you can read**, Riverside Community College, **Computer Science**, **Fall 2027**. Click **Continue**.
    - If that email already has an application, the existing-application panel appears (Scenario B). Choose **Submit Another Application** to continue.
 3. Step 2: drop both STU-001 transcripts on **Academic Transcript**. Watch the progress bars, then **Uploaded**.
@@ -413,7 +413,7 @@ The problem statement does not define these. They are implementation choices, no
 3. **Required fields.**
    - Name, email, previous institution, intended program and start term are required. The start term is needed for the one-year transfer deadline.
    - GPA, credits, phone and date of birth are no longer asked of applicants; the transcript carries the coursework.
-   - The staff eligibility report shows criteria that need these as "unable to determine".
+   - The admission-style eligibility score is not shown to staff: students are already admitted (problem step 2).
 4. **Documents.**
    - At least one transcript is required to submit.
    - Supporting documents are optional; a syllabus is requested per course only when a department needs one.

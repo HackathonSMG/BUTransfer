@@ -127,7 +127,7 @@ export default function StaffTopbar({ onOpenNav }) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={['admin', 'credit_office'].includes(user?.role) ? 'Search applicants, application numbers, institutions' : 'Search my evaluations'}
+          placeholder={['admin', 'credit_office'].includes(user?.role) ? 'Search students, application numbers, institutions' : 'Search my evaluations'}
           className="w-full pl-9 pr-3 py-2 text-sm bg-staff-sunk border border-transparent rounded-lg placeholder:text-staff-muted focus:outline-none focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
         />
       </form>

@@ -17,7 +17,7 @@ const STAGE_CHIPS = [
   ['processing', 'Processing'],
   ['pending_review', 'Pending evaluator review'],
   ['in_review', 'In review'],
-  ['waiting_for_applicant', 'Waiting for applicant'],
+  ['waiting_for_applicant', 'Waiting for student'],
   ['credit_office_review', 'Credit Office review'],
   ['completed', 'Completed'],
   ['closed', 'Closed']

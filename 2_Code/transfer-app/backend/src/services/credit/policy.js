@@ -35,6 +35,26 @@ export const POLICY = {
   deadlineWarningDays: num(process.env.TRANSFER_DEADLINE_WARNING_DAYS, 60),
 };
 
+// ---------- Where each rule comes from ----------
+// So staff can tell the Problem 1 statement's rules from rules in the supplied data (3_Data rules.csv, programs
+// sheet) and from this implementation's own documented assumptions. Labels only; no rule logic here.
+export const RULE_SOURCES = {
+  R1: { name: 'Minimum grade (C or higher)', source: 'Problem statement' },
+  R2: { name: 'Quarter credits convert at 2/3', source: 'Problem statement' },
+  R3: { name: 'Elective credit, no BU Hub units', source: 'Problem statement' },
+  R4: { name: 'Transfer within one year of starting at BU', source: 'Problem statement' },
+  R5: { name: 'External grades not in the BU GPA', source: 'Problem statement' },
+  R6: { name: 'Group C course must be taken at BU (elective only)', source: 'Supplied program data' },
+  R7: { name: 'At most four 200+ Economics courses', source: 'Supplied program data' },
+  R8: { name: 'Biology residency requirement', source: 'Supplied program data' },
+  R9: { name: 'Approved course substitutions', source: 'Supplied program data' },
+  W: { name: 'Withdrawn: no credit earned', source: 'Transcript data' },
+  GRADE: { name: 'Final grade needed', source: 'Transcript data' },
+  CREDITS: { name: 'Credits needed (never assumed 0)', source: 'Transcript data' },
+  PASS: { name: 'Pass grade confirmed by the department', source: 'Implementation assumption (configurable)' },
+  REPEAT: { name: 'Repeated course credited once', source: 'Implementation assumption' },
+};
+
 // ---------- Grades ----------
 const LETTER_POINTS = { 'A+': 4.3, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
 const ALIASES = {

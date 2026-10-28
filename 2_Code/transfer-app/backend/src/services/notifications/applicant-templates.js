@@ -117,7 +117,7 @@ export function renderApplicantEmail(event, ctx) {
   if (!t) throw new Error(`No applicant template for "${event}"`);
   const subject = t.subject.replace('{ref}', ctx.reference_number);
   const link = trackUrl(ctx.reference_number);
-  const greeting = `Dear ${ctx.name || 'Applicant'},`;
+  const greeting = `Dear ${ctx.name || 'Student'},`;
   const showStatus = event !== 'application_lookup';
 
   const text = [

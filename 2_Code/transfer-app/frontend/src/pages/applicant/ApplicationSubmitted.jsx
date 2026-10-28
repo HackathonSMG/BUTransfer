@@ -26,7 +26,7 @@ export default function ApplicationSubmitted() {
             <span className="w-14 h-14 rounded-full bg-green-50 grid place-items-center mx-auto"><CheckCircle2 className="w-8 h-8 text-green-600" /></span>
             <h1 className="font-display text-[28px] sm:text-3xl font-semibold text-gray-900 mt-4">Application Submitted</h1>
             <p className="text-gray-600 mt-2">
-              {state.applicant ? `Thank you, ${state.applicant}. ` : ''}Your transfer credit eligibility application has been submitted successfully.
+              {state.applicant ? `Thank you, ${state.applicant}. ` : ''}Your transcripts have been submitted for transfer credit evaluation.
             </p>
 
             <div className="mt-7 rounded-xl border border-gray-200 bg-gray-50 px-5 py-5">

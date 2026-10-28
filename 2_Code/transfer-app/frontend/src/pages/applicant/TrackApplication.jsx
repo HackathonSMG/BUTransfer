@@ -112,7 +112,7 @@ function TrackForm({ initialNumber, onOpen }) {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-8">
-          Haven't applied yet? <Link to="/apply" className="font-semibold text-brand hover:underline">Start Transfer Credit Eligibility</Link>
+          Haven't submitted your transcripts yet? <Link to="/apply" className="font-semibold text-brand hover:underline">Submit Transcripts for Evaluation</Link>
         </p>
       </div>
     </div>

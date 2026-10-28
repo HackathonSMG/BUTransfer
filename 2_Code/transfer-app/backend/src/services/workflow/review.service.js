@@ -13,7 +13,8 @@ import { badRequest, notFound } from '../../utils/errors.js';
 import { courseKnowledge, matchLabel, recordResolution } from './knowledge.service.js';
 import { requestCourseInformation } from './information.service.js';
 import { refreshApplicationStatus, notifyCreditOffice } from './lifecycle.service.js';
-import { POLICY } from '../credit/policy.js';
+import { POLICY, RULE_SOURCES } from '../credit/policy.js';
+import { compareCourses } from '../credit/comparison.js';
 
 const OPEN = ['new', 'in_progress', 'info_requested'];
 const BU_CODE = /\bCAS [A-Z]{2} \d{3}\b/g;
@@ -71,7 +72,7 @@ export async function getReview(reviewId, userId) {
   const [course, target, sponsor, equivalency, transcript, documents, decision, history, next, infoRequests, assignments] = await Promise.all([
     query(`SELECT tc.id, tc.institution, tc.course_code, tc.catalog_code, COALESCE(c.title, tc.title) AS title, tc.term, tc.grade, tc.source_credits, tc.credit_system,
                   c.credits AS catalog_credits, c.program, c.level, c.requirement_type, c.description, c.learning_outcomes, c.syllabus IS NOT NULL AS has_syllabus,
-                  tc.syllabus_document_id, tc.syllabus_received_at, tc.repeat_of
+                  tc.syllabus_document_id, tc.syllabus_received_at, tc.repeat_of, tc.syllabus_text, c.syllabus AS catalog_syllabus
            FROM transcript_courses tc LEFT JOIN catalog_courses c ON c.institution = tc.institution AND c.course_code = COALESCE(tc.catalog_code, tc.course_code)
            WHERE tc.id = $1`, [r.transcript_course_id]),
     targets.length
@@ -100,9 +101,11 @@ export async function getReview(reviewId, userId) {
            FROM review_assignments ra LEFT JOIN profiles p ON p.id = ra.evaluator_id WHERE ra.review_id = $1 ORDER BY ra.assigned_at`, [reviewId]),
   ]);
 
-  const sourceCourse = course.rows[0] || null;
-  const code = sourceCourse ? (sourceCourse.catalog_code || sourceCourse.course_code) : null;
-  const knowledge = sourceCourse
+  // The syllabus texts feed the comparison only; they are not sent to the browser
+  const { syllabus_text: syllabusText, catalog_syllabus: catalogSyllabus, ...sourceCourse } = course.rows[0] || {};
+  const hasSource = Boolean(course.rows[0]);
+  const code = hasSource ? (sourceCourse.catalog_code || sourceCourse.course_code) : null;
+  const knowledge = hasSource
     ? await courseKnowledge({ institution: sourceCourse.institution, courseCode: code, targetBuCourse: r.target_bu_course })
     : null;
 
@@ -135,7 +138,10 @@ export async function getReview(reviewId, userId) {
       id: r.application_id, reference_number: r.reference_number, student_name: r.student_name,
       transfer_from_institution: r.transfer_from_institution, transfer_to_program: r.transfer_to_program,
     },
-    source_course: sourceCourse && { ...sourceCourse, bu_credits: ev?.bu_credits != null ? Number(ev.bu_credits) : null },
+    source_course: hasSource ? { ...sourceCourse, bu_credits: ev?.bu_credits != null ? Number(ev.bu_credits) : null } : null,
+    // Why the recommendation fits (or not): BU outcomes and topics checked against the transfer course's text
+    comparison: hasSource ? compareCourses({ ...sourceCourse, syllabus_text: [syllabusText, catalogSyllabus].filter(Boolean).join(' ') || null,
+      bu_credits: ev?.bu_credits != null ? Number(ev.bu_credits) : null }, target.rows) : null,
     target_course: target.rows[0] || null,
     target_courses: target.rows,
     proposed: proposedOutcome(r, ev),
@@ -152,6 +158,7 @@ export async function getReview(reviewId, userId) {
       path: ev?.path || null,
       reasons: ev?.reasons || [],
       rules: ev?.rules || [],
+      rule_sources: (ev?.rules || []).map((code) => ({ code, ...(RULE_SOURCES[code] || { name: code, source: 'Implementation' }) })),
       // score ranks candidates (it includes program/level adjustments); it is not shown as a percentage
       candidates: (ev?.candidates || []).slice(0, 3).map(({ code: c, title }) => ({ code: c, title })),
       sponsor_matches: sponsor.rows,

@@ -11,6 +11,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import { DECISION_LABELS, formatDate } from '../../lib/reviews'
 import { activityLabel, timeAgo } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
+import ImpactPanel from '../../components/staff/ImpactPanel'
 
 // Delivery state of an applicant email (notifications.email_status)
 const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry', sent: 'sent', logged: 'logged (email not configured)', failed: 'failed', suppressed: 'not sent (test address)' }
@@ -19,8 +20,8 @@ const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry
 const STATE = {
   posted: { label: 'Posted', tone: 'ok' },
   decided: { label: 'Awaiting final review', tone: 'info' },
-  information_requested: { label: 'Waiting for applicant', tone: 'warn' },
-  information_received: { label: 'Applicant answered', tone: 'info' },
+  information_requested: { label: 'Waiting for student', tone: 'warn' },
+  information_received: { label: 'Student answered', tone: 'info' },
   department_review: { label: 'Department review', tone: 'neutral' },
   waiting_for_review: { label: 'Queued for hand-off', tone: 'neutral' },
   credit_office_review: { label: 'Needs an evaluator', tone: 'warn' },
@@ -104,7 +105,7 @@ export default function OfficeApplication() {
 
       {app.applicant_comments && (
         <section className="staff-card px-6 py-4">
-          <p className="text-[13px] font-medium text-staff-muted">Additional information from the applicant</p>
+          <p className="text-[13px] font-medium text-staff-muted">Additional information from the student</p>
           <p className="text-[15px] text-staff-ink mt-1 whitespace-pre-wrap">{app.applicant_comments}</p>
         </section>
       )}
@@ -155,10 +156,12 @@ export default function OfficeApplication() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Tile label="Courses" value={s.courses} />
         <Tile label="Decided" value={s.decided} />
-        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the applicant` : null} />
+        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the student` : null} />
         <Tile label="Posted" value={s.posted} />
         <Tile label="Credits posted" value={s.credits_posted} detail={s.credits_approved ? `${s.credits_approved} credits decided, not yet posted` : null} />
       </div>
+
+      <ImpactPanel impact={d.impact} compact />
 
       {/* Courses */}
       <section className="staff-card">
@@ -198,7 +201,7 @@ export default function OfficeApplication() {
             {!d.documents.length && <li className="text-staff-muted">No documents.</li>}
           </ul>
         </Fold>
-        <Fold title={`Applicant updates (${(d.applicant_updates || []).length})`}>
+        <Fold title={`Student updates (${(d.applicant_updates || []).length})`}>
           {!(d.applicant_updates || []).length ? <p className="text-[14px] text-staff-muted">No updates sent yet.</p> : (
             <ul className="space-y-2 text-[14px]">
               {d.applicant_updates.map((u, i) => (

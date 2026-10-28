@@ -35,7 +35,7 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <NavLink to="/apply" className={navClass}><FileText className="w-4 h-4" /><span className="hidden md:inline">Start Application</span></NavLink>
+            <NavLink to="/apply" className={navClass}><FileText className="w-4 h-4" /><span className="hidden md:inline">Submit Transcripts</span></NavLink>
             <NavLink to="/track" className={navClass}><Search className="w-4 h-4" /><span className="hidden sm:inline">Track Application</span></NavLink>
             {student ? (
               <>

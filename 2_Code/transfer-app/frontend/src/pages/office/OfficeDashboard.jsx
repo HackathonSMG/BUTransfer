@@ -11,6 +11,7 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
+import ImpactPanel from '../../components/staff/ImpactPanel'
 
 // The Credit Evaluation Office's working view: what to post, what to place, what to resolve. Every number comes
 // from /api/office/overview.
@@ -84,6 +85,8 @@ export default function OfficeDashboard() {
         <Metric label="Settled without department work" value={c.established_applied + c.policy_applied} detail={`${c.established_applied} established equivalencies · ${c.policy_applied} policy outcomes`} />
         <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} applications complete`} />
       </div>
+
+      <ImpactPanel impact={d.impact} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 items-start">
         <div className="space-y-6">
@@ -183,7 +186,7 @@ export default function OfficeDashboard() {
           <section className="staff-card">
             <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Syllabi</h2>
             <div className="grid grid-cols-2 border-t border-staff-line2 divide-x divide-staff-line2">
-              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Waiting on applicants</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_pending}</p></div>
+              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Waiting on students</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_pending}</p></div>
               <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Received, in review</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_received}</p></div>
             </div>
           </section>
