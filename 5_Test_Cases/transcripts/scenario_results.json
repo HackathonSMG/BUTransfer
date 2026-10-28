@@ -1,0 +1,1925 @@
+{
+ "checks": [
+  {
+   "id": "S01/S06",
+   "scenario": "TC01: three established equivalencies applied without an evaluator; straight to Credit Office review",
+   "pass": true,
+   "actual": "CS 2000→transfer CAS CS 111 (established_equivalency); CS 1800→transfer CAS CS 131 (established_equivalency); ECON 1116→transfer CAS EC 101 (established_equivalency) | Final Review"
+  },
+  {
+   "id": "S19/S25",
+   "scenario": "TC01 finalized: Completed; credits awarded = accepted; pending 0; grade T, no Hub units, not in GPA; final email",
+   "pass": true,
+   "actual": "awarded 13, accepted 13, pending 0; emails application_received[logged], final_review[logged], decision_available[logged]"
+  },
+  {
+   "id": "S22",
+   "scenario": "TC22: same email again after TC01 completed → accepted as a new evaluation (finished applications are not duplicate candidates)",
+   "pass": true,
+   "actual": "duplicate_status null"
+  },
+  {
+   "id": "S22b",
+   "scenario": "TC22: a third application while TC22 is still open → flagged as a suspected duplicate for the Credit Office; the email check lists all three (masked)",
+   "pass": true,
+   "actual": "Same student (email address) as APP-2026-0022, also from See transcripts, same start term (Fall 2027)."
+  },
+  {
+   "id": "S23",
+   "scenario": "TC23: BU start Fall 2024 → one-year deadline passed; posting blocked until an exception is recorded; Fall 2027 start is within the deadline",
+   "pass": true,
+   "actual": "blocked: The one-year transfer deadline (2025-09-01) has passed. Record an exception to post.; after exception: 200; TC01 deadline 2028-09-01 (within)"
+  },
+  {
+   "id": "S02",
+   "scenario": "TC02: ENG 101 established elective equivalency (R3) applied and posted as elective credit with no Hub units",
+   "pass": true,
+   "actual": "elective Elective credit (established_equivalency); 3 units, grade T, hub 0, gpa false"
+  },
+  {
+   "id": "S02b",
+   "scenario": "TC03: DS 3000 (elective precedent) and CS 3800 (R6: must be taken at BU) recommended as elective; PSYC 2320 to the Psychology evaluator",
+   "pass": true,
+   "actual": "DS 3000: precedent/elective CS elective (CAS CS 2XX) → new · Dr. Kevin Liu (Computer Science); PSYC 2320: review/pending Psych elective (CAS PS 2XX) → queued · Dr. Laura Bennett (Psychological & Brain Sciences); CS 3800: rule/elective CS elective (CAS CS 3XX) → queued · Dr. Priya Raman (Computer Science)"
+  },
+  {
+   "id": "S03",
+   "scenario": "TC03: evaluator chose a different BU course (PSYC 2320 → CAS PS 211); application completed",
+   "pass": true,
+   "actual": "transfer CAS PS 211 (evaluator)"
+  },
+  {
+   "id": "S04/S10",
+   "scenario": "TC04: grade D and C- → no credit (R1) even with an equivalency on file; W → no credit; PSYCH-UA 1 A → PS 101; no evaluator needed",
+   "pass": true,
+   "actual": "BIOL-UA 11 D → no_credit (policy_rule); MATH-UA 121 C- → no_credit (policy_rule); CHEM-UA 125 W → no_credit (policy_rule); PSYCH-UA 1 A → transfer CAS PS 101 (established_equivalency)"
+  },
+  {
+   "id": "S05",
+   "scenario": "TC05: MATH-UA 235 has no description on file → needs information; syllabus requested from the applicant; MATH-UA 122 → MA 124",
+   "pass": true,
+   "actual": "needs_information; syllabus:pending; Action Required; review info_requested · Dr. Anita Rao (Mathematics & Statistics)"
+  },
+  {
+   "id": "S20",
+   "scenario": "TC05: applicant uploads the syllabus from tracking → evaluator decides → posted; the applicant was emailed at each stage",
+   "pass": true,
+   "actual": "elective Math elective (CAS MA 1XX) (evaluator); emails application_received[logged], information_required[logged], department_review[logged], final_review[logged], decision_available[logged]"
+  },
+  {
+   "id": "S07",
+   "scenario": "TC07: courses with disagreeing past decisions go to a department evaluator (never auto-applied) and appear on the conflicts list",
+   "pass": true,
+   "actual": "CHEM 1161: review CAS CH 101 (partial) → new · Dr. Thomas Reyes (Chemistry) | Past decisions disagree: PD-018 (2025-02-22) → CAS CH 101; PD-031 (202; MATH 1365: review CAS MA 293 → queued · Dr. Anita Rao (Mathematics & Statistics) | Past decisions disagree: PD-033 (2025-12-01) → CAS MA 293; PD-020 (202; ECON 2560: review CAS EC 204 → queued · Prof. David Okafor (Economics) | Past decisions disagree: PD-032 (2025-10-15) → CAS EC 204; PD-010 (202 | conflicts listed: CHEM 1161, MATH 1365, ECON 2560"
+  },
+  {
+   "id": "S08/S09/S10",
+   "scenario": "TC08: A+ meets the minimum (CS 1800 → CS 131 auto); P → department confirms (PASS); C- → no credit (R1)",
+   "pass": true,
+   "actual": "CS 1800 A+: transfer CAS CS 131 (established_equivalency); MATH 1341 P: review → new · Dr. Anita Rao (Mathematics & Statistics); ECON 1116 C-: no_credit (policy_rule); MATH 2341 B: review → new · Dr. Anita Rao (Mathematics & Statistics)"
+  },
+  {
+   "id": "S11",
+   "scenario": "TC11: CS 2000 taken twice → credit once (best grade A-); the other attempt no credit (REPEAT)",
+   "pass": true,
+   "actual": "C+: no_credit (policy_rule); A-: transfer CAS CS 111 (established_equivalency)"
+  },
+  {
+   "id": "S12",
+   "scenario": "TC12: CS2000, cs-1800, ECON1116 and \"math 1341\" normalize and match their equivalencies",
+   "pass": true,
+   "actual": "CS2000 → transfer CAS CS 111 (established_equivalency); cs-1800 → transfer CAS CS 131 (established_equivalency); ECON1116 → transfer CAS EC 101 (established_equivalency); math 1341 → transfer CAS MA 123 (established_equivalency)"
+  },
+  {
+   "id": "S13",
+   "scenario": "TC13: CS 2000 with no credits is kept (credits null, not 0) and held for the department to confirm the credits; ECON 1116 auto",
+   "pass": true,
+   "actual": "needs_information; Credits are not shown on the transcript, so the BU units cannot be calculated. They are not assumed to be zero.; review new · Dr. Michael Smith (Computer Science); summary pending_without_credits 1"
+  },
+  {
+   "id": "S14",
+   "scenario": "TC14: CS 4973 (not in the catalog or equivalency data) → manual path: syllabus needed, routed to an evaluator",
+   "pass": true,
+   "actual": "needs_information; syllabus:pending; info_requested · Maria Santos (Credit Evaluation Department)"
+  },
+  {
+   "id": "S15",
+   "scenario": "TC15: philosophy and music have no subject specialist → general credit evaluator (or the Credit Office queue); KIN 105 follows its no-credit precedent",
+   "pass": true,
+   "actual": "PHIL 101: needs_information/pending → info_requested · Maria Santos (Credit Evaluation Department) | No course description or syllabus on file, so the content ca; MUS 110: needs_information/pending → new · Maria Santos (Credit Evaluation Department) | No course description or syllabus on file, so the content ca; KIN 105: precedent/no_credit → new · Maria Santos (Credit Evaluation Department) | Past decision PD-028: Activity course; not transferable for "
+  },
+  {
+   "id": "S16",
+   "scenario": "TC16: two transcripts → four courses from two institutions; quarter courses convert (5 qtr → 3.33 BU, R2)",
+   "pass": true,
+   "actual": "Riverside CSC 110 4 → 4 BU; transfer CAS CS 111 (established_equivalency); Riverside MAT 151 4 → 4 BU; transfer CAS MA 123 (established_equivalency); Pacific PSYC 1 5q → 3.33 BU; transfer CAS PS 101 (established_equivalency); Pacific MATH 19A 5q → 3.33 BU; transfer CAS MA 123 (established_equivalency)"
+  },
+  {
+   "id": "S17/S24",
+   "scenario": "TC17: courses go to different subject evaluators; CS 2100 + CS 2700 recommended together (combined precedent PD-002)",
+   "pass": true,
+   "actual": "CS 2100 → new · Dr. Michael Smith (Computer Science) (with CS 2700); BIOL 2301 → queued · Dr. Rachel Adams (Biology) (with ); MATH 2331 → null (with ); CS 2700 → new · Dr. Michael Smith (Computer Science) (with CS 2100); PSYC 2320 → queued · Dr. Laura Bennett (Psychological & Brain Sciences) (with )"
+  },
+  {
+   "id": "S18",
+   "scenario": "TC17 partial: the applicant sees accepted courses with units and the rest pending at 0 units",
+   "pass": true,
+   "actual": "evaluated 2/5; accepted 9; pending 14"
+  },
+  {
+   "id": "S21",
+   "scenario": "TC17: the evaluator becomes unavailable → their course is reassigned; the history keeps both assignments",
+   "pass": true,
+   "actual": "PSYC 2320: Assigned Dr. Laura Bennett > Reassigned Maria Santos"
+  },
+  {
+   "id": "S17b",
+   "scenario": "TC17: all evaluators decide → Credit Office posts → Completed",
+   "pass": true,
+   "actual": "credit_posted; awarded 23"
+  },
+  {
+   "id": "S26",
+   "scenario": "TC26: five upper-level economics courses → the one over the cap of four earns no credit (R7)",
+   "pass": true,
+   "actual": "ECON 100A: pending CAS EC 201 [R2]; ECON 100B: pending CAS EC 202 [R2]; ECON 113: pending CAS EC 204 [R2]; ECON 136: elective Econ elective (CAS EC 3XX) [R2]; ECON 2560: no_credit No credit [R7]"
+  }
+ ],
+ "applications": {
+  "TC01": {
+   "ref": "APP-2026-0021",
+   "status": "ready_for_posting",
+   "applicant_status": "Final Review",
+   "stage": "Credit Office Review",
+   "summary": {
+    "courses": 3,
+    "decided": 3,
+    "posted": 0,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 13,
+    "credits_pending_source": 0,
+    "courses_accepted": 3,
+    "courses_equivalent": 3,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 13,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-001: CS 2000 → CAS CS 111."
+    },
+    {
+     "course": "CS 1800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 131",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 131 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-004: CS 1800 → CAS CS 131."
+    },
+    {
+     "course": "ECON 1116",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS EC 101",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS EC 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-010: ECON 1116 → CAS EC 101."
+    }
+   ]
+  },
+  "TC01_final": {
+   "ref": "APP-2026-0021",
+   "status": "credit_posted",
+   "applicant_status": "Completed",
+   "stage": "Completed",
+   "summary": {
+    "courses": 3,
+    "decided": 3,
+    "posted": 3,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 13,
+    "credits_approved": 0,
+    "credits_pending_source": 0,
+    "courses_accepted": 3,
+    "courses_equivalent": 3,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 13,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]",
+    "decision_available[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "5 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-001: CS 2000 → CAS CS 111."
+    },
+    {
+     "course": "CS 1800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 131",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 131 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-004: CS 1800 → CAS CS 131."
+    },
+    {
+     "course": "ECON 1116",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS EC 101",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS EC 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-010: ECON 1116 → CAS EC 101."
+    }
+   ]
+  },
+  "TC02": {
+   "ref": "APP-2026-0025",
+   "status": "credit_posted",
+   "applicant_status": "Completed",
+   "stage": "Completed",
+   "summary": {
+    "courses": 2,
+    "decided": 2,
+    "posted": 2,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 7,
+    "credits_approved": 0,
+    "credits_pending_source": 0,
+    "courses_accepted": 2,
+    "courses_equivalent": 1,
+    "courses_elective": 1,
+    "courses_not_accepted": 0,
+    "credits_accepted": 7,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]",
+    "decision_available[logged]"
+   ],
+   "courses": [
+    {
+     "course": "ENG 101",
+     "institution": "Riverside Community College",
+     "credits": 3,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [
+      "R3"
+     ],
+     "engine": "elective",
+     "suggestion": "Elective credit",
+     "bu_credits": 3,
+     "combined_with": [],
+     "decided": "elective Elective credit (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "3 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-060: ENG 101 → elective credit."
+    },
+    {
+     "course": "CSC 110",
+     "institution": "Riverside Community College",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-052: CSC 110 → CAS CS 111."
+    }
+   ]
+  },
+  "TC03": {
+   "ref": "APP-2026-0026",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 3,
+    "decided": 0,
+    "posted": 0,
+    "pending": 3,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 0,
+    "credits_pending_source": 12,
+    "courses_accepted": 0,
+    "courses_equivalent": 0,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 0,
+    "credits_pending": 12,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "DS 3000",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "precedent",
+     "rules": [],
+     "engine": "elective",
+     "suggestion": "CS elective (CAS CS 2XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Dr. Kevin Liu (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-023: No direct equivalent."
+    },
+    {
+     "course": "PSYC 2320",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "Psych elective (CAS PS 2XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Laura Bennett (Psychological & Brain Sciences)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-012: Statistics only; no experiment design or lab component."
+    },
+    {
+     "course": "CS 3800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "rule",
+     "rules": [
+      "R6"
+     ],
+     "engine": "elective",
+     "suggestion": "CS elective (CAS CS 3XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Priya Raman (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "R6: CAS CS 332 is a Group C course that must be taken at BU, so elective credit only (PD-008)."
+    }
+   ]
+  },
+  "TC03_final": {
+   "ref": "APP-2026-0026",
+   "status": "credit_posted",
+   "applicant_status": "Completed",
+   "stage": "Completed",
+   "summary": {
+    "courses": 3,
+    "decided": 3,
+    "posted": 3,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 12,
+    "credits_approved": 0,
+    "credits_pending_source": 0,
+    "courses_accepted": 3,
+    "courses_equivalent": 1,
+    "courses_elective": 2,
+    "courses_not_accepted": 0,
+    "credits_accepted": 12,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]",
+    "final_review[logged]",
+    "decision_available[logged]"
+   ],
+   "courses": [
+    {
+     "course": "DS 3000",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "precedent",
+     "rules": [],
+     "engine": "elective",
+     "suggestion": "CS elective (CAS CS 2XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "elective General elective (evaluator)",
+     "review": "approved · Dr. Kevin Liu (Computer Science)",
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Past decision PD-023: No direct equivalent."
+    },
+    {
+     "course": "PSYC 2320",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "Psych elective (CAS PS 2XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS PS 211 (evaluator)",
+     "review": "approved · Dr. Laura Bennett (Psychological & Brain Sciences)",
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Past decision PD-012: Statistics only; no experiment design or lab component."
+    },
+    {
+     "course": "CS 3800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "rule",
+     "rules": [
+      "R6"
+     ],
+     "engine": "elective",
+     "suggestion": "CS elective (CAS CS 3XX)",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "elective CS elective (CAS CS 3XX) (evaluator)",
+     "review": "approved · Dr. Priya Raman (Computer Science)",
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "R6: CAS CS 332 is a Group C course that must be taken at BU, so elective credit only (PD-008)."
+    }
+   ]
+  },
+  "TC04": {
+   "ref": "APP-2026-0027",
+   "status": "ready_for_posting",
+   "applicant_status": "Final Review",
+   "stage": "Credit Office Review",
+   "summary": {
+    "courses": 4,
+    "decided": 4,
+    "posted": 0,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 4,
+    "credits_pending_source": 0,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 3,
+    "credits_accepted": 4,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "BIOL-UA 11",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "D",
+     "path": "rule",
+     "rules": [
+      "R1"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "no_credit (policy_rule)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "R1: grade D is below the C minimum."
+    },
+    {
+     "course": "MATH-UA 121",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "C-",
+     "path": "rule",
+     "rules": [
+      "R1"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "no_credit (policy_rule)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "R1: grade C- is below the C minimum."
+    },
+    {
+     "course": "CHEM-UA 125",
+     "institution": "New York University",
+     "credits": 5,
+     "grade": "W",
+     "path": "rule",
+     "rules": [
+      "W"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 0,
+     "combined_with": [],
+     "decided": "no_credit (policy_rule)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Withdrawn (W): no credit was earned."
+    },
+    {
+     "course": "PSYCH-UA 1",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS PS 101",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS PS 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-021: PSYCH-UA 1 → CAS PS 101."
+    }
+   ]
+  },
+  "TC05": {
+   "ref": "APP-2026-0028",
+   "status": "information_required",
+   "applicant_status": "Action Required",
+   "stage": "Waiting for Applicant",
+   "summary": {
+    "courses": 2,
+    "decided": 1,
+    "posted": 0,
+    "pending": 1,
+    "needs_student_action": 1,
+    "credits_posted": 0,
+    "credits_approved": 4,
+    "credits_pending_source": 4,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 4,
+    "credits_pending": 4,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "information_required[logged]"
+   ],
+   "courses": [
+    {
+     "course": "MATH-UA 122",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 124",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 124 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-045: MATH-UA 122 → CAS MA 124."
+    },
+    {
+     "course": "MATH-UA 235",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "needs_information",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": null,
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "info_requested · Dr. Anita Rao (Mathematics & Statistics)",
+     "info": "syllabus:pending",
+     "posted": null,
+     "reason": "No course description or syllabus on file, so the content cannot be compared. The syllabus is needed."
+    }
+   ]
+  },
+  "TC05_final": {
+   "ref": "APP-2026-0028",
+   "status": "credit_posted",
+   "applicant_status": "Completed",
+   "stage": "Completed",
+   "summary": {
+    "courses": 2,
+    "decided": 2,
+    "posted": 2,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 8,
+    "credits_approved": 0,
+    "credits_pending_source": 0,
+    "courses_accepted": 2,
+    "courses_equivalent": 1,
+    "courses_elective": 1,
+    "courses_not_accepted": 0,
+    "credits_accepted": 8,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "information_required[logged]",
+    "department_review[logged]",
+    "final_review[logged]",
+    "decision_available[logged]"
+   ],
+   "courses": [
+    {
+     "course": "MATH-UA 122",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 124",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 124 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-045: MATH-UA 122 → CAS MA 124."
+    },
+    {
+     "course": "MATH-UA 235",
+     "institution": "New York University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "elective Math elective (CAS MA 1XX) (evaluator)",
+     "review": "approved · Dr. Anita Rao (Mathematics & Statistics)",
+     "info": "syllabus:resolved",
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "No approved equivalency or past decision. Closest BU course by content (syllabus compared): CAS CS 112 Introduction to Computer Science 2."
+    }
+   ]
+  },
+  "TC07": {
+   "ref": "APP-2026-0029",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 3,
+    "decided": 0,
+    "posted": 0,
+    "pending": 3,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 0,
+    "credits_pending_source": 13,
+    "courses_accepted": 0,
+    "courses_equivalent": 0,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 0,
+    "credits_pending": 13,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CHEM 1161",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CH 101 (partial)",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Dr. Thomas Reyes (Chemistry)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decisions disagree: PD-018 (2025-02-22) → CAS CH 101; PD-031 (2025-11-04) → CAS CH 101 + CAS CH 102. All of them award CAS CH 101, so partial credit is suggested pending department review."
+    },
+    {
+     "course": "MATH 1365",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS MA 293",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Anita Rao (Mathematics & Statistics)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decisions disagree: PD-033 (2025-12-01) → CAS MA 293; PD-020 (2025-12-11) → Math elective (CAS MA 1XX). Department review is needed."
+    },
+    {
+     "course": "ECON 2560",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS EC 204",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decisions disagree: PD-032 (2025-10-15) → CAS EC 204; PD-010 (2025-10-16) → Econ elective (CAS EC 3XX). Department review is needed."
+    }
+   ]
+  },
+  "TC08": {
+   "ref": "APP-2026-0030",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 4,
+    "decided": 2,
+    "posted": 0,
+    "pending": 2,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 4,
+    "credits_pending_source": 8,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 1,
+    "credits_accepted": 4,
+    "credits_pending": 8,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 1800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 131",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 131 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-004: CS 1800 → CAS CS 131."
+    },
+    {
+     "course": "MATH 1341",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "P",
+     "path": "review",
+     "rules": [
+      "PASS"
+     ],
+     "engine": "pending",
+     "suggestion": "CAS MA 123",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Dr. Anita Rao (Mathematics & Statistics)",
+     "info": null,
+     "posted": null,
+     "reason": "Pass/Fail grade: the department confirms that a Pass meets the C minimum."
+    },
+    {
+     "course": "ECON 1116",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "C-",
+     "path": "rule",
+     "rules": [
+      "R1"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "no_credit (policy_rule)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "R1: grade C- is below the C minimum."
+    },
+    {
+     "course": "MATH 2341",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS MA 226",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Dr. Anita Rao (Mathematics & Statistics)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-019: ODE content sufficient."
+    }
+   ]
+  },
+  "TC11": {
+   "ref": "APP-2026-0031",
+   "status": "ready_for_posting",
+   "applicant_status": "Final Review",
+   "stage": "Credit Office Review",
+   "summary": {
+    "courses": 3,
+    "decided": 3,
+    "posted": 0,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 9,
+    "credits_pending_source": 0,
+    "courses_accepted": 2,
+    "courses_equivalent": 2,
+    "courses_elective": 0,
+    "courses_not_accepted": 1,
+    "credits_accepted": 9,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "C+",
+     "path": "rule",
+     "rules": [
+      "REPEAT"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit (repeat)",
+     "bu_credits": 0,
+     "combined_with": [],
+     "decided": "no_credit (policy_rule)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Repeat of CS 2000: credit is awarded once, for the Spring 2025 attempt (grade A-)."
+    },
+    {
+     "course": "CS 1800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 131",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 131 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-004: CS 1800 → CAS CS 131."
+    },
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A-",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-001: CS 2000 → CAS CS 111."
+    }
+   ]
+  },
+  "TC12": {
+   "ref": "APP-2026-0032",
+   "status": "ready_for_posting",
+   "applicant_status": "Final Review",
+   "stage": "Credit Office Review",
+   "summary": {
+    "courses": 4,
+    "decided": 4,
+    "posted": 0,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 17,
+    "credits_pending_source": 0,
+    "courses_accepted": 4,
+    "courses_equivalent": 4,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 17,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-001: CS2000 → CAS CS 111."
+    },
+    {
+     "course": "cs-1800",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 131",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 131 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-004: cs-1800 → CAS CS 131."
+    },
+    {
+     "course": "ECON1116",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS EC 101",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS EC 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-010: ECON1116 → CAS EC 101."
+    },
+    {
+     "course": "math 1341",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 123",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 123 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-042: math 1341 → CAS MA 123."
+    }
+   ]
+  },
+  "TC13": {
+   "ref": "APP-2026-0033",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 2,
+    "decided": 1,
+    "posted": 0,
+    "pending": 1,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 4,
+    "credits_pending_source": 0,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 4,
+    "credits_pending": 0,
+    "pending_without_credits": 1
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": null,
+     "grade": "A",
+     "path": "needs_information",
+     "rules": [
+      "CREDITS"
+     ],
+     "engine": "pending",
+     "suggestion": "CAS CS 111",
+     "bu_credits": null,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Credits are not shown on the transcript, so the BU units cannot be calculated. They are not assumed to be zero."
+    },
+    {
+     "course": "ECON 1116",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS EC 101",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS EC 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-010: ECON 1116 → CAS EC 101."
+    }
+   ]
+  },
+  "TC14": {
+   "ref": "APP-2026-0034",
+   "status": "information_required",
+   "applicant_status": "Action Required",
+   "stage": "Waiting for Applicant",
+   "summary": {
+    "courses": 2,
+    "decided": 1,
+    "posted": 0,
+    "pending": 1,
+    "needs_student_action": 1,
+    "credits_posted": 0,
+    "credits_approved": 5,
+    "credits_pending_source": 4,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 5,
+    "credits_pending": 4,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "information_required[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2000",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-001: CS 2000 → CAS CS 111."
+    },
+    {
+     "course": "CS 4973",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "needs_information",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": null,
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "info_requested · Maria Santos (Credit Evaluation Department)",
+     "info": "syllabus:pending",
+     "posted": null,
+     "reason": "No course description or syllabus on file, so the content cannot be compared. The syllabus is needed."
+    }
+   ]
+  },
+  "TC15": {
+   "ref": "APP-2026-0035",
+   "status": "information_required",
+   "applicant_status": "Action Required",
+   "stage": "Waiting for Applicant",
+   "summary": {
+    "courses": 3,
+    "decided": 0,
+    "posted": 0,
+    "pending": 3,
+    "needs_student_action": 2,
+    "credits_posted": 0,
+    "credits_approved": 0,
+    "credits_pending_source": 7,
+    "courses_accepted": 0,
+    "courses_equivalent": 0,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 0,
+    "credits_pending": 7,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "information_required[logged]",
+    "information_required[logged]"
+   ],
+   "courses": [
+    {
+     "course": "PHIL 101",
+     "institution": "Riverside Community College",
+     "credits": 3,
+     "grade": "A-",
+     "path": "needs_information",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": null,
+     "bu_credits": 3,
+     "combined_with": [],
+     "decided": null,
+     "review": "info_requested · Maria Santos (Credit Evaluation Department)",
+     "info": "syllabus:pending",
+     "posted": null,
+     "reason": "No course description or syllabus on file, so the content cannot be compared. The syllabus is needed."
+    },
+    {
+     "course": "MUS 110",
+     "institution": "Riverside Community College",
+     "credits": 3,
+     "grade": "B+",
+     "path": "needs_information",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": null,
+     "bu_credits": 3,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Maria Santos (Credit Evaluation Department)",
+     "info": null,
+     "posted": null,
+     "reason": "No course description or syllabus on file, so the content cannot be compared. The syllabus is needed."
+    },
+    {
+     "course": "KIN 105",
+     "institution": "Riverside Community College",
+     "credits": 1,
+     "grade": "A",
+     "path": "precedent",
+     "rules": [],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 1,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Maria Santos (Credit Evaluation Department)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-028: Activity course; not transferable for academic credit."
+    }
+   ]
+  },
+  "TC16": {
+   "ref": "APP-2026-0036",
+   "status": "ready_for_posting",
+   "applicant_status": "Final Review",
+   "stage": "Credit Office Review",
+   "summary": {
+    "courses": 4,
+    "decided": 4,
+    "posted": 0,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 14.66,
+    "credits_pending_source": 0,
+    "courses_accepted": 4,
+    "courses_equivalent": 4,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 14.66,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "final_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CSC 110",
+     "institution": "Riverside Community College",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS CS 111",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS CS 111 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-052: CSC 110 → CAS CS 111."
+    },
+    {
+     "course": "MAT 151",
+     "institution": "Riverside Community College",
+     "credits": 4,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 123",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 123 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-053: MAT 151 → CAS MA 123."
+    },
+    {
+     "course": "PSYC 1",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "B",
+     "path": "equivalency",
+     "rules": [
+      "R2"
+     ],
+     "engine": "transfer",
+     "suggestion": "CAS PS 101",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": "transfer CAS PS 101 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-062: PSYC 1 → CAS PS 101."
+    },
+    {
+     "course": "MATH 19A",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "B+",
+     "path": "equivalency",
+     "rules": [
+      "R2"
+     ],
+     "engine": "transfer",
+     "suggestion": "CAS MA 123",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": "transfer CAS MA 123 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-061: MATH 19A → CAS MA 123."
+    }
+   ]
+  },
+  "TC17": {
+   "ref": "APP-2026-0037",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 5,
+    "decided": 1,
+    "posted": 0,
+    "pending": 4,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 4,
+    "credits_pending_source": 19,
+    "courses_accepted": 1,
+    "courses_equivalent": 1,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 4,
+    "credits_pending": 19,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2100",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B+",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2700)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2700"
+     ],
+     "decided": null,
+     "review": "new · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "BIOL 2301",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS BI 206",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Rachel Adams (Biology)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-017: Genetics content sufficient; lab included."
+    },
+    {
+     "course": "MATH 2331",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 242",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 242 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-048: MATH 2331 → CAS MA 242."
+    },
+    {
+     "course": "CS 2700",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2100)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2100"
+     ],
+     "decided": null,
+     "review": "new · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "PSYC 2320",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS PS 211",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Laura Bennett (Psychological & Brain Sciences)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decisions disagree: PD-012 (2025-08-05) → Psych elective (CAS PS 2XX); PD-1001 (2026-10-28) → CAS PS 211. Department review is needed."
+    }
+   ]
+  },
+  "TC17_partial": {
+   "ref": "APP-2026-0037",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 5,
+    "decided": 2,
+    "posted": 0,
+    "pending": 3,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 9,
+    "credits_pending_source": 14,
+    "courses_accepted": 2,
+    "courses_equivalent": 2,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 9,
+    "credits_pending": 14,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2100",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B+",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2700)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2700"
+     ],
+     "decided": "transfer CAS CS 112 (evaluator)",
+     "review": "approved · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "BIOL 2301",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS BI 206",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Rachel Adams (Biology)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-017: Genetics content sufficient; lab included."
+    },
+    {
+     "course": "MATH 2331",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 242",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 242 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": null,
+     "reason": "Approved equivalency EQ-048: MATH 2331 → CAS MA 242."
+    },
+    {
+     "course": "CS 2700",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2100)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2100"
+     ],
+     "decided": null,
+     "review": "new · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "PSYC 2320",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS PS 211",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "queued · Dr. Laura Bennett (Psychological & Brain Sciences)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decisions disagree: PD-012 (2025-08-05) → Psych elective (CAS PS 2XX); PD-1001 (2026-10-28) → CAS PS 211. Department review is needed."
+    }
+   ]
+  },
+  "TC17_final": {
+   "ref": "APP-2026-0037",
+   "status": "credit_posted",
+   "applicant_status": "Completed",
+   "stage": "Completed",
+   "summary": {
+    "courses": 5,
+    "decided": 5,
+    "posted": 5,
+    "pending": 0,
+    "needs_student_action": 0,
+    "credits_posted": 23,
+    "credits_approved": 0,
+    "credits_pending_source": 0,
+    "courses_accepted": 5,
+    "courses_equivalent": 5,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 23,
+    "credits_pending": 0,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]",
+    "final_review[logged]",
+    "decision_available[logged]"
+   ],
+   "courses": [
+    {
+     "course": "CS 2100",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B+",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2700)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2700"
+     ],
+     "decided": "transfer CAS CS 112 (evaluator)",
+     "review": "approved · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": "5 units, grade T, hub 0, gpa false",
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "BIOL 2301",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "A-",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS BI 206",
+     "bu_credits": 5,
+     "combined_with": [],
+     "decided": "transfer CAS BI 206 (evaluator)",
+     "review": "approved · Dr. Rachel Adams (Biology)",
+     "info": null,
+     "posted": "5 units, grade T, hub 0, gpa false",
+     "reason": "Past decision PD-017: Genetics content sufficient; lab included."
+    },
+    {
+     "course": "MATH 2331",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A",
+     "path": "equivalency",
+     "rules": [],
+     "engine": "transfer",
+     "suggestion": "CAS MA 242",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS MA 242 (established_equivalency)",
+     "review": null,
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Approved equivalency EQ-048: MATH 2331 → CAS MA 242."
+    },
+    {
+     "course": "CS 2700",
+     "institution": "Northeastern University",
+     "credits": 5,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS CS 112 (with CS 2100)",
+     "bu_credits": 5,
+     "combined_with": [
+      "CS 2100"
+     ],
+     "decided": "transfer CAS CS 112 (evaluator)",
+     "review": "approved · Dr. Michael Smith (Computer Science)",
+     "info": null,
+     "posted": "5 units, grade T, hub 0, gpa false",
+     "reason": "Past decision PD-002: CS 2100 + CS 2700 together = CAS CS 112. Combined, the two courses cover CS 112 content."
+    },
+    {
+     "course": "PSYC 2320",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "B",
+     "path": "review",
+     "rules": [],
+     "engine": "pending",
+     "suggestion": "CAS PS 211",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": "transfer CAS PS 211 (evaluator)",
+     "review": "approved · Maria Santos (Credit Evaluation Department)",
+     "info": null,
+     "posted": "4 units, grade T, hub 0, gpa false",
+     "reason": "Past decisions disagree: PD-012 (2025-08-05) → Psych elective (CAS PS 2XX); PD-1001 (2026-10-28) → CAS PS 211. Department review is needed."
+    }
+   ]
+  },
+  "TC26": {
+   "ref": "APP-2026-0038",
+   "status": "under_evaluator_review",
+   "applicant_status": "Department Review",
+   "stage": "Pending Evaluator Review",
+   "summary": {
+    "courses": 5,
+    "decided": 0,
+    "posted": 0,
+    "pending": 5,
+    "needs_student_action": 0,
+    "credits_posted": 0,
+    "credits_approved": 0,
+    "credits_pending_source": 17.32,
+    "courses_accepted": 0,
+    "courses_equivalent": 0,
+    "courses_elective": 0,
+    "courses_not_accepted": 0,
+    "credits_accepted": 0,
+    "credits_pending": 17.32,
+    "pending_without_credits": 0
+   },
+   "emails": [
+    "application_received[logged]",
+    "department_review[logged]"
+   ],
+   "courses": [
+    {
+     "course": "ECON 100A",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "A-",
+     "path": "review",
+     "rules": [
+      "R2"
+     ],
+     "engine": "pending",
+     "suggestion": "CAS EC 201",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "No approved equivalency or past decision. Closest BU course by content: CAS EC 201 Intermediate Microeconomic Analysis."
+    },
+    {
+     "course": "ECON 100B",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "B+",
+     "path": "review",
+     "rules": [
+      "R2"
+     ],
+     "engine": "pending",
+     "suggestion": "CAS EC 202",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "No approved equivalency or past decision. Closest BU course by content: CAS EC 202 Intermediate Macroeconomic Analysis."
+    },
+    {
+     "course": "ECON 113",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "A",
+     "path": "review",
+     "rules": [
+      "R2"
+     ],
+     "engine": "pending",
+     "suggestion": "CAS EC 204",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "No approved equivalency or past decision. Closest BU course by content (syllabus compared): CAS EC 204 Empirical Economics 2."
+    },
+    {
+     "course": "ECON 136",
+     "institution": "Pacific Coast State University",
+     "credits": 5,
+     "grade": "A",
+     "path": "precedent",
+     "rules": [
+      "R2"
+     ],
+     "engine": "elective",
+     "suggestion": "Econ elective (CAS EC 3XX)",
+     "bu_credits": 3.33,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "Past decision PD-030: No BU core equivalent."
+    },
+    {
+     "course": "ECON 2560",
+     "institution": "Northeastern University",
+     "credits": 4,
+     "grade": "A-",
+     "path": "rule",
+     "rules": [
+      "R7"
+     ],
+     "engine": "no_credit",
+     "suggestion": "No credit",
+     "bu_credits": 4,
+     "combined_with": [],
+     "decided": null,
+     "review": "new · Prof. David Okafor (Economics)",
+     "info": null,
+     "posted": null,
+     "reason": "R7: upper-level Economics course 5, over the cap of 4."
+    }
+   ]
+  }
+ }
+}

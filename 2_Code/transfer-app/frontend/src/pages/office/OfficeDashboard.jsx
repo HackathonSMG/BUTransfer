@@ -183,7 +183,7 @@ export default function OfficeDashboard() {
           <section className="staff-card">
             <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Syllabi</h2>
             <div className="grid grid-cols-2 border-t border-staff-line2 divide-x divide-staff-line2">
-              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Waiting on students</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_pending}</p></div>
+              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Waiting on applicants</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_pending}</p></div>
               <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Received, in review</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_received}</p></div>
             </div>
           </section>

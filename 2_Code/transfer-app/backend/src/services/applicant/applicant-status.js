@@ -38,7 +38,7 @@ export const STAGES = [
 const firstAt = (history, statuses) => history.find((h) => statuses.includes(h.status))?.at || null;
 
 /**
- * The timeline. Each stage is done, current or upcoming, with the time it was reached when known.
+ * The timeline. Each stage is done, current, upcoming or skipped (not needed for this application), with the time it was reached when known.
  * @param {object} app the application row (status, submitted_at, decision_date)
  * @param {{ courses: Array<{state: string}>, history: Array<{status: string, at: string}>, evaluationDone: boolean }} facts
  */
@@ -66,7 +66,10 @@ export function buildProgress(app, { courses, history, evaluationDone }) {
     completed: firstAt(history, ['credit_posted', 'approved', 'rejected', 'closed']) || (finished ? app.decision_date : null),
   };
   let currentFound = false;
+  // Every course settled without a department evaluator (established equivalencies, policy rules)
+  const noDepartmentReview = done.department && visible.length > 0 && !visible.some((c) => c.review_id);
   const stages = STAGES.map((stage) => {
+    if (stage.key === 'department' && noDepartmentReview) return { ...stage, state: 'skipped', at: null, note: 'Not needed' };
     if (done[stage.key]) return { ...stage, state: 'done', at: at[stage.key] || null };
     if (!currentFound && s !== 'draft' && s !== 'closed') { currentFound = true; return { ...stage, state: 'current', at: null }; }
     return { ...stage, state: 'upcoming', at: null };

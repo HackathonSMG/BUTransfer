@@ -608,7 +608,7 @@ function StatusBanner({ d }) {
           <p className="font-semibold text-staff-ink">
             {replied
               ? `${info.kind === 'syllabus' ? 'Syllabus received' : 'The student replied'} ${formatDate(info.responded_at)}`
-              : `Waiting on the student for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
+              : `Waiting on the applicant for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
           </p>
           <p className="text-staff-ink2">Requested {formatDate(info.created_at)}{info.message ? `: ${info.message}` : ''}</p>
           {info.student_response && <p className="text-staff-ink mt-1"><span className="font-medium">Reply:</span> {info.student_response}</p>}
@@ -894,7 +894,7 @@ function InfoRequests({ requests }) {
           <span className="text-staff-muted tabular-nums">{formatDate(q.created_at)}</span>
           <span>
             <span className="text-staff-ink">{q.kind === 'syllabus' ? 'Syllabus requested' : 'Information requested'}</span>
-            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the student' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
+            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the applicant' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
             {q.message && <span className="block text-[13px] text-staff-ink2">{q.message}</span>}
             {q.student_response && <span className="block text-[13px] text-staff-ink"><span className="font-medium">Reply:</span> {q.student_response}</span>}
             {q.document_id && <span className="inline-block mt-1"><DocumentButton id={q.document_id} label={q.document_name || 'Open file'} icon={Paperclip} /></span>}

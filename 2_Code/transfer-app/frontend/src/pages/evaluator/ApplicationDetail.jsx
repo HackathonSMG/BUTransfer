@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Globe, Mail, UserCheck, RefreshCw, Brain,
+  ArrowLeft, Globe, Mail, UserCheck, RefreshCw, ClipboardCheck,
   MessageSquare, Gavel, FileText, Clock, User, StickyNote, Link2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -20,6 +20,7 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
 import Textarea from '../../components/ui/Textarea'
+import { activityLabel } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
 
 const SOURCE_CONFIG = {
@@ -43,6 +44,13 @@ function InfoField({ label, value }) {
   )
 }
 
+// The human-readable part of an audit entry (a reason or note); ids and raw payloads stay in the database
+function auditNote(entry) {
+  const d = typeof entry.details === 'string' ? { note: entry.details } : entry.details || {}
+  const status = entry.new_value?.status ? `Status: ${String(entry.new_value.status).replace(/_/g, ' ')}` : null
+  return [status, d.reason || d.note || d.note_preview || null].filter(Boolean).join(' · ') || null
+}
+
 function AuditEntry({ entry }) {
   return (
     <div className="flex gap-3">
@@ -51,9 +59,9 @@ function AuditEntry({ entry }) {
         <div className="w-px bg-gray-200 flex-1 mt-1" />
       </div>
       <div className="pb-4">
-        <p className="text-sm font-medium text-gray-900">{entry.action}</p>
-        <p className="text-xs text-gray-500">{entry.actor_name || entry.actor} · {formatDate(entry.created_at || entry.timestamp)}</p>
-        {entry.details && <p className="text-xs text-gray-500 mt-0.5">{typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}</p>}
+        <p className="text-sm font-medium text-gray-900">{activityLabel(entry.action)}</p>
+        <p className="text-xs text-gray-500">{entry.actor_name || entry.actor || entry.actor_email || 'System'} · {formatDate(entry.created_at || entry.timestamp)}</p>
+        {auditNote(entry) && <p className="text-xs text-gray-600 mt-0.5">{auditNote(entry)}</p>}
       </div>
     </div>
   )
@@ -148,12 +156,12 @@ export default function ApplicationDetail() {
   const infoRequests = app.information_requests || []
   const transcriptCourses = app.transcript_courses || []
   const isDecided = ['approved', 'rejected'].includes(app.status)
-  const statusLink = app.secure_token ? `${window.location.origin}/status/${app.secure_token}` : null
+  const statusLink = app.reference_number ? `${window.location.origin}/track?application=${encodeURIComponent(app.reference_number)}` : null
 
   const copyStatusLink = async () => {
     try {
       await navigator.clipboard.writeText(statusLink)
-      toast.success('Status link copied')
+      toast.success('Tracking link copied')
     } catch {
       toast.error('Could not copy; select the link and copy it manually')
     }
@@ -209,7 +217,7 @@ export default function ApplicationDetail() {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-5">
           {/* Student Info */}
-          <Card title="Student Information">
+          <Card title="Applicant Information">
             <dl className="grid grid-cols-2 gap-4">
               <InfoField label="Full Name" value={app.student_name} />
               <InfoField label="Email" value={app.student_email} />
@@ -353,22 +361,22 @@ export default function ApplicationDetail() {
             )) : <p className="text-sm text-gray-700">{app.ownership?.stage_label || 'No evaluator'}</p>}
           </div>
 
-          {/* Student status link: lets staff hand the link to students they applied for */}
+          {/* Applicant tracking: applicants open their application with its number and their email */}
           {statusLink && (
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
                 <Link2 className="w-4 h-4" />
-                Student Status Link
+                Applicant Tracking
               </h3>
               <p className="text-xs text-gray-500 mb-2">
-                Share with the student so they can follow the application and upload documents.
+                The applicant tracks this application at Track Application with <span className="font-mono">{app.reference_number}</span> and {app.student_email}. The link fills in the number; the email is always required.
               </p>
               <div className="flex items-center gap-2">
                 <input
                   readOnly
                   value={statusLink}
                   onFocus={e => e.target.select()}
-                  aria-label="Student status link"
+                  aria-label="Applicant tracking link"
                   className="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700"
                 />
                 <Button size="sm" variant="secondary" onClick={copyStatusLink}>Copy</Button>
@@ -387,7 +395,7 @@ export default function ApplicationDetail() {
                 onClick={handleTriggerEvaluation}
                 loading={triggering}
               >
-                <Brain className="w-4 h-4" />
+                <ClipboardCheck className="w-4 h-4" />
                 Run Evaluation
               </Button>
             )}

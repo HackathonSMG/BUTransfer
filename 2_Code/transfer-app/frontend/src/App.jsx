@@ -47,19 +47,20 @@ export default function App() {
     <AuthProvider>
       <Routes>
         {/* Public applicant routes: no account needed */}
-        <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/apply" element={<Layout><EligibilityApplication /></Layout>} />
-        <Route path="/apply/submitted" element={<Layout><ApplicationSubmitted /></Layout>} />
+        <Route path="/" element={<Layout isPublic><Home /></Layout>} />
+        <Route path="/apply" element={<Layout isPublic><EligibilityApplication /></Layout>} />
+        <Route path="/apply/submitted" element={<Layout isPublic><ApplicationSubmitted /></Layout>} />
         <Route path="/apply/confirm" element={<Navigate to="/track" replace />} />
-        <Route path="/track" element={<Layout><TrackApplication /></Layout>} />
-        <Route path="/status/:token" element={<Layout><ApplicationStatus /></Layout>} />
-        <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
-        <Route path="/self-check" element={<Layout><SelfCheck /></Layout>} />
+        <Route path="/track" element={<Layout isPublic><TrackApplication /></Layout>} />
+        {/* Links from earlier emails: tracking always asks for the application number and email */}
+        <Route path="/status/:token" element={<Navigate to="/track" replace />} />
+        <Route path="/eligibility" element={<Layout isPublic><EligibilityCheck /></Layout>} />
+        <Route path="/self-check" element={<Layout isPublic><SelfCheck /></Layout>} />
 
         {/* Student portal: applications of student accounts created before applicant-first intake */}
         <Route path="/student" element={<ProtectedRoute allowedRoles={['student']}><Layout><StudentPortal /></Layout></ProtectedRoute>} />
         <Route path="/student/applications/:token" element={<ProtectedRoute allowedRoles={['student']}><Layout><ApplicationStatus /></Layout></ProtectedRoute>} />
-        <Route path="/login" element={<Layout><Login /></Layout>} />
+        <Route path="/login" element={<Layout isPublic><Login /></Layout>} />
 
         {/* Evaluator workspace; admins who land on /evaluator go to the admin applications list */}
         <Route
