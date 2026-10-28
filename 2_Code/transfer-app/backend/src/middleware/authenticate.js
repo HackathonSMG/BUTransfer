@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
 import { unauthorized } from '../utils/errors.js';
 
@@ -39,6 +39,12 @@ export async function requireAuth(req, res, next) {
   } catch (err) {
     return next(unauthorized('Authentication failed'));
   }
+}
+
+/** Like requireAuth, but an anonymous request simply continues without req.user. */
+export async function optionalAuth(req, res, next) {
+  if (!req.headers.authorization?.startsWith('Bearer ')) return next();
+  return requireAuth(req, res, next);
 }
 
 export default requireAuth;

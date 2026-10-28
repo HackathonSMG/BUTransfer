@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { validateSecureToken } from '../middleware/secure-token.js';
-import { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions } from '../controllers/student.controller.js';
+import { requireAuth, optionalAuth } from '../middleware/authenticate.js';
+import { requireRole } from '../middleware/require-role.js';
+import { eligibilityCheck, submitApplication, submitDraft, myApplications, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions } from '../controllers/student.controller.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -20,7 +22,10 @@ router.post('/eligibility-check', eligibilityCheck);
 // Self-check: guidance from the equivalency database before applying; nothing is stored
 router.get('/self-check/institutions', selfCheckInstitutions);
 router.post('/self-check', selfCheck);
-router.post('/applications', submitApplication);
+router.post('/applications', optionalAuth, submitApplication);
+router.post('/applications/:token/submit', validateSecureToken, submitDraft);
+// Student portal: the signed-in student's own applications
+router.get('/me/applications', requireAuth, requireRole('student'), myApplications);
 router.post('/applications/:token/documents', validateSecureToken, upload.single('file'), uploadDocument);
 router.get('/status/:token', validateSecureToken, getApplicationStatus);
 router.get('/status/:token/notifications', validateSecureToken, getStudentNotifications);

@@ -53,6 +53,18 @@ export async function importRoster({ initialSecret, actor }) {
     accounts.push({ email: a.email, full_name: a.full_name, role: 'admin', created });
   }
 
+  // Demo student accounts (synthetic sample students); their existing applications are linked by email
+  for (const st of roster.students || []) {
+    const { id, created } = await ensureAccount(existing, { ...st, role: 'student' }, initialSecret);
+    await query(
+      `INSERT INTO profiles (id, role, full_name, email) VALUES ($1, 'student', $2, $3)
+       ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, is_active = true, updated_at = NOW()`,
+      [id, st.full_name, st.email.toLowerCase()]
+    );
+    await query(`UPDATE applications SET student_profile_id = $1 WHERE LOWER(student_email) = $2 AND student_profile_id IS NULL`, [id, st.email.toLowerCase()]);
+    accounts.push({ email: st.email, full_name: st.full_name, role: 'student', created });
+  }
+
   // Credit Evaluation Office staff: process applications, place unassigned courses, post transfer credit
   for (const c of roster.credit_office || []) {
     const { id, created } = await ensureAccount(existing, { ...c, role: 'credit_office' }, initialSecret);

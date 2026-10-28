@@ -9,7 +9,7 @@ export const STATUS_LABELS = {
   evaluation_completed: 'Evaluation Completed',
   under_evaluator_review: 'Under Evaluator Review',
   validation_failed: 'Validation Failed',
-  ready_for_posting: 'Decided, Posting Pending',
+  ready_for_posting: 'Awaiting Final Review',
   credit_posted: 'Credit Posted',
   approved: 'Approved',
   rejected: 'Rejected',

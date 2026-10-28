@@ -5,7 +5,7 @@ import { requireRole } from '../middleware/require-role.js';
 import { query } from '../config/db.js';
 import { badRequest } from '../utils/errors.js';
 import * as reviewService from '../services/workflow/review.service.js';
-import { matchLabel } from '../services/workflow/knowledge.service.js';
+import { matchLabel, courseKnowledge } from '../services/workflow/knowledge.service.js';
 
 // The match label is decided here, not in the browser. Catalog levels and approved equivalencies are named
 // levels (no percentage); only a computed content similarity carries a score.
@@ -37,7 +37,7 @@ const STATUS_FILTERS = {
 // One row per course review with the application, the source course and the BU target course
 const REVIEW_SELECT = `
   SELECT r.id, r.status, r.priority, r.sequence, r.target_bu_course, r.match_score, r.match_basis, r.sponsor_match_level,
-         r.assigned_at, r.started_at, r.completed_at, r.created_at,
+         r.assigned_at, r.started_at, r.completed_at, r.created_at, r.assignment_reason, r.returned_reason,
          a.id AS application_id, a.reference_number, a.student_name, a.student_email, a.transfer_to_program,
          tc.institution, tc.course_code, COALESCE(src.title, tc.title) AS course_title, tc.term, tc.grade, tc.source_credits,
          bu.title AS target_title, bu.credits AS target_credits
@@ -62,7 +62,7 @@ router.get('/dashboard', async (req, res, next) => {
              LEFT JOIN transfer_requests tr ON tr.id = r.transfer_request_id
              LEFT JOIN profiles fp ON fp.id = tr.from_evaluator_id
              WHERE r.evaluator_id = $1 AND r.status = ANY($2) AND (r.status <> 'info_requested' OR ir.status = 'responded')
-             ORDER BY (ir.status = 'responded') DESC NULLS LAST, (r.priority = 'high') DESC,
+             ORDER BY (ir.status = 'responded') DESC NULLS LAST, (r.returned_at IS NOT NULL AND r.status = 'new') DESC, (r.priority = 'high') DESC,
                       (r.status = 'new' AND r.transfer_request_id IS NOT NULL) DESC, (r.status = 'new') DESC, r.assigned_at ASC NULLS LAST
              LIMIT 6`, [me, OPEN]),
       query(`${REVIEW_SELECT} WHERE r.evaluator_id = $1 AND r.status IN ('approved', 'rejected')
@@ -71,7 +71,7 @@ router.get('/dashboard', async (req, res, next) => {
       query(`SELECT * FROM (
                SELECT n.type AS kind, n.title, n.created_at, a.reference_number FROM notifications n
                LEFT JOIN applications a ON a.id = n.application_id
-               WHERE n.recipient_id = $1 AND n.type IN ('evaluation_assigned', 'transfer_request')
+               WHERE n.recipient_id = $1 AND n.type IN ('evaluation_assigned', 'transfer_request', 'decision_returned', 'information_received')
                UNION ALL
                SELECT al.action, NULL, al.created_at, a.reference_number FROM audit_logs al
                LEFT JOIN applications a ON a.id = al.application_id
@@ -83,6 +83,14 @@ router.get('/dashboard', async (req, res, next) => {
     const { rows: [apps] } = await query(
       `SELECT COUNT(DISTINCT application_id)::int AS applications FROM course_reviews WHERE evaluator_id = $1 AND status = ANY($2)`, [me, OPEN]
     );
+    // Open courses whose earlier decisions disagree (derived the same way as on the review page)
+    const { rows: openCourses } = await query(
+      `SELECT DISTINCT tc.institution, COALESCE(tc.catalog_code, tc.course_code) AS code FROM course_reviews r
+       JOIN transcript_courses tc ON tc.id = r.transcript_course_id WHERE r.evaluator_id = $1 AND r.status = ANY($2)`, [me, OPEN]);
+    let conflicts = 0;
+    for (const c of openCourses) {
+      if ((await courseKnowledge({ institution: c.institution, courseCode: c.code })).conflicts.length) conflicts += 1;
+    }
     return res.status(200).json({
       data: {
         profile: profile.rows[0] || null,
@@ -92,6 +100,7 @@ router.get('/dashboard', async (req, res, next) => {
           completed_this_month: counts.rows.filter((r) => ['approved', 'rejected'].includes(r.status)).reduce((s, r) => s + r.this_month, 0),
           open: n('new') + n('in_progress') + n('info_requested'),
           open_applications: apps.applications,
+          conflicts,
         },
         up_next: withLabel(upNext.rows),
         recent_decisions: withLabel(recent.rows),

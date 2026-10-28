@@ -3,6 +3,9 @@
   "admins": [
     { "email": "admin@bu-transfer.local", "full_name": "Avery Collins" }
   ],
+  "students": [
+    { "email": "maya.ortiz@students.example.org", "full_name": "Maya Ortiz" }
+  ],
   "credit_office": [
     { "email": "credit.office@bu-transfer.local", "full_name": "Jordan Ellis", "title": "Transfer Credit Coordinator" }
   ],

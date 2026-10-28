@@ -27,6 +27,7 @@ import Reports from './pages/admin/Reports'
 import Conflicts from './pages/admin/Conflicts'
 import NotFound from './pages/NotFound'
 import SelfCheck from './pages/student/SelfCheck'
+import StudentPortal from './pages/student/StudentPortal'
 import OfficeDashboard from './pages/office/OfficeDashboard'
 import OfficeApplication from './pages/office/OfficeApplication'
 
@@ -50,6 +51,10 @@ export default function App() {
         <Route path="/status/:token" element={<Layout><ApplicationStatus /></Layout>} />
         <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
         <Route path="/self-check" element={<Layout><SelfCheck /></Layout>} />
+
+        {/* Student portal: the signed-in student's own applications */}
+        <Route path="/student" element={<ProtectedRoute allowedRoles={['student']}><Layout><StudentPortal /></Layout></ProtectedRoute>} />
+        <Route path="/student/applications/:token" element={<ProtectedRoute allowedRoles={['student']}><Layout><ApplicationStatus /></Layout></ProtectedRoute>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
 
         {/* Evaluator workspace; admins who land on /evaluator go to the admin applications list */}

@@ -1,4 +1,4 @@
-﻿import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/db.js';
 import { generateReferenceNumber } from '../utils/reference-number.js';
 import { log as auditLog } from './audit.service.js';
@@ -13,7 +13,12 @@ import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
 
-export async function createApplication(data, source = 'website', createdBy = null) {
+/**
+ * Creates an application. With { draft: true } it stays a draft so the student can attach documents first;
+ * submitApplication then submits it and starts the evaluation. Without it (staff intake, email intake) the
+ * application is submitted and evaluated straight away, as before.
+ */
+export async function createApplication(data, source = 'website', createdBy = null, { draft = false } = {}) {
   const referenceNumber = await generateReferenceNumber();
   const secureToken = uuidv4();
 
@@ -35,25 +40,39 @@ export async function createApplication(data, source = 'website', createdBy = nu
   );
 
   const application = result.rows[0];
+  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source } });
+  if (draft) return application;
+  return finishSubmission(application, createdBy, source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
+}
 
-  // Staff-raised applications are filed on the student's behalf, so they're submitted straight away too
-  await updateApplicationStatus(application.id, 'submitted', createdBy,
-    source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
+async function finishSubmission(application, actorId, reason) {
+  await updateApplicationStatus(application.id, 'submitted', actorId, reason);
   application.status = 'submitted';
-
-  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: application.status }, details: { source } });
   await notificationService.applicationSubmitted(application);
   // Flag (never block or delete) a second open application from the same student
   await lifecycle.detectDuplicate(application.id).catch((err) => console.error('[Duplicate] Check failed:', err.message));
 
-  // Auto-trigger AI evaluation in the background so evaluators see results immediately
+  // Document processing and course evaluation run in the background
   setImmediate(() => {
-    triggerEvaluation(application.id, createdBy).catch((err) => {
-      console.error(`[AI] Auto-trigger failed for application ${application.reference_number}:`, err.message);
+    triggerEvaluation(application.id, actorId).catch((err) => {
+      console.error(`[Evaluation] Could not start for application ${application.reference_number}:`, err.message);
     });
   });
-
   return application;
+}
+
+/**
+ * Submits a draft once its documents are attached: at least one transcript is required. The transcript has
+ * already been read (courses extracted) on upload, so the evaluation that starts here sees every course.
+ */
+export async function submitApplication(applicationId, actorId = null) {
+  const { rows: [application] } = await query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
+  if (!application) throw notFound('Application');
+  if (application.status !== 'draft') throw badRequest('This application has already been submitted.');
+  const { rows: [docs] } = await query(
+    `SELECT COUNT(*) FILTER (WHERE document_type = 'transcript')::int AS transcripts FROM application_documents WHERE application_id = $1`, [applicationId]);
+  if (!docs.transcripts) throw badRequest('Upload your official transcript before submitting.');
+  return finishSubmission(application, actorId, 'Submitted by the student');
 }
 
 /**
@@ -384,9 +403,17 @@ export async function runEvaluation(evaluationId) {
     );
     console.log(`[Eval]   ai_evaluations record updated`);
 
-    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'AI evaluation completed');
+    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'Course evaluation completed');
     console.log(`[Eval]   Application status → evaluation_completed`);
 
+    // A transcript arrived but no course could be read from it: the Credit Evaluation Office follows up
+    if (!credit && documents.some((d) => d.document_type === 'transcript')) {
+      await lifecycle.notifyCreditOffice({
+        applicationId, type: 'transcript_unreadable', title: `Transcript needs attention: ${application.reference_number}`,
+        message: `No courses could be read from ${application.student_name}'s transcript. Contact the student or the sending college.`,
+        data: { reference_number: application.reference_number },
+      }).catch(() => {});
+    }
     await notificationService.evaluationComplete(application, evaluationId);
     console.log(`[Eval]   Notification sent`);
 
@@ -483,4 +510,4 @@ export async function assignEvaluator(applicationId, evaluatorId, assignedBy) {
   await auditLog({ applicationId, action: 'evaluator_assigned', actorId: assignedBy, newValue: { assigned_evaluator_id: evaluatorId } });
 }
 
-export default { createApplication, getApplicationById, listApplications, getApplicationStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };
+export default { createApplication, submitApplication, getApplicationById, listApplications, getApplicationStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };

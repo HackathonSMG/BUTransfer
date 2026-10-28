@@ -4,10 +4,10 @@ import StaffShell from './StaffShell'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function Layout({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
-  // Signed-in staff get the portal shell; the public (student) pages keep the simple top bar
-  if (isAuthenticated) return <StaffShell>{children}</StaffShell>
+  // Signed-in staff get the portal shell; students and visitors keep the simple top bar
+  if (isAuthenticated && user?.role !== 'student') return <StaffShell>{children}</StaffShell>
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

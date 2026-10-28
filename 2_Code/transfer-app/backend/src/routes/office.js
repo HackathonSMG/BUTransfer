@@ -20,7 +20,7 @@ const OPEN_APP = `a.status NOT IN ('closed', 'draft', 'credit_posted')`;
 
 router.get('/overview', async (_req, res, next) => {
   try {
-    const [counts, toPost, officeQueue, syllabi, duplicates, openApps, recent] = await Promise.all([
+    const [counts, toPost, officeQueue, syllabi, duplicates, openApps, recent, escalations] = await Promise.all([
       query(`SELECT
                (SELECT COUNT(*) FROM applications)::int AS applications,
                (SELECT COUNT(*) FROM applications a WHERE ${OPEN_APP})::int AS open_applications,
@@ -61,6 +61,15 @@ router.get('/overview', async (_req, res, next) => {
              WHERE al.action IN ('credit_posted', 'established_outcomes_applied', 'duplicate_suspected', 'duplicate_resolved', 'review_reassigned',
                                  'deadline_exception_recorded', 'syllabus_received', 'conflict_escalated', 'evaluator_availability_changed')
              ORDER BY al.created_at DESC LIMIT 10`),
+      // Courses an evaluator asked the office to look at, until the conflict is resolved or a standard recorded
+      query(`SELECT cr.institution, cr.course_code, cr.note, cr.created_at, COALESCE(p.full_name, 'Evaluator') AS raised_by
+             FROM conflict_resolutions cr LEFT JOIN profiles p ON p.id = cr.resolved_by
+             WHERE cr.action = 'additional_review'
+               AND NOT EXISTS (SELECT 1 FROM conflict_resolutions x WHERE x.institution = cr.institution AND x.course_code = cr.course_code
+                                 AND x.action IN ('resolved', 'use_established') AND x.created_at > cr.created_at)
+               AND NOT EXISTS (SELECT 1 FROM equivalencies e WHERE e.institution = cr.institution AND e.course_code = cr.course_code
+                                 AND e.status = 'active' AND e.approved_on >= cr.created_at::date AND e.source = 'promoted')
+             ORDER BY cr.created_at DESC LIMIT 10`),
     ]);
     const now = new Date();
     const deadlines = openApps.rows
@@ -71,7 +80,8 @@ router.get('/overview', async (_req, res, next) => {
     return res.status(200).json({
       data: {
         counts: { ...c, credits_posted: Number(c.credits_posted), syllabi_pending: syllabi.rows[0].pending, syllabi_received: syllabi.rows[0].received,
-          office_queue: officeQueue.rows.length, duplicates: duplicates.rows.length, deadline_issues: deadlines.length },
+          office_queue: officeQueue.rows.length, duplicates: duplicates.rows.length, deadline_issues: deadlines.length, escalations: escalations.rows.length },
+        escalations: escalations.rows,
         ready_to_post: toPost.rows,
         office_queue: officeQueue.rows,
         duplicates: duplicates.rows,
@@ -126,6 +136,7 @@ router.get('/applications/:id', async (req, res, next) => {
           review_id: c.review_id, review_status: c.review_status, queue: c.queue, evaluator_name: c.evaluator_name, target_bu_course: c.target_bu_course,
           assignment_reason: c.assignment_reason, missing_information: c.missing_information, combined_with: c.combined_with,
           suggestion: c.suggestion, path: c.path, info_kind: c.info_kind, info_status: c.info_status, syllabus_received_at: c.syllabus_received_at,
+          returned_reason: c.returned_reason, can_return: c.state === 'decided',
         })),
         documents: documents.rows,
         information_requests: requests.rows,
@@ -179,6 +190,16 @@ router.post('/reviews/:id/assign', async (req, res, next) => {
     }).safeParse(req.body);
     if (!parsed.success) return next(badRequest('Choose an evaluator'));
     return res.status(200).json({ data: await reassignReview(req.params.id, parsed.data.evaluator_id, req.user, parsed.data.note) });
+  } catch (err) { return next(err); }
+});
+
+// Final review: send one course's decision back to the evaluator before posting
+router.post('/courses/:id/return', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid course id'));
+    const parsed = z.object({ reason: z.string().trim().min(5, 'Give the reason for returning the decision').max(1000) }).safeParse(req.body);
+    if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
+    return res.status(200).json({ data: await lifecycle.returnToEvaluator(req.params.id, parsed.data.reason, req.user) });
   } catch (err) { return next(err); }
 });
 
