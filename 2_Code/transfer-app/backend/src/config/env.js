@@ -27,10 +27,12 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().optional().default('http://localhost:5173,http://localhost:4000'),
 
   // Microsoft Foundry agent (optional - empty endpoint means the credit engine runs without the agent).
-  // Authenticates with DefaultAzureCredential: `az login` locally, managed identity on App Service.
+  // Auth: set FOUNDRY_API_KEY for key-based auth (local dev + non-Azure hosting).
+  // On Azure App Service leave it unset and use a System-Assigned Managed Identity instead.
   FOUNDRY_PROJECT_ENDPOINT: z.string().optional().transform(v => v || undefined),
   FOUNDRY_AGENT_NAME: z.string().optional().default('bu-transfer-evaluator'),
   FOUNDRY_MODEL_DEPLOYMENT: z.string().optional().transform(v => v || undefined),
+  FOUNDRY_API_KEY: z.string().optional().transform(v => v || undefined),
 
   // Storage
   STORAGE_PROVIDER: z.string().optional().default('supabase'),
