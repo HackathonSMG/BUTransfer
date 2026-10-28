@@ -301,98 +301,127 @@ export function assertNoStudentDetails(payload, application) {
   if (/[\w.+-]+@[\w-]+\.[a-z]{2,}/.test(text)) throw new Error('Refusing to send the agent a case that contains an email address');
 }
 
+// Cache agent ID — looked up once by name, reused for all runs
+let cachedAgentId = null;
+async function resolveAgentId(agents, agentName) {
+  if (cachedAgentId) { log(`  Agent ID (cached): ${cachedAgentId}`); return cachedAgentId; }
+  log(`  Looking up agent '${agentName}'...`);
+  const list = await agents.listAgents({ limit: 100 });
+  const all = list.data || list.value || (Array.isArray(list) ? list : []);
+  log(`  Found ${all.length} agent(s): ${all.map(a => a.name).join(', ')}`);
+  const found = all.find(a => a.name === agentName);
+  if (!found) throw new Error(`Agent '${agentName}' not found in Azure AI Foundry. Run: npm run agent:create`);
+  log(`  Agent ID: ${found.id} model=${found.model}`);
+  cachedAgentId = found.id;
+  return found.id;
+}
+
 /**
- * Runs one agent conversation for a case.
+ * Runs one agent thread/run for a case using the native Azure AI Foundry agents API.
  * Returns { type: 'recommendations', data: [...] } or { type: 'validation_error', reason, details }
  */
-export async function runAgent(agentCase, { client = getProjectClient().getOpenAIClient(), agentName = env.FOUNDRY_AGENT_NAME, ref } = {}) {
+export async function runAgent(agentCase, { agentName = env.FOUNDRY_AGENT_NAME, ref } = {}) {
   const reference = ref || await loadReference();
-  // agent_reference requires type field per the Responses API schema
-  const agentRef = { body: { agent_reference: { type: 'agent_reference', name: agentName } } };
+  const projectClient = getProjectClient();
+  const agents = projectClient.agents;
 
   log(`runAgent START — case_id=${agentCase.case_id} courses=${agentCase.courses?.length ?? 0} validation_only=${!!agentCase.validation_only}`);
-  log(`  Agent name      : ${agentName}`);
-  log(`  agentRef body   : ${JSON.stringify(agentRef.body)}`);
+  log(`  Agent: ${agentName}`);
 
-  let conversation;
-  try {
-    log(`  Creating conversation...`);
-    conversation = await client.conversations.create();
-    log(`  Conversation created: ${conversation.id}`);
-  } catch (err) {
-    logErr(`conversations.create() failed`, err);
-    throw err;
-  }
+  const agentId = await resolveAgentId(agents, agentName);
+
+  log(`  Creating thread...`);
+  const thread = await agents.createThread();
+  log(`  Thread: ${thread.id}`);
 
   try {
     const caseText = JSON.stringify(agentCase);
-    // Try plain string — the simplest input form the Responses API accepts
-    log(`  Sending initial message (${caseText.length} bytes)...`);
-    log(`  agentRef body: ${JSON.stringify(agentRef.body)}`);
-    let response = await client.responses.create({ conversation: conversation.id, input: caseText }, agentRef);
-    log(`  Initial response received — output items: ${response.output?.length ?? 0}`);
+    log(`  Adding user message (${caseText.length} bytes)...`);
+    await agents.createMessage(thread.id, { role: 'user', content: caseText });
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const allItems = response.output || [];
-      const calls = allItems.filter((item) => item.type === 'function_call');
-      const textItems = allItems.filter((item) => item.type === 'message');
+    log(`  Creating run (agentId=${agentId})...`);
+    let run = await agents.createRun(thread.id, { assistant_id: agentId });
+    log(`  Run: ${run.id} status=${run.status}`);
 
-      log(`  Round ${round}: output items=${allItems.length} function_calls=${calls.length} messages=${textItems.length}`);
-      // Log ALL output item types so we can see exactly what the agent returned
-      allItems.forEach((item, i) => log(`    [${i}] type=${item.type} ${item.name ? `name=${item.name}` : ''} content=${JSON.stringify(item.content ?? item.output ?? '').slice(0, 150)}`));
-      if (calls.length) log(`    Tool calls: ${calls.map((c) => c.name).join(', ')}`);
+    const deadline = Date.now() + RUN_TIMEOUT_MS;
+    let round = 0;
 
-      const validationCall = calls.find((c) => c.name === 'submit_validation_error');
-      if (validationCall) {
-        log(`  submit_validation_error called — args: ${validationCall.arguments}`);
-        const vErr = ValidationError.parse(JSON.parse(validationCall.arguments));
-        log(`  Validation failed: reason=${vErr.reason}`);
-        return { type: 'validation_error', reason: vErr.reason, details: vErr.details };
+    while (Date.now() < deadline) {
+      // Poll until out of queued/in_progress
+      while ((run.status === 'queued' || run.status === 'in_progress') && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2_000));
+        run = await agents.getRun(thread.id, run.id);
+        log(`  Poll: ${run.status}`);
       }
 
-      const final = calls.find((c) => c.name === 'submit_recommendations');
-      if (final) {
-        log(`  submit_recommendations called — parsing results...`);
-        const data = parseSubmission(final.arguments, agentCase, reference);
-        log(`  Parsed ${data.length} course recommendation(s)`);
-        data.forEach((r) => log(`    ${r.course_ref}: outcome=${r.outcome} bu_course=${r.bu_course} confidence=${r.confidence}`));
-        return { type: 'recommendations', data };
-      }
-
-      if (calls.length === 0) {
-        // Validation-only: agent returning text with no tool calls means Phase 1 passed
+      if (run.status === 'completed') {
         if (agentCase.validation_only) {
-          const agentText = textItems.map((t) => {
-            const c = t.content;
-            return Array.isArray(c) ? c.map((p) => p.text || p.output || '').join('') : String(c ?? '');
-          }).join(' ');
-          log(`  Validation-only case — agent returned no tool calls (validation passed)`);
-          log(`  Agent said: ${agentText.slice(0, 300)}`);
+          log(`  Validation-only completed without error — validation passed`);
           return { type: 'validation_ok' };
         }
+        // Get final messages for diagnostics
+        const msgs = await agents.listMessages(thread.id).catch(() => null);
+        const lastText = (msgs?.data?.[0]?.content || []).map((c) => c.text?.value || '').join('');
+        log(`  Agent completed without submit_recommendations. Said: ${lastText.slice(0, 300)}`);
         throw new Error('The agent finished without submitting recommendations');
       }
 
-      const outputs = [];
-      for (const c of calls) {
-        log(`    Executing tool: ${c.name}  args=${c.arguments?.slice(0, 200)}`);
-        const toolResult = await callTool(reference, c.name, c.arguments);
-        log(`    Tool ${c.name} returned: ${JSON.stringify(toolResult).slice(0, 200)}`);
-        outputs.push({ type: 'function_call_output', call_id: c.call_id, output: JSON.stringify(toolResult) });
+      if (run.status === 'failed') {
+        const reason = run.last_error?.message || JSON.stringify(run.last_error) || 'unknown';
+        throw new Error(`Agent run failed: ${reason}`);
       }
 
-      log(`  Sending ${outputs.length} tool result(s) back to agent...`);
-      response = await client.responses.create({ conversation: conversation.id, input: outputs }, agentRef);
-      log(`  Response received — output items: ${response.output?.length ?? 0}`);
+      if (run.status === 'cancelled' || run.status === 'expired') {
+        throw new Error(`Agent run ${run.status}`);
+      }
+
+      if (run.status === 'requires_action') {
+        round++;
+        if (round > MAX_TOOL_ROUNDS) throw new Error(`Agent exceeded ${MAX_TOOL_ROUNDS} tool rounds`);
+
+        const toolCalls = run.required_action?.submit_tool_outputs?.tool_calls || [];
+        log(`  Round ${round}: ${toolCalls.length} call(s) — ${toolCalls.map((tc) => tc.function?.name).join(', ')}`);
+
+        const validationCall = toolCalls.find((tc) => tc.function?.name === 'submit_validation_error');
+        if (validationCall) {
+          const vErr = ValidationError.parse(JSON.parse(validationCall.function.arguments));
+          log(`  VALIDATION FAILED: reason=${vErr.reason}`);
+          return { type: 'validation_error', reason: vErr.reason, details: vErr.details };
+        }
+
+        const finalCall = toolCalls.find((tc) => tc.function?.name === 'submit_recommendations');
+        if (finalCall) {
+          const data = parseSubmission(finalCall.function.arguments, agentCase, reference);
+          log(`  submit_recommendations: ${data.length} course(s)`);
+          data.forEach((r) => log(`    ${r.course_ref}: ${r.outcome} ${r.bu_course || ''} conf=${r.confidence}`));
+          return { type: 'recommendations', data };
+        }
+
+        const toolOutputs = [];
+        for (const tc of toolCalls) {
+          log(`    Tool: ${tc.function?.name}  args=${tc.function?.arguments?.slice(0, 200)}`);
+          const result = await callTool(reference, tc.function?.name, tc.function?.arguments);
+          log(`    Result: ${JSON.stringify(result).slice(0, 200)}`);
+          toolOutputs.push({ tool_call_id: tc.id, output: JSON.stringify(result) });
+        }
+
+        log(`  Submitting ${toolOutputs.length} tool output(s)...`);
+        run = await agents.submitToolOutputsToRun(thread.id, run.id, { tool_outputs: toolOutputs });
+        log(`  Status after submit: ${run.status}`);
+        continue;
+      }
+
+      throw new Error(`Unexpected run status: ${run.status}`);
     }
-    throw new Error(`The agent used more than ${MAX_TOOL_ROUNDS} tool rounds without finishing`);
+    throw new Error('Agent run timed out');
+
   } catch (err) {
-    logErr(`runAgent conversation ${conversation?.id} failed at round`, err);
+    logErr(`runAgent thread=${thread?.id} FAILED`, err);
     throw err;
   } finally {
-    if (conversation?.id) {
-      await client.conversations.delete(conversation.id).catch((e) => log(`  Warning: could not delete conversation ${conversation.id}: ${e?.message}`));
-      log(`  Conversation ${conversation.id} deleted`);
+    if (thread?.id) {
+      await agents.deleteThread(thread.id).catch((e) => log(`  Warning: thread cleanup failed: ${e?.message}`));
+      log(`  Thread ${thread.id} deleted`);
     }
   }
 }
