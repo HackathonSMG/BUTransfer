@@ -42,3 +42,7 @@ export const resolveConflict = (body) =>
 // One-off after deploying: brings applications evaluated earlier into the lifecycle (safe to repeat)
 export const processExistingApplications = () =>
   client.post('/office/process-existing').then(r => r.data)
+
+// Final review: send a course's decision back to the evaluator before it is posted
+export const returnToEvaluator = (transcriptCourseId, reason) =>
+  client.post(`/office/courses/${transcriptCourseId}/return`, { reason }).then(r => r.data)

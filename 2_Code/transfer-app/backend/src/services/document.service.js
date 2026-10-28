@@ -82,4 +82,16 @@ export async function removeDocument(documentId, requestorId) {
   await query(`DELETE FROM application_documents WHERE id = $1`, [documentId]);
 }
 
-export default { uploadDocument, getDocument, listDocuments, removeDocument };
+/**
+ * Removes a document the applicant attached to a draft (before submission). Courses read from a transcript go
+ * with it (transcript_courses.document_id cascades). Submitted applications keep every document.
+ */
+export async function removeDraftDocument(application, documentId) {
+  if (application.status !== 'draft') throw forbidden('Documents can only be removed before the application is submitted');
+  const { rows: [doc] } = await query(`SELECT id, storage_path FROM application_documents WHERE id = $1 AND application_id = $2`, [documentId, application.id]);
+  if (!doc) throw notFound('Document');
+  await query(`DELETE FROM application_documents WHERE id = $1`, [doc.id]);
+  await deleteFile(doc.storage_path).catch((err) => console.error('[Documents] Stored file not removed:', err.message));
+}
+
+export default { uploadDocument, getDocument, listDocuments, removeDocument, removeDraftDocument };

@@ -8,6 +8,7 @@ import { log as auditLog } from '../services/audit.service.js';
 import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, assignApplication } from '../services/workflow/assignment.service.js';
 import { POLICY } from '../services/credit/policy.js';
+import { ownershipView, unassignedReason } from '../services/workflow/ownership.service.js';
 
 // The Credit Evaluation Office (Problem 1, steps 3, 4 and 7): monitors every application, places courses that
 // have no subject specialist, resolves duplicates and deadline exceptions, and posts decided transfer credit.
@@ -20,7 +21,7 @@ const OPEN_APP = `a.status NOT IN ('closed', 'draft', 'credit_posted')`;
 
 router.get('/overview', async (_req, res, next) => {
   try {
-    const [counts, toPost, officeQueue, syllabi, duplicates, openApps, recent] = await Promise.all([
+    const [counts, toPost, officeQueue, syllabi, duplicates, openApps, recent, escalations] = await Promise.all([
       query(`SELECT
                (SELECT COUNT(*) FROM applications)::int AS applications,
                (SELECT COUNT(*) FROM applications a WHERE ${OPEN_APP})::int AS open_applications,
@@ -45,11 +46,16 @@ router.get('/overview', async (_req, res, next) => {
              WHERE a.status <> 'closed'
              GROUP BY a.id HAVING COUNT(cd.id) FILTER (WHERE cp.id IS NULL) > 0
              ORDER BY (a.status = 'ready_for_posting') DESC, a.submitted_at ASC NULLS LAST LIMIT 20`),
+      // Courses without an evaluator, and courses held by an evaluator who is now inactive or unavailable
       query(`SELECT r.id, r.status, r.target_bu_course, r.assignment_reason, r.assigned_at, a.id AS application_id, a.reference_number, a.student_name,
-                    tc.institution, tc.course_code, tc.title
+                    tc.institution, tc.course_code, tc.title, p.full_name AS evaluator_name,
+                    (r.evaluator_id IS NOT NULL) AS needs_reassignment
              FROM course_reviews r JOIN applications a ON a.id = r.application_id JOIN transcript_courses tc ON tc.id = r.transcript_course_id
-             WHERE r.queue = 'credit_office' AND r.status IN ('new', 'in_progress', 'info_requested')
-             ORDER BY r.assigned_at ASC NULLS LAST LIMIT 20`),
+             LEFT JOIN evaluators e ON e.id = r.evaluator_id LEFT JOIN profiles p ON p.id = r.evaluator_id
+             WHERE r.status IN ('new', 'in_progress', 'info_requested', 'queued')
+               AND ((r.queue = 'credit_office' AND r.evaluator_id IS NULL)
+                    OR (r.evaluator_id IS NOT NULL AND (e.is_active = false OR (e.availability = 'unavailable' AND (e.unavailable_until IS NULL OR e.unavailable_until >= CURRENT_DATE)))))
+             ORDER BY r.assigned_at ASC NULLS LAST LIMIT 50`),
       query(`SELECT COUNT(*) FILTER (WHERE ir.status = 'pending')::int AS pending,
                     COUNT(*) FILTER (WHERE ir.status = 'responded')::int AS received
              FROM information_requests ir WHERE ir.kind = 'syllabus'`),
@@ -61,6 +67,15 @@ router.get('/overview', async (_req, res, next) => {
              WHERE al.action IN ('credit_posted', 'established_outcomes_applied', 'duplicate_suspected', 'duplicate_resolved', 'review_reassigned',
                                  'deadline_exception_recorded', 'syllabus_received', 'conflict_escalated', 'evaluator_availability_changed')
              ORDER BY al.created_at DESC LIMIT 10`),
+      // Courses an evaluator asked the office to look at, until the conflict is resolved or a standard recorded
+      query(`SELECT cr.institution, cr.course_code, cr.note, cr.created_at, COALESCE(p.full_name, 'Evaluator') AS raised_by
+             FROM conflict_resolutions cr LEFT JOIN profiles p ON p.id = cr.resolved_by
+             WHERE cr.action = 'additional_review'
+               AND NOT EXISTS (SELECT 1 FROM conflict_resolutions x WHERE x.institution = cr.institution AND x.course_code = cr.course_code
+                                 AND x.action IN ('resolved', 'use_established') AND x.created_at > cr.created_at)
+               AND NOT EXISTS (SELECT 1 FROM equivalencies e WHERE e.institution = cr.institution AND e.course_code = cr.course_code
+                                 AND e.status = 'active' AND e.approved_on >= cr.created_at::date AND e.source = 'promoted')
+             ORDER BY cr.created_at DESC LIMIT 10`),
     ]);
     const now = new Date();
     const deadlines = openApps.rows
@@ -71,9 +86,10 @@ router.get('/overview', async (_req, res, next) => {
     return res.status(200).json({
       data: {
         counts: { ...c, credits_posted: Number(c.credits_posted), syllabi_pending: syllabi.rows[0].pending, syllabi_received: syllabi.rows[0].received,
-          office_queue: officeQueue.rows.length, duplicates: duplicates.rows.length, deadline_issues: deadlines.length },
+          office_queue: officeQueue.rows.length, duplicates: duplicates.rows.length, deadline_issues: deadlines.length, escalations: escalations.rows.length },
+        escalations: escalations.rows,
         ready_to_post: toPost.rows,
-        office_queue: officeQueue.rows,
+        office_queue: officeQueue.rows.map((r) => ({ ...r, reason_category: unassignedReason(r.assignment_reason, { unavailable: r.needs_reassignment }) })),
         duplicates: duplicates.rows,
         deadlines: deadlines.map((a) => ({ id: a.id, reference_number: a.reference_number, student_name: a.student_name, start_term: a.expected_start_term,
           status: a.deadline.status, deadline: a.deadline.deadline, days_left: a.deadline.days_left, exception: a.deadline_exception })),
@@ -91,7 +107,7 @@ router.get('/applications/:id', async (req, res, next) => {
       `SELECT a.*, p.full_name AS evaluator_name, x.full_name AS deadline_exception_by_name FROM applications a
        LEFT JOIN profiles p ON p.id = a.assigned_evaluator_id LEFT JOIN profiles x ON x.id = a.deadline_exception_by WHERE a.id = $1`, [req.params.id]);
     if (!app) return next(notFound('Application'));
-    const [courses, documents, requests, duplicate, history] = await Promise.all([
+    const [courses, documents, requests, duplicate, history, applicantUpdates] = await Promise.all([
       lifecycle.courseStates(app.id),
       query(`SELECT d.id, d.file_name, d.document_type, d.created_at, d.upload_source, tc.course_code AS for_course
              FROM application_documents d LEFT JOIN transcript_courses tc ON tc.id = d.transcript_course_id WHERE d.application_id = $1 ORDER BY d.created_at`, [app.id]),
@@ -102,6 +118,9 @@ router.get('/applications/:id', async (req, res, next) => {
       lifecycle.duplicateComparison(app),
       query(`SELECT al.action, al.created_at, al.details, COALESCE(p.full_name, al.actor_email, 'System') AS actor FROM audit_logs al
              LEFT JOIN profiles p ON p.id = al.actor_id WHERE al.application_id = $1 ORDER BY al.created_at DESC LIMIT 25`, [app.id]),
+      // What the applicant was told, and whether the email went out
+      query(`SELECT type, title, created_at, email_status, emailed_at, email_attempts, email_error FROM notifications
+             WHERE application_id = $1 AND email_status IS NOT NULL ORDER BY created_at DESC`, [app.id]),
     ]);
     const visible = courses.filter((c) => c.state !== 'withdrawn');
     return res.status(200).json({
@@ -111,6 +130,7 @@ router.get('/applications/:id', async (req, res, next) => {
           transfer_from_institution: app.transfer_from_institution, transfer_to_program: app.transfer_to_program, expected_start_term: app.expected_start_term,
           submitted_at: app.submitted_at, posted_at: app.posted_at, evaluator_name: app.evaluator_name, secure_token: undefined,
           deadline_exception: app.deadline_exception, deadline_exception_by: app.deadline_exception_by_name,
+          applicant_comments: app.applicant_comments,
         },
         institutions: [...new Set(visible.map((c) => c.institution))],
         summary: lifecycle.summarizeCourses(visible),
@@ -126,10 +146,13 @@ router.get('/applications/:id', async (req, res, next) => {
           review_id: c.review_id, review_status: c.review_status, queue: c.queue, evaluator_name: c.evaluator_name, target_bu_course: c.target_bu_course,
           assignment_reason: c.assignment_reason, missing_information: c.missing_information, combined_with: c.combined_with,
           suggestion: c.suggestion, path: c.path, info_kind: c.info_kind, info_status: c.info_status, syllabus_received_at: c.syllabus_received_at,
+          returned_reason: c.returned_reason, can_return: c.state === 'decided',
         })),
         documents: documents.rows,
         information_requests: requests.rows,
         history: history.rows,
+        applicant_updates: applicantUpdates.rows,
+        ownership: await ownershipView(app.id),
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });
@@ -179,6 +202,16 @@ router.post('/reviews/:id/assign', async (req, res, next) => {
     }).safeParse(req.body);
     if (!parsed.success) return next(badRequest('Choose an evaluator'));
     return res.status(200).json({ data: await reassignReview(req.params.id, parsed.data.evaluator_id, req.user, parsed.data.note) });
+  } catch (err) { return next(err); }
+});
+
+// Final review: send one course's decision back to the evaluator before posting
+router.post('/courses/:id/return', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid course id'));
+    const parsed = z.object({ reason: z.string().trim().min(5, 'Give the reason for returning the decision').max(1000) }).safeParse(req.body);
+    if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
+    return res.status(200).json({ data: await lifecycle.returnToEvaluator(req.params.id, parsed.data.reason, req.user) });
   } catch (err) { return next(err); }
 });
 

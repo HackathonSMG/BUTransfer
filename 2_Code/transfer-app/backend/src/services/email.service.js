@@ -1,5 +1,8 @@
-// Sends transactional emails via Gmail SMTP using nodemailer.
-// All student-facing emails go through here so templates stay in one place.
+// Sends transactional emails. The transport is chosen by configuration (EMAIL_PROVIDER): SMTP for any relay
+// (Azure Communication Services, SendGrid, Microsoft 365, Gmail) or a development log transport. Business code
+// never talks to a transport directly: applicant emails go through notifications/applicant-notification.service.
+import fs from 'fs';
+import path from 'path';
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 
@@ -11,8 +14,8 @@ function getTransporter() {
     transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT || 587,
-      secure: false,
-      requireTLS: true,
+      secure: Number(env.SMTP_PORT) === 465,
+      requireTLS: Number(env.SMTP_PORT) !== 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
     });
   }
@@ -21,76 +24,56 @@ function getTransporter() {
 
 export const isEmailConfigured = () => Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 
+/** The transport in use: 'smtp' or 'log'. */
+export const emailProvider = () => env.EMAIL_PROVIDER || (isEmailConfigured() ? 'smtp' : 'log');
+
+/** True for addresses at reserved/test domains (EMAIL_SUPPRESS_DOMAINS), which are never emailed. */
+export function isSuppressedAddress(address) {
+  const domain = String(address || '').split('@')[1]?.toLowerCase().trim();
+  if (!domain) return true;
+  return env.EMAIL_SUPPRESS_DOMAINS.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
+    .some((d) => domain === d || domain.endsWith(`.${d}`));
+}
+
+/**
+ * Delivers one email and throws when it cannot (the caller decides whether to retry).
+ * @returns {Promise<{ provider: 'smtp'|'log', messageId: string|null }>}
+ */
+export async function deliverEmail({ to, subject, html, text }) {
+  const provider = emailProvider();
+  if (provider === 'smtp') {
+    const t = getTransporter();
+    if (!t) throw new Error('SMTP is selected but SMTP_HOST, SMTP_USER and SMTP_PASS are not all set');
+    const info = await t.sendMail({ from: `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_FROM}>`, to, subject, html, text });
+    console.log(`[Email] Sent "${subject}" to ${to} (${info.messageId})`);
+    return { provider, messageId: info.messageId || null };
+  }
+  // Development transport: nothing leaves the server
+  console.log(`[Email:log] To: ${to} | Subject: ${subject}\n${text}\n[Email:log] ----`);
+  if (env.EMAIL_OUTBOX_DIR) {
+    fs.mkdirSync(env.EMAIL_OUTBOX_DIR, { recursive: true });
+    const file = path.join(env.EMAIL_OUTBOX_DIR, `${Date.now()}-${String(to).replace(/[^a-z0-9.@_-]/gi, '_')}.html`);
+    fs.writeFileSync(file, `<!-- To: ${to} | Subject: ${subject} -->\n${html}`);
+  }
+  return { provider, messageId: null };
+}
+
+/** Fire-and-forget send for the email intake: never throws, returns null when nothing was sent. */
 export async function sendEmail({ to, subject, html, text }) {
-  const t = getTransporter();
-  if (!t) {
+  if (!isEmailConfigured()) {
     console.warn('[Email] SMTP not configured — skipping email to', to);
     return null;
   }
   try {
-    const info = await t.sendMail({ from: `"BU Transfer Office" <${env.EMAIL_FROM}>`, to, subject, html, text });
-    console.log(`[Email] Sent "${subject}" to ${to} (${info.messageId})`);
-    return info;
+    return await deliverEmail({ to, subject, html, text });
   } catch (err) {
     console.error(`[Email] Failed to send to ${to}:`, err.message);
     return null;
   }
 }
 
-// ── Templates ──────────────────────────────────────────────────────────────
-
-export async function sendApplicationConfirmation(toEmail, studentName, referenceNumber, secureToken = null) {
-  const name = studentName || 'Applicant';
-  const trackingLink = secureToken ? `${env.APP_URL}/status/${secureToken}` : null;
-  const trackingText = trackingLink
-    ? `\nTrack your application at any time using this private link:\n${trackingLink}\n`
-    : '';
-  const trackingHtml = trackingLink
-    ? `<div style="background:#eef4ff;border:1px solid #c7d7f5;border-radius:8px;padding:16px;margin:20px 0">
-    <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#1a3a6b">Your Application Tracking Link</p>
-    <a href="${trackingLink}" style="color:#cc0000;word-break:break-all;font-size:13px">${trackingLink}</a>
-    <p style="margin:8px 0 0;font-size:12px;color:#555">Bookmark this link — it lets you check your status, upload documents, and view your evaluation result. No login required.</p>
-  </div>`
-    : '';
-  return sendEmail({
-    to: toEmail,
-    subject: `Application Received — ${referenceNumber} | BU Transfer Office`,
-    text: [
-      `Dear ${name},`,
-      '',
-      `Thank you for submitting your transfer application to Boston University.`,
-      '',
-      `Your application reference number is: ${referenceNumber}`,
-      trackingText,
-      `We have received your application and our team will review it shortly. If your transcript was attached, it has been queued for automated evaluation.`,
-      '',
-      `You will receive further updates at this email address. If you have questions, reply to this email quoting your reference number.`,
-      '',
-      'Boston University Transfer Office',
-    ].join('\n'),
-    html: `
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:24px">
-  <div style="border-left:4px solid #cc0000;padding-left:16px;margin-bottom:24px">
-    <h2 style="margin:0;color:#cc0000">Boston University</h2>
-    <p style="margin:4px 0 0;color:#555;font-size:14px">Transfer Admissions Office</p>
-  </div>
-  <p>Dear ${name},</p>
-  <p>Thank you for submitting your transfer application. We have received it and it is now in our review queue.</p>
-  <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0;text-align:center">
-    <p style="margin:0;font-size:13px;color:#555">Your Reference Number</p>
-    <p style="margin:8px 0 0;font-size:26px;font-weight:bold;letter-spacing:2px;color:#cc0000">${referenceNumber}</p>
-  </div>
-  ${trackingHtml}
-  <p>If you attached a transcript, it has been queued for automated evaluation. Our team will review the results and reach out if anything further is needed.</p>
-  <p>Please keep your reference number for future correspondence. You can reply to this email quoting it at any time.</p>
-  <hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>
-  <p style="font-size:12px;color:#888">Boston University Transfer Office &nbsp;|&nbsp; 233 Bay State Road, Boston, MA 02215</p>
-</body>
-</html>`,
-  });
-}
+// ── Email intake templates ──────────────────────────────────────────────────
+// (The application received / status update emails are in notifications/applicant-templates.js.)
 
 export async function sendInfoRequiredEmail(toEmail, studentName, missingFields, referenceNumber = null) {
   const name = studentName || 'Applicant';
@@ -133,44 +116,4 @@ export async function sendInfoRequiredEmail(toEmail, studentName, missingFields,
   });
 }
 
-export async function sendDecisionEmail(toEmail, studentName, referenceNumber, decision, comments) {
-  const name = studentName || 'Applicant';
-  const approved = decision === 'approved';
-  return sendEmail({
-    to: toEmail,
-    subject: `Transfer Application ${approved ? 'Approved' : 'Decision'} — ${referenceNumber} | BU Transfer Office`,
-    text: [
-      `Dear ${name},`,
-      '',
-      `A decision has been made on your transfer application (${referenceNumber}).`,
-      '',
-      `Decision: ${approved ? 'APPROVED' : 'NOT APPROVED'}`,
-      comments ? `\nComments: ${comments}` : '',
-      '',
-      'If you have questions, please contact the Transfer Office.',
-      '',
-      'Boston University Transfer Office',
-    ].join('\n'),
-    html: `
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:24px">
-  <div style="border-left:4px solid #cc0000;padding-left:16px;margin-bottom:24px">
-    <h2 style="margin:0;color:#cc0000">Boston University</h2>
-    <p style="margin:4px 0 0;color:#555;font-size:14px">Transfer Admissions Office</p>
-  </div>
-  <p>Dear ${name},</p>
-  <p>A decision has been made on your transfer application <strong>${referenceNumber}</strong>.</p>
-  <div style="background:${approved ? '#f0fff0' : '#fff0f0'};border-radius:8px;padding:16px;margin:20px 0;text-align:center">
-    <p style="margin:0;font-size:20px;font-weight:bold;color:${approved ? '#2d7a2d' : '#cc0000'}">${approved ? '✓ Approved' : '✗ Not Approved'}</p>
-  </div>
-  ${comments ? `<p><strong>Comments:</strong> ${comments}</p>` : ''}
-  <p>If you have questions, please reply to this email quoting your reference number.</p>
-  <hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>
-  <p style="font-size:12px;color:#888">Boston University Transfer Office &nbsp;|&nbsp; 233 Bay State Road, Boston, MA 02215</p>
-</body>
-</html>`,
-  });
-}
-
-export default { isEmailConfigured, sendEmail, sendApplicationConfirmation, sendInfoRequiredEmail, sendDecisionEmail };
+export default { isEmailConfigured, emailProvider, isSuppressedAddress, deliverEmail, sendEmail, sendInfoRequiredEmail };

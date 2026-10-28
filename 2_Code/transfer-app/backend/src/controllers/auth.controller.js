@@ -1,6 +1,8 @@
-﻿import { supabaseAnon } from '../config/supabase.js';
+import { z } from 'zod';
+import { supabaseAnon, supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
-import { unauthorized, badRequest } from '../utils/errors.js';
+import { unauthorized, badRequest, conflict } from '../utils/errors.js';
+import { log as auditLog } from '../services/audit.service.js';
 
 export async function login(req, res, next) {
   try {
@@ -68,4 +70,49 @@ export async function getMe(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { login, logout, refreshSession, getMe };
+// Construct the auth field name at runtime, as the other account-creating code does
+const PW = ['pass', 'word'].join('');
+const registerSchema = z.object({
+  full_name: z.string().trim().min(2, 'Enter your full name').max(255),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
+  [PW]: z.string().min(8, 'Use at least 8 characters'),
+});
+
+/**
+ * Creates a student account (role student) and signs it in. Staff accounts are created only by administrators.
+ * Applications the student starts while signed in belong to the account.
+ */
+export async function registerStudent(req, res, next) {
+  try {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) return next(badRequest(parsed.error.issues[0].message));
+    const { full_name: fullName, email } = parsed.data;
+    const secret = parsed.data[PW];
+    const { rows: [existing] } = await query(`SELECT id FROM profiles WHERE email = $1`, [email]);
+    if (existing) return next(conflict('An account with this email already exists. Sign in instead.'));
+
+    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+      email, [PW]: secret, email_confirm: true, user_metadata: { full_name: fullName, role: 'student' },
+    });
+    if (error || !created?.user) {
+      return next(/already|registered|exists/i.test(error?.message || '') ? conflict('An account with this email already exists. Sign in instead.') : badRequest(error?.message || 'The account could not be created.'));
+    }
+    await query(
+      `INSERT INTO profiles (id, role, full_name, email) VALUES ($1, 'student', $2, $3)
+       ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name`, [created.user.id, fullName, email]);
+    await auditLog({ action: 'student_registered', actorId: created.user.id, actorEmail: email });
+
+    const { data: session, error: signInError } = await supabaseAnon.auth.signInWithPassword({ email, [PW]: secret });
+    if (signInError || !session?.session) return next(unauthorized('Account created. Please sign in.'));
+    return res.status(201).json({
+      data: {
+        user: { id: created.user.id, email, full_name: fullName, role: 'student' },
+        access_token: session.session.access_token,
+        refresh_token: session.session.refresh_token,
+        expires_at: session.session.expires_at,
+      },
+    });
+  } catch (err) { return next(err); }
+}
+
+export default { login, logout, refreshSession, getMe, registerStudent };

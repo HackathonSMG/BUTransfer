@@ -21,7 +21,8 @@ const OUTCOMES = [
   { key: 'equivalent', label: 'Equivalent BU course', hint: 'Award the proposed BU course.' },
   { key: 'different_course', label: 'Different BU course', hint: 'Award another course from the BU catalog.' },
   { key: 'elective', label: 'Elective credit', hint: 'Counts as units without a specific BU course.' },
-  { key: 'no_credit', label: 'No credit', hint: '0 units. A reason is required.' }
+  { key: 'no_credit', label: 'No credit', hint: '0 units. A reason is required.' },
+  { key: 'request_info', label: 'Request more information', hint: 'Ask the student for the syllabus or other details before deciding.' }
 ]
 
 // One sentence on where the proposed BU course came from
@@ -79,7 +80,7 @@ export default function ReviewDetail() {
   const openDecision = (preset = {}) => {
     const d = state.data
     setText('')
-    setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, ...preset })
+    setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, infoKind: 'syllabus', ...preset })
     setDialog('decide')
   }
   const openDialog = (kind) => { setText(''); setInfoKind('syllabus'); setDialog(kind) }
@@ -93,6 +94,9 @@ export default function ReviewDetail() {
       } else if (dialog === 'escalate') {
         await escalateReview(id, text)
         toast.success('Sent to the Credit Evaluation Office')
+      } else if (form.outcome === 'request_info') {
+        await requestReviewInfo(id, text, form.infoKind)
+        toast.success(form.infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else {
         const payload = {
           decision: form.outcome,
@@ -137,6 +141,7 @@ export default function ReviewDetail() {
   const canSubmit = (() => {
     if (dialog === 'escalate') return true
     if (dialog === 'info') return infoKind === 'syllabus' || text.trim()
+    if (form.outcome === 'request_info') return form.infoKind === 'syllabus' || text.trim()
     if (units?.required && form.outcome !== 'no_credit' && !(Number(form.units) > 0)) return false
     if (form.outcome === 'different_course') return form.courses.length > 0 && text.trim()
     if (form.outcome === 'no_credit') return text.trim()
@@ -365,7 +370,7 @@ export default function ReviewDetail() {
               disabled={!canSubmit}
               variant={dialog === 'decide' ? (form.outcome === 'no_credit' ? 'danger' : 'success') : 'primary'}
             >
-              {dialog === 'decide' ? 'Confirm decision' : dialog === 'escalate' ? 'Send to the office' : 'Send request'}
+              {dialog === 'decide' ? (form.outcome === 'request_info' ? 'Send request' : 'Confirm decision') : dialog === 'escalate' ? 'Send to the office' : 'Send request'}
             </Button>
           </div>
         </div>
@@ -455,34 +460,55 @@ function DecisionForm({ d, form, setForm, text, setText }) {
         })}
       </fieldset>
 
-      {form.outcome === 'different_course' && <BuCoursePicker selected={form.courses} onChange={(courses) => set({ courses })} />}
-      {form.outcome === 'elective' && (
-        <label className="block">
-          <span className="block text-sm font-medium text-gray-700 mb-1.5">Elective (optional)</span>
-          <input value={form.elective} onChange={e => set({ elective: e.target.value })} className={FIELD} placeholder="e.g. CS elective (CAS CS 1XX)" maxLength={120} />
-        </label>
-      )}
-
-      {form.outcome !== 'no_credit' && (
-        units?.required ? (
+      {form.outcome === 'request_info' ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            {[['syllabus', 'Course syllabus'], ['information', 'Other information']].map(([k, label]) => (
+              <button key={k} type="button" onClick={() => set({ infoKind: k })}
+                className={`rounded-lg border px-3 py-2.5 text-left text-[14px] ${form.infoKind === k ? 'border-primary-500 bg-primary-50/60 text-primary-800 font-semibold' : 'border-staff-line text-staff-ink2 hover:bg-staff-sunk'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <label className="block">
-            <span className="block text-sm font-medium text-gray-700 mb-1.5">BU units <span className="text-red-500">*</span></span>
-            <input type="number" min="0.5" max="24" step="0.01" value={form.units} onChange={e => set({ units: e.target.value })} className={`${FIELD} max-w-[10rem]`} />
-            <span className="block text-[12.5px] text-amber-800 mt-1">The transcript does not show credits for {src?.course_code}. Confirm them before awarding units.</span>
+            <span className="block text-sm font-medium text-gray-700 mb-1.5">
+              {form.infoKind === 'syllabus' ? 'Note to the student (optional)' : <>What is needed? <span className="text-red-500">*</span></>}
+            </span>
+            <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
+              placeholder={form.infoKind === 'syllabus' ? 'e.g. Please include the weekly topics and lab hours.' : 'e.g. Please confirm the number of contact hours.'} />
           </label>
-        ) : (
-          <p className="text-[13px] text-staff-ink2">
-            <span className="font-medium text-staff-ink">{defaultUnits} BU units</span>
-            {units?.quarter ? ` (${Number(src?.source_credits)} quarter credits × 2/3)` : ' from the transcript'} · posted with a grade of {d.policy?.transfer_grade || 'T'}
-          </p>
-        )
-      )}
+          <p className="text-[12.5px] text-staff-muted">The student sees the request on this course in their portal. The course returns to you when they answer.</p>
+        </>
+      ) : (
+        <>
+          {form.outcome === 'different_course' && <BuCoursePicker selected={form.courses} onChange={(courses) => set({ courses })} />}
+          {form.outcome === 'elective' && (
+            <label className="block">
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">Elective category <span className="text-staff-muted font-normal">(optional)</span></span>
+              <input value={form.elective} onChange={e => set({ elective: e.target.value })} className={FIELD} placeholder="e.g. Biology elective, CS elective (CAS CS 1XX)" maxLength={120} />
+            </label>
+          )}
 
-      <label className="block">
+          {form.outcome !== 'no_credit' && (
+            <label className="block">
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">Credits (BU units) {units?.required && <span className="text-red-500">*</span>}</span>
+              <input type="number" min="0.5" max="24" step="0.01" value={form.units} onChange={e => set({ units: e.target.value })}
+                placeholder={defaultUnits != null ? String(defaultUnits) : ''} className={`${FIELD} max-w-[10rem]`} />
+              <span className={`block text-[12.5px] mt-1 ${units?.required ? 'text-amber-800' : 'text-staff-muted'}`}>
+                {units?.required
+                  ? `The transcript does not show credits for ${src?.course_code}. Confirm them before awarding units.`
+                  : `${defaultUnits} by default${units?.quarter ? ` (${Number(src?.source_credits)} quarter credits × 2/3)` : ' from the transcript'}; posted with a grade of ${d.policy?.transfer_grade || 'T'}.`}
+              </span>
+            </label>
+          )}
+
+          <label className="block">
         <span className="block text-sm font-medium text-gray-700 mb-1.5">Reason {needsReason ? <span className="text-red-500">*</span> : <span className="text-staff-muted font-normal">(optional)</span>}</span>
         <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
           placeholder={form.outcome === 'no_credit' ? 'e.g. Content does not cover the data structures required for CAS CS 112.' : form.outcome === 'different_course' ? 'e.g. The syllabus covers discrete mathematics, not programming.' : 'Anything the next evaluator should know.'} />
-      </label>
+          </label>
+        </>
+      )}
     </>
   )
 }
@@ -544,6 +570,18 @@ function CourseBox({ label, code, title, meta, emphasis = false }) {
 
 function StatusBanner({ d }) {
   const { review: r, decision, info_request: info, syllabus } = d
+  if (r.returned_reason && OPEN.includes(r.status)) {
+    return (
+      <div className="flex gap-3 rounded-xl px-5 py-4 mb-6 border bg-amber-50 border-amber-300">
+        <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+        <div className="text-[14px]">
+          <p className="font-semibold text-staff-ink">Returned by the Credit Evaluation Office {formatDate(r.returned_at)}</p>
+          <p className="text-staff-ink2">{r.returned_reason}</p>
+          <p className="text-staff-muted mt-1">Review the course again and record your decision.</p>
+        </div>
+      </div>
+    )
+  }
   if (decision && ['approved', 'rejected'].includes(r.status)) {
     const approved = decision.outcome !== 'no_credit'
     return (

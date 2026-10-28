@@ -34,7 +34,8 @@ client.interceptors.response.use(
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('transfer_user')
       // Redirect to login only if not already there
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/status')) {
+      const publicPage = ['/login', '/status', '/track', '/apply'].some(p => window.location.pathname.startsWith(p)) || window.location.pathname === '/'
+      if (!publicPage) {
         window.location.href = '/login'
       }
     }

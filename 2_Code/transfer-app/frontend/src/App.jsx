@@ -7,8 +7,9 @@ import Layout from './components/layout/Layout'
 
 import Home from './pages/Home'
 import EligibilityCheck from './pages/student/EligibilityCheck'
-import ApplicationForm from './pages/student/ApplicationForm'
-import ApplicationConfirmation from './pages/student/ApplicationConfirmation'
+import EligibilityApplication from './pages/applicant/EligibilityApplication'
+import ApplicationSubmitted from './pages/applicant/ApplicationSubmitted'
+import TrackApplication from './pages/applicant/TrackApplication'
 import ApplicationStatus from './pages/student/ApplicationStatus'
 import Login from './pages/auth/Login'
 import EvaluatorDashboard from './pages/evaluator/Dashboard'
@@ -23,10 +24,12 @@ import MyDashboard from './pages/evaluator/MyDashboard'
 import MyEvaluations from './pages/evaluator/MyEvaluations'
 import MyProfile from './pages/evaluator/MyProfile'
 import ReviewDetail from './pages/evaluator/ReviewDetail'
+import ApplicationLookup from './pages/evaluator/ApplicationLookup'
 import Reports from './pages/admin/Reports'
 import Conflicts from './pages/admin/Conflicts'
 import NotFound from './pages/NotFound'
 import SelfCheck from './pages/student/SelfCheck'
+import StudentPortal from './pages/student/StudentPortal'
 import OfficeDashboard from './pages/office/OfficeDashboard'
 import OfficeApplication from './pages/office/OfficeApplication'
 
@@ -43,13 +46,19 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public routes */}
+        {/* Public applicant routes: no account needed */}
         <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/apply" element={<Layout><ApplicationForm /></Layout>} />
-        <Route path="/apply/confirm" element={<Layout><ApplicationConfirmation /></Layout>} />
+        <Route path="/apply" element={<Layout><EligibilityApplication /></Layout>} />
+        <Route path="/apply/submitted" element={<Layout><ApplicationSubmitted /></Layout>} />
+        <Route path="/apply/confirm" element={<Navigate to="/track" replace />} />
+        <Route path="/track" element={<Layout><TrackApplication /></Layout>} />
         <Route path="/status/:token" element={<Layout><ApplicationStatus /></Layout>} />
         <Route path="/eligibility" element={<Layout><EligibilityCheck /></Layout>} />
         <Route path="/self-check" element={<Layout><SelfCheck /></Layout>} />
+
+        {/* Student portal: applications of student accounts created before applicant-first intake */}
+        <Route path="/student" element={<ProtectedRoute allowedRoles={['student']}><Layout><StudentPortal /></Layout></ProtectedRoute>} />
+        <Route path="/student/applications/:token" element={<ProtectedRoute allowedRoles={['student']}><Layout><ApplicationStatus /></Layout></ProtectedRoute>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
 
         {/* Evaluator workspace; admins who land on /evaluator go to the admin applications list */}
@@ -77,6 +86,17 @@ export default function App() {
             <ProtectedRoute allowedRoles={['evaluator']}>
               <Layout>
                 <ReviewDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        {/* Application Lookup: where an application is and who has it (evaluators are scoped by the API) */}
+        <Route
+          path="/evaluator/lookup"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator', 'admin', 'credit_office']}>
+              <Layout>
+                <ApplicationLookup />
               </Layout>
             </ProtectedRoute>
           }

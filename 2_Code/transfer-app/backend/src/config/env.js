@@ -45,6 +45,16 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().optional().default('noreply@transferapp.edu'),
+  EMAIL_FROM_NAME: z.string().optional().default('BU Transfer Credit Evaluation'),
+  // smtp (any SMTP relay: Azure Communication Services, SendGrid, Microsoft 365, Gmail) or log (development:
+  // the email is written to the server log, and to EMAIL_OUTBOX_DIR as .html when set). Default: smtp when
+  // SMTP_HOST/USER/PASS are set, otherwise log.
+  EMAIL_PROVIDER: z.enum(['smtp', 'log']).optional(),
+  EMAIL_OUTBOX_DIR: z.string().optional().transform(v => v || undefined),
+  // Reserved/test domains are never emailed (synthetic demo applicants use them)
+  EMAIL_SUPPRESS_DOMAINS: z.string().optional().default('example.org,example.com,example.net,test,invalid,local,localhost'),
+  // Public application lookups (track, existing-application check) per IP per 15 minutes
+  TRACK_RATE_LIMIT_MAX: z.coerce.number().int().positive().optional().default(30),
 
   // App
   APP_URL: z.string().url().optional().default('http://localhost:5173'),

@@ -370,9 +370,9 @@ The problem statement does not define these. Each one is isolated in `policy.js`
 
 ## 8. Deploying
 
-1. Run `supabase/migrations/009_credit_lifecycle.sql` in the Supabase SQL editor. It only adds to the schema.
+1. Run `supabase/migrations/009_credit_lifecycle.sql`, then `010_final_review.sql`, then `011_applicant_experience.sql`, in the Supabase SQL editor. All three only add to the schema.
 2. Merge and push. The GitHub Actions workflow builds and deploys as before.
-3. As an administrator, import the staff roster again on the Evaluators page. This creates the Credit Evaluation Office account; existing accounts keep their passwords.
+3. As an administrator, import the staff roster again on the Evaluators page. This creates the Credit Evaluation Office account and the demo student account (`maya.ortiz@students.example.org`, linked to her sample application); existing accounts keep their passwords.
 4. As an administrator or the Credit Office, open the Credit Office dashboard and click **Process existing applications** once. Established equivalencies are applied to applications evaluated earlier, and unopened reviews of those courses are withdrawn.
 5. Optional: run `supabase/seed/synthetic_audit_scenarios.sql`, then click **Run evaluation** on APP-2026-9101 to 9111 to demonstrate the edge cases.
 
@@ -402,3 +402,141 @@ These can't be solved from the supplied requirements and data:
   - R9, substitutions.
   
   They concern degree audit, not transfer posting.
+
+---
+
+## 10. Second round: the student journey and the Credit Office final review
+
+Added on branch `feature/student-journey`. It makes the whole story run in one connected flow, from the landing page to the student seeing their awarded credits. `END_TO_END_TRANSFER_CREDIT_DEMO.md` walks through it.
+
+### What changed
+
+| Area | Change |
+|---|---|
+| Landing page | **Start Transfer Credit Evaluation** is the main action. *Track your application* now points to the student portal. |
+| Sign-in | One split-layout sign-in page (BU red panel, form on the right) for every role; the account's role decides where each person lands. Students can create an account there. |
+| Student accounts | `POST /api/auth/register` creates a `student` account and signs it in. Staff accounts are still created only by administrators. |
+| Application | Four steps: student information (from the account), academic information, documents, review and submit. Unnecessary fields were removed: address, personal statement, ID. |
+| Draft, upload, submit | The application is saved as a draft; transcripts (one per college, required) and supporting documents (optional) are attached and read on upload; **Submit** (`POST /api/student/applications/:token/submit`) refuses a draft without a transcript, then starts processing. This fixes an old race where evaluation could start before the transcript arrived. Unfinished drafts can be resumed. |
+| Student portal | `/student` lists the student's own applications with database counts: courses, evaluated, pending, action needed, credits awarded (`GET /api/student/me/applications`). Each application opens its status page with the per-course results. |
+| Status page | Progress: Submitted → Documents Processed → Course Evaluation → Evaluator Review → Final Review → Completed. "We're reviewing your academic documents" while processing; a notice if the transcript couldn't be read (the Credit Office is notified). |
+| Evaluator | Decision options now include **Request more information**. Credits can be adjusted for any awarded outcome. Elective credit has a category. A **Returned by the Credit Evaluation Office** banner appears on a returned course. The dashboard adds workload and the number of open courses with a potential conflict. My Evaluations shows the assignment context. The transcript drawer also lists supporting documents. |
+| Credit Evaluation Office final review | Each decided course shows *Awaiting final review* with who decided it. **Return** sends one decision back (`POST /api/office/courses/:id/return`, reason required): the decision is removed (kept in the audit trail, its precedent revoked) and the course reopens for its evaluator, or for an assigned evaluator if it was settled automatically. **Finalize and post** posts the reviewed courses. The dashboard adds an *Escalations* list. Posted courses cannot be returned. |
+| Students and staff isolated | Students reach only their own applications; every staff API refuses them, and the student API refuses staff. |
+
+### Database
+
+Migration `010_final_review.sql` adds `course_reviews.returned_reason` and `returned_at`.
+
+The roster adds a `students` list: one synthetic demo student, linked to her existing application by email.
+
+### What the Credit Office can and cannot do
+
+- **The office can return a decision; it cannot modify the academic outcome itself.** The problem statement says academic departments make the final decision, so the office's review step is to accept a decision for posting or return it to the evaluator.
+- **"Request information" stays with the evaluator,** who owns the course. The office follows up on unreadable transcripts outside the app.
+
+### Tests
+
+| Suite | Result |
+|---|---|
+| Student journey (new, 25 checks) | **25/25**. Covers registration, draft rules, upload of the STU-001 transcripts, 6 courses extracted across 2 colleges, 3 established equivalencies applied, 3 courses assigned, student isolation, syllabus request and response, decisions and hand-offs, office return of an evaluator decision and of an auto-settled course, re-decision, posting with grade T, and the student's final view. |
+| Lifecycle | 67/67 |
+| Roles | 22/22 |
+| Review workflow | 20/20 |
+| Knowledge | 16/16 |
+| Course matching (`credit:eval`) | 76/76 |
+| Frontend production build | Passes |
+
+### Still not covered
+
+- **No manual course entry.** Transcripts must be PDFs with a text layer in the sample layout, unless the Foundry agent is configured. Otherwise the transcript is stored, the student is told, and the office is notified.
+- **No real MyBU Student connection.** "Posted" is shown on the student's status page.
+- **Email:** sending depends on the deployment's email settings; notifications are always stored and shown in the app.
+
+## 11. Third round: applicant-first intake, tracking and email updates
+
+The full walkthrough, routes, rules and assumptions are in `END_TO_END_TRANSFER_CREDIT_DEMO.md`.
+
+### What changed
+- **No applicant account.**
+  - **Start Transfer Credit Eligibility** opens a four-step application (`/apply`): Applicant Information, Academic Documents, Additional Information, Review & Submit.
+  - It reuses the existing draft → upload → submit pipeline.
+  - Applicants track with application number + email at `/track`.
+- **Duplicate emails.**
+  - A masked existing-application panel offers Track Existing Application, Email me my application number, or Submit Another Application.
+  - A second application while one is active is flagged for the Credit Evaluation Office (existing duplicate workflow).
+  - Duplicate detection now ignores finished applications.
+- **Applicant notifications.**
+  - One service (`notifications/applicant-notification.service.js`) with separate templates and a retrying email outbox on the `notifications` table.
+  - The transport is configured by environment (`smtp` or development `log`).
+  - Only applicant-visible stages are emailed.
+- **Tracking page.**
+  - Server-computed six-stage progress from the status history (audit `status_changed` rows).
+  - Course table with status, transfer result, credit type and units; final outcome summary.
+  - No internal data. Evaluator reasons for "no credit" are no longer shown to applicants.
+- **Staff.**
+  - The sign-in page is staff-only ("Welcome back") and self-registration was removed.
+  - The Credit Office page shows the applicant's comments and every applicant update with its email delivery status.
+
+### Database
+Migration `011_applicant_experience.sql` adds:
+- `applications.applicant_comments`;
+- email delivery columns on `notifications`: `email_status`, `email_attempts`, `email_error`, `email_next_attempt_at`, `emailed_at`;
+- indexes.
+
+### Configuration
+- `APP_URL`: used for the Track Application links in emails.
+- SMTP variables, to send real email; without them, emails are logged.
+- Optional: `EMAIL_PROVIDER`, `EMAIL_FROM_NAME`, `EMAIL_SUPPRESS_DOMAINS`, `EMAIL_OUTBOX_DIR`, `TRACK_RATE_LIMIT_MAX`.
+
+### Demo data
+`npm run db:seed:applicants` advances four sample applications to:
+- an existing application;
+- additional information required;
+- mixed outcomes;
+- completed.
+
+## 12. Fourth round: review ownership and Application Lookup
+
+**Goal:** staff can see where an application is pending and who owns each course, without opening the database.
+
+### Ownership model (no new tables)
+- **Current owner of a course:** its `course_reviews` row:
+  - `evaluator_id`, `status`, `assigned_at`;
+  - `assignment_reason` and `assignment_context`;
+  - `queue`, where `credit_office` with no evaluator means unassigned.
+- **Assignment history:** `review_assignments` already keeps every assignment. The open row is the current one; reassignments close the old row and add a new one.
+- **Derived view:** `workflow/ownership.service.js` works out, per application:
+  - the operational **stage**: Processing, Unassigned, Reassignment Required, Pending Evaluator Review, In Review, Waiting for Applicant, Credit Office Review, Completed, Closed, Needs Attention;
+  - the current owner(s) and the courses blocking completion;
+  - every course with its evaluator and department;
+  - the assignment history (Assigned, Reassigned, Routed to / Returned to Credit Evaluation Office, Review completed).
+- **Reassignment Required:** an open review whose evaluator is inactive or marked unavailable.
+
+### API (existing endpoints extended)
+- `GET /api/applications`:
+  - each row carries `stage`, `current_owner_name`, `current_owner_department`, `owners_count`, `pending_course`, `pending_since`, `unassigned_reviews`;
+  - new filters: `stage` (including `needs_attention`), `owner_id`, `department`, `min_age_days`; sorting by `pending_since`;
+  - for the Credit Office and admins, `stats.ownership` returns counts by stage, needs-attention and unassigned-review counts, and the filter options.
+  - Evaluators keep the existing scope: only applications with a course assigned to them.
+- `GET /api/applications/:id` and `GET /api/office/applications/:id` now include `ownership`.
+- `GET /api/office/overview`: the unassigned queue also lists courses whose evaluator is unavailable, each with a reason category (No subject specialist, Evaluator unavailable, Returned for another review, Established equivalency needs confirmation, Unknown course, Manual assignment required).
+
+### UI
+- **Credit Office / admin Applications queue:**
+  - stage chips with counts;
+  - Needs attention and Unassigned reviews indicators;
+  - evaluator, department and age filters;
+  - columns: Application, Applicant, Status, Current evaluator (+N more, pending course), Department, Pending since, Age.
+- **Current Review Assignment panel** on the Credit Office application page and the evaluation report page. It shows:
+  - Where is it / Currently with / Blocking completion;
+  - assigned evaluator, department, assigned time, pending duration and assignment context;
+  - a course and evaluator table;
+  - the assignment history.
+- **Application Lookup** (`/evaluator/lookup`, evaluator menu): server-side search by application number, partial applicant name or email. Results show stage, current evaluator, department and pending since, and open the existing details page.
+- **My Evaluations:** each row shows when it was assigned and how long it has been waiting.
+- The Credit Office dashboard's **Unassigned reviews** list shows the reason for each course.
+
+**Age** is operational information, not an SLA; no SLA is defined.
+
+**Applicants see none of this.** The public tracking response has no evaluator names, emails, assignments or history.

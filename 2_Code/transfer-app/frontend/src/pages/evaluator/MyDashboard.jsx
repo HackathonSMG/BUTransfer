@@ -32,6 +32,7 @@ export default function MyDashboard() {
   if (state.error) return <div className="staff-card"><EmptyState title="Your dashboard could not be loaded" description={state.error} action={load} actionLabel="Try Again" /></div>
 
   const { counts: c, up_next: attention, recent_activity: activity } = state.data
+  const d = state.data
   const firstName = (user?.full_name || '').replace(/^(Dr|Prof)\.?\s+/i, '').split(' ')[0]
   const today = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date())
 
@@ -43,10 +44,15 @@ export default function MyDashboard() {
         subtitle={c.open > 0 ? `${plural(c.open, 'course')} ${c.open === 1 ? 'needs' : 'need'} your review.` : "You're all caught up."}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <Metric label="New" value={c.new} detail={c.upcoming ? `${c.upcoming} more coming after other reviews` : 'Assigned, not yet opened'} to="/evaluator/my-evaluations?status=new" accent={c.new > 0} />
         <Metric label="In progress" value={c.in_progress + c.info_requested} detail={c.info_requested ? `${c.info_requested} waiting on the student` : 'Opened and under review'} to="/evaluator/my-evaluations?status=in_progress" />
         <Metric label="Completed" value={c.completed} detail={`${c.completed_this_month} this month`} to="/evaluator/my-evaluations?status=completed" />
+        <Metric
+          label="Workload"
+          value={d.profile?.max_concurrent_cases ? `${c.open} / ${d.profile.max_concurrent_cases}` : c.open}
+          detail={c.conflicts ? `${plural(c.conflicts, 'course')} with a potential equivalency conflict` : 'No potential equivalency conflicts'}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-6 items-start">

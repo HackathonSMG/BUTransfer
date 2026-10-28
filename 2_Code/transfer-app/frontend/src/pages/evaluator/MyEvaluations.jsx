@@ -7,6 +7,7 @@ import PageHeader from '../../components/staff/PageHeader'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { REVIEW_STATUS, matchLabelClass, matchDisplay } from '../../lib/reviews'
+import { pendingFor, formatDateTime } from '../../lib/staffFormat'
 
 const TABS = [
   ['open', 'Open'],
@@ -126,6 +127,9 @@ export default function MyEvaluations() {
                           : <span className="text-staff-muted italic">to be determined</span>}
                       </span>
                       <span className="block text-[12.5px] text-staff-muted truncate">{r.institution}</span>
+                      {r.returned_reason && r.status === 'new'
+                        ? <span className="block text-[12px] text-amber-800 truncate">Returned by the Credit Evaluation Office: {r.returned_reason}</span>
+                        : r.assignment_reason && <span className="block text-[12px] text-staff-muted truncate" title={r.assignment_reason}>{r.assignment_reason}</span>}
                     </span>
                     <span className="hidden md:block">
                       {r.match_label ? (
@@ -138,6 +142,11 @@ export default function MyEvaluations() {
                     <span className="flex flex-col items-end md:items-start gap-1">
                       <StatusPill tone={status.tone}>{status.label}</StatusPill>
                       {r.priority === 'high' && <span className="text-[11.5px] font-semibold text-red-700">High priority</span>}
+                      {r.assigned_at && (
+                        <span className="text-[11.5px] text-staff-muted whitespace-nowrap" title={`Assigned ${formatDateTime(r.assigned_at)}`}>
+                          Assigned {formatDateTime(r.assigned_at).split(',')[0]}{!['approved', 'rejected'].includes(r.status) && ` · waiting ${pendingFor(r.assigned_at)}`}
+                        </span>
+                      )}
                     </span>
                     <ChevronRight className="hidden md:block w-4 h-4 text-staff-muted" />
                   </Link>

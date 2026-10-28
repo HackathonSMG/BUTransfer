@@ -11,6 +11,11 @@ const listQuerySchema = z.object({
   source: z.string().optional(),
   search: z.string().optional(),
   assigned_evaluator_id: z.string().uuid().optional(),
+  // Ownership (ownership.service): operational stage, an evaluator / department holding an open course, minimum age
+  stage: z.string().max(40).optional(),
+  owner_id: z.string().uuid().optional(),
+  department: z.string().max(200).optional(),
+  min_age_days: z.coerce.number().int().min(1).max(365).optional(),
   date_from: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional(),
   date_to: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -53,13 +58,17 @@ export async function listApplications(req, res, next) {
   try {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) return next(badRequest('Invalid query parameters'));
-    const { status, source, search, assigned_evaluator_id, date_from, date_to, page, limit, sort, order } = parseResult.data;
+    const { status, source, search, assigned_evaluator_id, date_from, date_to, stage, owner_id, department, min_age_days, page, limit, sort, order } = parseResult.data;
+    // Evaluators (Application Lookup) see only applications with a course assigned to them, as on the details page
     const reviewerId = req.user.role === 'evaluator' ? req.user.id : undefined;
-    const [result, stats] = await Promise.all([
-      applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, reviewerId, dateFrom: date_from, dateTo: date_to, page, limit, sort, order }),
+    const [result, stats, ownership] = await Promise.all([
+      applicationService.listApplications({ status, source, search, assignedEvaluatorId: assigned_evaluator_id, reviewerId, dateFrom: date_from, dateTo: date_to,
+        stage, ownerId: owner_id, department, minAgeDays: min_age_days, page, limit, sort, order }),
       applicationService.getApplicationStats(),
+      reviewerId ? null : applicationService.getOwnershipStats(),
     ]);
-    return res.status(200).json({ data: result.applications, meta: { total: result.total, page: result.page, limit: result.limit, pages: result.pages }, stats });
+    return res.status(200).json({ data: result.applications, meta: { total: result.total, page: result.page, limit: result.limit, pages: result.pages },
+      stats: { ...stats, ...(ownership && { ownership }) } });
   } catch (err) { return next(err); }
 }
 

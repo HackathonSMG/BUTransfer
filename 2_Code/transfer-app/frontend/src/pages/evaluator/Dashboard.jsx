@@ -1,42 +1,32 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ClipboardList, FilePlus, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ClipboardList, FilePlus, SlidersHorizontal, AlertTriangle, UserX } from 'lucide-react'
 import { listApplications } from '../../api/applications'
 import ApplicationFilters from '../../components/evaluator/ApplicationFilters'
-import StatusPill from '../../components/staff/StatusPill'
 import PageHeader from '../../components/staff/PageHeader'
 import Pagination from '../../components/ui/Pagination'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import Button from '../../components/ui/Button'
+import { OwnershipTable } from './ApplicationLookup'
 
-const SOURCE_LABELS = {
-  website: 'Web portal',
-  web: 'Web portal',
-  email: 'Email',
-  evaluator_submitted: 'Raised by staff',
-  evaluator: 'Raised by staff'
-}
-
-// Status chips in workflow order; empty ones are hidden
-const STATUS_CHIPS = [
-  ['submitted', 'Submitted'],
-  ['under_evaluation', 'Being evaluated'],
-  ['validation_failed', 'Validation failed'],
-  ['information_required', 'Waiting on student'],
-  ['evaluation_completed', 'Ready for review'],
-  ['under_evaluator_review', 'In evaluator review'],
-  ['approved', 'Approved'],
-  ['rejected', 'Rejected'],
+// Where applications are (ownership.service stages), in workflow order; empty ones are hidden
+const STAGE_CHIPS = [
+  ['unassigned', 'Unassigned'],
+  ['reassignment_required', 'Reassignment required'],
+  ['processing', 'Processing'],
+  ['pending_review', 'Pending evaluator review'],
+  ['in_review', 'In review'],
+  ['waiting_for_applicant', 'Waiting for applicant'],
+  ['credit_office_review', 'Credit Office review'],
+  ['completed', 'Completed'],
   ['closed', 'Closed']
 ]
 
-const DEFAULT_FILTERS = { page: 1, limit: 20 }
+// Operational age of the pending review (not an SLA)
+const AGE_OPTIONS = [['', 'Any age'], ['1', 'Pending 1+ day'], ['3', 'Pending 3+ days'], ['7', 'Pending 7+ days'], ['14', 'Pending 14+ days']]
 
-function formatDate(d) {
-  if (!d) return '—'
-  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(d))
-}
+const DEFAULT_FILTERS = { page: 1, limit: 20 }
 
 // Drops empty filters and turns the "column:direction" sort value into the API's sort + order params
 function toQuery(filters) {
@@ -88,9 +78,12 @@ export default function ApplicationsList() {
   const total = state.data?.meta?.total || state.data?.total || 0
   const totalPages = Math.ceil(total / (filters.limit || DEFAULT_FILTERS.limit))
   const stats = state.data?.stats
-  const byStatus = stats?.by_status || {}
-  const setStatus = (status) => setFilters(f => ({ ...f, page: 1, status }))
-  const extraFilters = ['search', 'source', 'sort', 'date_from', 'date_to'].filter(k => filters[k]).length
+  const own = stats?.ownership
+  const byStage = own?.by_stage || {}
+  const setStage = (stage) => setFilters(f => ({ ...f, page: 1, stage, status: '' }))
+  const setFilter = (key, value) => setFilters(f => ({ ...f, page: 1, [key]: value }))
+  const extraFilters = ['search', 'source', 'sort', 'date_from', 'date_to', 'status'].filter(k => filters[k]).length
+  const selectClass = 'px-3 py-1.5 text-[14px] border border-staff-line rounded-lg bg-white text-staff-ink2 focus:outline-none focus:border-primary-500'
 
   return (
     <div className="space-y-6">
@@ -105,11 +98,28 @@ export default function ApplicationsList() {
         }
       />
 
-      {/* Status chips */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
-        <Chip active={!filters.status} onClick={() => setStatus('')} label="All" count={stats?.total} />
-        {STATUS_CHIPS.filter(([s]) => byStatus[s] || filters.status === s).map(([s, label]) => (
-          <Chip key={s} active={filters.status === s} onClick={() => setStatus(filters.status === s ? '' : s)} label={label} count={byStatus[s] || 0} />
+      {/* Operational indicators: where intervention is needed */}
+      {own && (own.needs_attention > 0 || own.unassigned_reviews > 0) && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <button type="button" onClick={() => setStage('needs_attention')} className="staff-card px-5 py-3.5 flex items-center gap-3 text-left hover:border-rose-300">
+            <AlertTriangle className="w-5 h-5 text-rose-700" />
+            <span><span className="block text-[13px] text-staff-ink2">Needs attention</span><span className="block text-[20px] font-semibold text-staff-ink tabular-nums">{own.needs_attention}</span></span>
+            <span className="ml-auto text-[12.5px] text-staff-muted">Unassigned, unavailable evaluator, failed processing or possible duplicate</span>
+          </button>
+          <button type="button" onClick={() => setStage('unassigned')} className="staff-card px-5 py-3.5 flex items-center gap-3 text-left hover:border-rose-300">
+            <UserX className="w-5 h-5 text-rose-700" />
+            <span><span className="block text-[13px] text-staff-ink2">Unassigned reviews</span><span className="block text-[20px] font-semibold text-staff-ink tabular-nums">{own.unassigned_reviews}</span></span>
+            <span className="ml-auto text-[12.5px] text-staff-muted">Courses waiting for an evaluator</span>
+          </button>
+        </div>
+      )}
+
+      {/* Stage chips */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by where the application is">
+        <Chip active={!filters.stage && !filters.status} onClick={() => setStage('')} label="All" count={stats?.total} />
+        {own?.needs_attention > 0 && <Chip active={filters.stage === 'needs_attention'} onClick={() => setStage(filters.stage === 'needs_attention' ? '' : 'needs_attention')} label="Needs attention" count={own.needs_attention} />}
+        {STAGE_CHIPS.filter(([s]) => byStage[s] || filters.stage === s).map(([s, label]) => (
+          <Chip key={s} active={filters.stage === s} onClick={() => setStage(filters.stage === s ? '' : s)} label={label} count={byStage[s] || 0} />
         ))}
         <button
           type="button"
@@ -120,6 +130,24 @@ export default function ApplicationsList() {
           <SlidersHorizontal className="w-4 h-4" />
           More filters{extraFilters ? ` (${extraFilters})` : ''}
         </button>
+      </div>
+
+      {/* Who has it */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Evaluator" value={filters.owner_id || ''} onChange={e => setFilter('owner_id', e.target.value)} className={selectClass}>
+          <option value="">Any evaluator</option>
+          {(own?.owners || []).map(o => <option key={o.id} value={o.id}>{o.name}{o.department ? ` (${o.department})` : ''}</option>)}
+        </select>
+        <select aria-label="Department" value={filters.department || ''} onChange={e => setFilter('department', e.target.value)} className={selectClass}>
+          <option value="">Any department</option>
+          {(own?.departments || []).map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select aria-label="Age" value={filters.min_age_days || ''} onChange={e => setFilter('min_age_days', e.target.value)} className={selectClass}>
+          {AGE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        {(filters.owner_id || filters.department || filters.min_age_days) && (
+          <button type="button" onClick={() => setFilters(f => ({ ...f, page: 1, owner_id: '', department: '', min_age_days: '' }))} className="text-[13px] font-medium text-primary-700 hover:underline px-1">Clear</button>
+        )}
       </div>
 
       <section className="staff-card overflow-hidden">
@@ -143,40 +171,7 @@ export default function ApplicationsList() {
           />
         ) : (
           <>
-            <ul className="divide-y divide-staff-line2">
-              <li className="hidden md:grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_11rem_8rem_1rem] gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
-                <span>Student</span><span>Transfer</span><span>Status</span><span>Submitted</span><span />
-              </li>
-              {apps.map(app => (
-                <li key={app.id}>
-                  <Link
-                    to={`/office/applications/${app.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_11rem_8rem_1rem] gap-x-4 gap-y-1.5 items-center px-6 py-4 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[15px] font-medium text-staff-ink truncate">
-                        {app.student_name || `${app.first_name || ''} ${app.last_name || ''}`.trim()}
-                      </span>
-                      <span className="block text-[12.5px] text-staff-muted">
-                        <span className="font-mono">{app.reference_number || `#${app.id}`}</span>
-                        {app.source && <span> · {SOURCE_LABELS[app.source] || app.source}</span>}
-                      </span>
-                    </span>
-                    <span className="min-w-0 order-3 md:order-none col-span-2 md:col-span-1 text-[14px]">
-                      <span className="block text-staff-ink truncate">{app.transfer_to_program || app.program || '—'}</span>
-                      <span className="block text-[12.5px] text-staff-muted truncate">from {app.transfer_from_institution || app.from_institution || '—'}</span>
-                    </span>
-                    <span className="flex flex-col items-end md:items-start gap-1">
-                      <StatusPill status={app.status} />
-                      {app.duplicate_status === 'suspected' && <StatusPill tone="warn">Possible duplicate</StatusPill>}
-                      {app.evaluator_name && <span className="text-[12px] text-staff-muted truncate max-w-[11rem]">{app.evaluator_name}</span>}
-                    </span>
-                    <span className="hidden md:block text-[13px] text-staff-ink2 whitespace-nowrap">{formatDate(app.submitted_at || app.created_at)}</span>
-                    <ChevronRight className="hidden md:block w-4 h-4 text-staff-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <OwnershipTable rows={apps} detailsPath={id => `/office/applications/${id}`} showAge />
 
             {totalPages > 1 && (
               <div className="border-t border-staff-line2 px-6 py-4 flex flex-wrap gap-3 items-center justify-between">

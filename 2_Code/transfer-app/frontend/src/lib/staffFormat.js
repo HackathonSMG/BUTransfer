@@ -51,9 +51,29 @@ const ACTIVITY_LABELS = {
   evaluator_availability_changed: 'Evaluator availability changed',
   ready_for_posting: 'Ready for posting',
   assignment_needed: 'Course needs an evaluator',
-  information_received: 'Student answered a request'
+  information_received: 'Student answered a request',
+  decision_returned: 'Decision returned by the Credit Evaluation Office',
+  transcript_unreadable: 'Transcript could not be read',
+  student_registered: 'Student account created',
+  existing_applications_processed: 'Existing applications processed'
 }
 
 export function activityLabel(action) {
   return ACTIVITY_LABELS[action] || String(action).replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
+}
+
+// How long something has been waiting, e.g. "2h 18m", "3d 4h" (operational information, not an SLA)
+export function pendingFor(since, now = new Date()) {
+  if (!since) return '—'
+  const mins = Math.max(0, Math.floor((now - new Date(since)) / 60000))
+  if (mins < 60) return `${mins}m`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ${mins % 60}m`
+  const days = Math.floor(hours / 24)
+  return `${days}d ${hours % 24}h`
+}
+
+export function formatDateTime(d) {
+  if (!d) return '—'
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(d))
 }

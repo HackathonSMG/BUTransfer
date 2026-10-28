@@ -2,6 +2,7 @@ import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import Spinner from '../ui/Spinner'
+import { homeFor } from '../../lib/homeFor'
 
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const { isAuthenticated, user, loading } = useAuth()
@@ -15,7 +16,7 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={`/login?next=${encodeURIComponent(window.location.pathname)}`} replace />
   }
 
   if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
@@ -30,7 +31,7 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
             You do not have permission to access this page.
           </p>
           <a
-            href={user.role === 'admin' ? '/admin' : user.role === 'credit_office' ? '/office' : user.role === 'evaluator' ? '/evaluator' : '/'}
+            href={homeFor(user.role)}
             className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
           >
             Back to my dashboard

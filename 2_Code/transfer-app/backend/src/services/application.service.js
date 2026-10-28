@@ -1,19 +1,26 @@
-﻿import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/db.js';
 import { generateReferenceNumber } from '../utils/reference-number.js';
 import { log as auditLog } from './audit.service.js';
 import * as notificationService from './notification.service.js';
+import { notifyApplicant, onStatusChange } from './notifications/applicant-notification.service.js';
 import * as eligibilityService from './eligibility.service.js';
 import * as creditService from './credit/credit.service.js';
 import { ENGINE_VERSION } from './credit/engine.js';
 import { recommendationOf } from './credit/memory.service.js';
 import * as assignmentService from './workflow/assignment.service.js';
 import * as lifecycle from './workflow/lifecycle.service.js';
+import { OWNERSHIP_FROM, ATTENTION_STAGES, ownershipView } from './workflow/ownership.service.js';
 import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
 
-export async function createApplication(data, source = 'website', createdBy = null) {
+/**
+ * Creates an application. With { draft: true } it stays a draft so the student can attach documents first;
+ * submitApplication then submits it and starts the evaluation. Without it (staff intake, email intake) the
+ * application is submitted and evaluated straight away, as before.
+ */
+export async function createApplication(data, source = 'website', createdBy = null, { draft = false } = {}) {
   const referenceNumber = await generateReferenceNumber();
   const secureToken = uuidv4();
 
@@ -23,37 +30,74 @@ export async function createApplication(data, source = 'website', createdBy = nu
        student_phone, date_of_birth, transfer_from_institution, transfer_from_program,
        transfer_to_program, transfer_to_department, expected_start_term,
        academic_history, personal_statement, additional_info, secure_token,
-       created_by, student_profile_id, policy_version
-     ) VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+       created_by, student_profile_id, policy_version, applicant_comments
+     ) VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      RETURNING *`,
     [referenceNumber, source, data.student_name, data.student_email, data.student_phone || null,
      data.date_of_birth || null, data.transfer_from_institution, data.transfer_from_program || null,
      data.transfer_to_program, data.transfer_to_department || null, data.expected_start_term || null,
      JSON.stringify(data.academic_history || {}), data.personal_statement || null,
      JSON.stringify(data.additional_info || {}), secureToken, createdBy,
-     data.student_profile_id || null, '1.0']
+     data.student_profile_id || null, '1.0', data.applicant_comments || null]
   );
 
   const application = result.rows[0];
+  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source } });
+  if (draft) return application;
+  return finishSubmission(application, createdBy, source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
+}
 
-  // Staff-raised applications are filed on the student's behalf, so they're submitted straight away too
-  await updateApplicationStatus(application.id, 'submitted', createdBy,
-    source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
+async function finishSubmission(application, actorId, reason) {
+  await updateApplicationStatus(application.id, 'submitted', actorId, reason);
   application.status = 'submitted';
-
-  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: application.status }, details: { source } });
-  await notificationService.applicationSubmitted(application);
+  // Confirmation to the applicant (in-app + email); a failed email never fails the submission
+  await notifyApplicant(application.id, 'application_received');
   // Flag (never block or delete) a second open application from the same student
   await lifecycle.detectDuplicate(application.id).catch((err) => console.error('[Duplicate] Check failed:', err.message));
 
-  // Auto-trigger AI evaluation in the background so evaluators see results immediately
+  // Document processing and course evaluation run in the background
   setImmediate(() => {
-    triggerEvaluation(application.id, createdBy).catch((err) => {
-      console.error(`[AI] Auto-trigger failed for application ${application.reference_number}:`, err.message);
+    triggerEvaluation(application.id, actorId).catch((err) => {
+      console.error(`[Evaluation] Could not start for application ${application.reference_number}:`, err.message);
     });
   });
-
   return application;
+}
+
+/**
+ * Submits a draft once its documents are attached: at least one transcript is required. The transcript has
+ * already been read (courses extracted) on upload, so the evaluation that starts here sees every course.
+ */
+export async function submitApplication(applicationId, actorId = null, { applicantComments } = {}) {
+  const { rows: [application] } = await query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
+  if (!application) throw notFound('Application');
+  if (application.status !== 'draft') throw badRequest('This application has already been submitted.');
+  const { rows: [docs] } = await query(
+    `SELECT COUNT(*) FILTER (WHERE document_type = 'transcript')::int AS transcripts FROM application_documents WHERE application_id = $1`, [applicationId]);
+  if (!docs.transcripts) throw badRequest('Upload your official transcript before submitting.');
+  if (applicantComments !== undefined) {
+    const text = String(applicantComments || '').trim() || null;
+    await query(`UPDATE applications SET applicant_comments = $1 WHERE id = $2`, [text, applicationId]);
+    application.applicant_comments = text;
+  }
+  return finishSubmission(application, actorId, 'Submitted by the applicant');
+}
+
+// Details an applicant can change while the application is still a draft
+const DRAFT_FIELDS = ['student_name', 'student_email', 'transfer_from_institution', 'transfer_from_program', 'transfer_to_program',
+  'transfer_to_department', 'expected_start_term', 'applicant_comments'];
+
+/** Updates a draft's applicant details (the applicant went back a step before submitting). */
+export async function updateDraft(applicationId, fields) {
+  const { rows: [application] } = await query(`SELECT status FROM applications WHERE id = $1`, [applicationId]);
+  if (!application) throw notFound('Application');
+  if (application.status !== 'draft') throw badRequest('This application has already been submitted and can no longer be changed.');
+  const keys = DRAFT_FIELDS.filter((k) => fields[k] !== undefined);
+  if (!keys.length) return null;
+  const { rows: [updated] } = await query(
+    `UPDATE applications SET ${keys.map((k, i) => `${k} = $${i + 1}`).join(', ')}, updated_at = NOW() WHERE id = $${keys.length + 1} RETURNING *`,
+    [...keys.map((k) => (fields[k] === '' ? null : fields[k])), applicationId]);
+  return updated;
 }
 
 /**
@@ -95,13 +139,29 @@ export async function getApplicationById(id) {
   application.documents = docsResult.rows;
   application.information_requests = infoResult.rows;
   application.recent_audit = auditResult.rows;
+  application.ownership = await ownershipView(id);
   return application;
 }
 
-export async function listApplications({ status, source, search, assignedEvaluatorId, reviewerId, dateFrom, dateTo, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
+/**
+ * Staff list and Application Lookup. Each row carries its ownership (current evaluator, department, pending course,
+ * pending since, stage; see ownership.service). stage: one stage or 'needs_attention' (every stage needing office
+ * action). ownerId / department: an open course review held by that evaluator / department. minAgeDays: pending
+ * for at least that many days (operational information, not an SLA).
+ */
+export async function listApplications({ status, source, search, assignedEvaluatorId, reviewerId, dateFrom, dateTo, stage, ownerId, department, minAgeDays, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
   const conditions = [];
   const params = [];
   let idx = 1;
+
+  if (stage === 'needs_attention') { conditions.push(`(a.stage = ANY($${idx++}) OR a.duplicate_status = 'suspected')`); params.push(ATTENTION_STAGES); }
+  else if (stage) { conditions.push(`a.stage = $${idx++}`); params.push(stage); }
+  if (ownerId) { conditions.push(`EXISTS (SELECT 1 FROM course_reviews ow WHERE ow.application_id = a.id AND ow.evaluator_id = $${idx++} AND ow.status IN ('queued', 'new', 'in_progress', 'info_requested'))`); params.push(ownerId); }
+  if (department) {
+    conditions.push(`EXISTS (SELECT 1 FROM course_reviews ow JOIN evaluators oe ON oe.id = ow.evaluator_id WHERE ow.application_id = a.id AND oe.department = $${idx++} AND ow.status IN ('queued', 'new', 'in_progress', 'info_requested'))`);
+    params.push(department);
+  }
+  if (minAgeDays) { conditions.push(`a.pending_since <= NOW() - make_interval(days => $${idx++})`); params.push(minAgeDays); }
 
   // An evaluator only sees applications with a course assigned to them
   if (reviewerId) { conditions.push(`EXISTS (SELECT 1 FROM course_reviews rv WHERE rv.application_id = a.id AND rv.evaluator_id = $${idx++})`); params.push(reviewerId); }
@@ -117,7 +177,7 @@ export async function listApplications({ status, source, search, assignedEvaluat
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const allowedSortCols = ['created_at', 'submitted_at', 'status', 'student_name', 'reference_number'];
+  const allowedSortCols = ['created_at', 'submitted_at', 'status', 'student_name', 'reference_number', 'pending_since'];
   const sortCol = allowedSortCols.includes(sort) ? sort : 'created_at';
   const sortDir = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const offset = (page - 1) * limit;
@@ -128,22 +188,45 @@ export async function listApplications({ status, source, search, assignedEvaluat
               a.transfer_from_institution, a.transfer_to_program, a.transfer_to_department,
               a.expected_start_term, a.submitted_at, a.final_decision, a.decision_date,
               a.assigned_evaluator_id, a.created_at, a.updated_at, p.full_name AS evaluator_name, a.duplicate_status,
-              ae.confidence_score AS ai_confidence_score
-       FROM applications a
+              ae.confidence_score AS ai_confidence_score,
+              a.stage, a.open_reviews, a.unassigned_reviews, a.owners_count, a.current_owner_id, a.current_owner_name,
+              a.current_owner_department, a.pending_course, a.pending_review_status, a.pending_since
+       FROM ${OWNERSHIP_FROM}
        LEFT JOIN profiles p ON p.id = a.assigned_evaluator_id
        LEFT JOIN LATERAL (
          SELECT confidence_score FROM ai_evaluations
          WHERE application_id = a.id AND status = 'completed'
          ORDER BY created_at DESC LIMIT 1
        ) ae ON true
-       ${where} ORDER BY a.${sortCol} ${sortDir} LIMIT $${idx} OFFSET $${idx + 1}`,
+       ${where} ORDER BY a.${sortCol} ${sortDir} NULLS LAST LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, limit, offset]
     ),
-    query(`SELECT COUNT(*) AS total FROM applications a ${where}`, params),
+    query(`SELECT COUNT(*) AS total FROM ${OWNERSHIP_FROM} ${where}`, params),
   ]);
 
   const total = parseInt(countResult.rows[0].total, 10);
   return { applications: dataResult.rows, total, page, limit, pages: Math.ceil(total / limit) };
+}
+
+/**
+ * Counts by stage, the evaluators and departments currently holding courses (the queue's filter options), and
+ * the number needing office attention. Independent of the list's filters and paging.
+ */
+export async function getOwnershipStats() {
+  const [{ rows: stages }, { rows: owners }, { rows: [attention] }, { rows: [unassigned] }] = await Promise.all([
+    query(`SELECT a.stage, COUNT(*)::int AS count FROM ${OWNERSHIP_FROM} GROUP BY a.stage`),
+    query(`SELECT DISTINCT r.evaluator_id AS id, p.full_name AS name, e.department FROM course_reviews r JOIN profiles p ON p.id = r.evaluator_id
+           LEFT JOIN evaluators e ON e.id = r.evaluator_id WHERE r.status IN ('queued', 'new', 'in_progress', 'info_requested') ORDER BY p.full_name`),
+    query(`SELECT COUNT(*)::int AS n FROM ${OWNERSHIP_FROM} WHERE a.stage = ANY($1) OR a.duplicate_status = 'suspected'`, [ATTENTION_STAGES]),
+    query(`SELECT COUNT(*)::int AS n FROM course_reviews WHERE evaluator_id IS NULL AND status IN ('queued', 'new', 'in_progress', 'info_requested')`),
+  ]);
+  return {
+    by_stage: Object.fromEntries(stages.map((r) => [r.stage, r.count])),
+    needs_attention: attention.n,
+    unassigned_reviews: unassigned.n,
+    owners: owners.map((o) => ({ id: o.id, name: o.name, department: o.department })),
+    departments: [...new Set(owners.map((o) => o.department).filter(Boolean))].sort(),
+  };
 }
 
 /** Queue-wide counts for the staff dashboard; independent of the list's filters and paging. */
@@ -384,9 +467,17 @@ export async function runEvaluation(evaluationId) {
     );
     console.log(`[Eval]   ai_evaluations record updated`);
 
-    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'AI evaluation completed');
+    await updateApplicationStatus(applicationId, 'evaluation_completed', null, 'Course evaluation completed');
     console.log(`[Eval]   Application status → evaluation_completed`);
 
+    // A transcript arrived but no course could be read from it: the Credit Evaluation Office follows up
+    if (!credit && documents.some((d) => d.document_type === 'transcript')) {
+      await lifecycle.notifyCreditOffice({
+        applicationId, type: 'transcript_unreadable', title: `Transcript needs attention: ${application.reference_number}`,
+        message: `No courses could be read from ${application.student_name}'s transcript. Contact the student or the sending college.`,
+        data: { reference_number: application.reference_number },
+      }).catch(() => {});
+    }
     await notificationService.evaluationComplete(application, evaluationId);
     console.log(`[Eval]   Notification sent`);
 
@@ -431,8 +522,7 @@ export async function submitDecision(applicationId, decision, comments, evaluato
   );
 
   await auditLog({ applicationId, action: 'decision_submitted', actorId: evaluatorId, oldValue: { status: oldStatus }, newValue: { status: decision, final_decision: decision }, details: { comments } });
-  const updatedApp = { ...application, status: decision, final_decision: decision };
-  await notificationService.decisionMade(updatedApp);
+  await onStatusChange(applicationId, oldStatus, decision);
 }
 
 export async function createInfoRequest(applicationId, items, message, evaluatorId) {
@@ -447,7 +537,9 @@ export async function createInfoRequest(applicationId, items, message, evaluator
   const infoRequest = infoResult.rows[0];
 
   await updateApplicationStatus(applicationId, 'information_required', evaluatorId, 'Information requested from student');
-  await notificationService.infoRequired(application, infoRequest.id);
+  await notifyApplicant(application.id, 'information_required', {
+    items: items.map((i) => (typeof i === 'string' ? i : i.description)).filter(Boolean),
+  });
   await auditLog({ applicationId, action: 'info_request_created', actorId: evaluatorId, details: { info_request_id: infoRequest.id, item_count: items.length } });
   return infoRequest;
 }
@@ -461,6 +553,7 @@ export async function updateApplicationStatus(applicationId, newStatus, actorId 
     await query(`UPDATE applications SET submitted_at = NOW() WHERE id = $1 AND submitted_at IS NULL`, [applicationId]);
   }
   await auditLog({ applicationId, action: 'status_changed', actorId, oldValue: { status: oldStatus }, newValue: { status: newStatus }, details: { reason } });
+  await onStatusChange(applicationId, oldStatus, newStatus);
 }
 
 export async function addNote(applicationId, note, actorId, actorEmail) {
@@ -483,4 +576,4 @@ export async function assignEvaluator(applicationId, evaluatorId, assignedBy) {
   await auditLog({ applicationId, action: 'evaluator_assigned', actorId: assignedBy, newValue: { assigned_evaluator_id: evaluatorId } });
 }
 
-export default { createApplication, getApplicationById, listApplications, getApplicationStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };
+export default { createApplication, submitApplication, updateDraft, getApplicationById, listApplications, getApplicationStats, getOwnershipStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };

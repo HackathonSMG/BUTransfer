@@ -1,10 +1,12 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 import * as eligibilityService from '../services/eligibility.service.js';
 import * as applicationService from '../services/application.service.js';
 import * as documentService from '../services/document.service.js';
 import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import * as informationService from '../services/workflow/information.service.js';
 import * as selfCheckService from '../services/selfcheck.service.js';
+import * as tracking from '../services/applicant/tracking.service.js';
+import { applicantStatus } from '../services/applicant/applicant-status.js';
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
 import { badRequest, notFound } from '../utils/errors.js';
@@ -30,7 +32,9 @@ const applicationSubmitSchema = z.object({
   academic_history: z.record(z.any()).optional().default({}),
   personal_statement: z.string().max(5000).optional().nullable(),
   additional_info: z.record(z.any()).optional().default({}),
-  student_profile_id: z.string().uuid().optional().nullable(),
+  applicant_comments: z.string().max(5000).optional().nullable(),
+  // true: keep it as a draft until the documents are attached (POST /applications/:token/submit)
+  draft: z.boolean().optional().default(false),
 });
 
 export async function eligibilityCheck(req, res, next) {
@@ -46,11 +50,108 @@ export async function submitApplication(req, res, next) {
   try {
     const parseResult = applicationSubmitSchema.safeParse(req.body);
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
-    const application = await applicationService.createApplication(parseResult.data, 'website', null);
+    const { draft, ...fields } = parseResult.data;
+    // A signed-in student owns the application; the account's name and email are used
+    if (req.user && req.user.role !== 'student') return next(badRequest('Staff raise applications from the staff portal.'));
+    if (req.user) Object.assign(fields, { student_profile_id: req.user.id, student_email: req.user.email });
+    const application = await applicationService.createApplication(fields, 'website', req.user?.id || null, { draft });
     const secureLink = `${env.APP_URL}/status/${application.secure_token}`;
     return res.status(201).json({
-      data: { id: application.id, reference_number: application.reference_number, status: application.status, secure_link: secureLink, student_email: application.student_email, message: 'Your application has been received.' },
+      data: { id: application.id, reference_number: application.reference_number, status: application.status, secure_link: secureLink, secure_token: application.secure_token,
+        student_email: application.student_email, message: draft ? 'Your application has been started.' : 'Your application has been received.' },
     });
+  } catch (err) { return next(err); }
+}
+
+const submitDraftSchema = z.object({ applicant_comments: z.string().max(5000).optional().nullable() });
+
+// Submits a draft after its documents are attached; the transcript is required. Processing then runs on the
+// server, independent of the browser.
+export async function submitDraft(req, res, next) {
+  try {
+    const parsed = submitDraftSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Validation failed', parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
+    const application = await applicationService.submitApplication(req.application.id, req.application.student_profile_id || null,
+      { applicantComments: parsed.data.applicant_comments });
+    return res.status(200).json({ data: {
+      reference_number: application.reference_number, status: application.status, status_info: applicantStatus(application.status),
+      student_email: application.student_email, submitted_at: new Date().toISOString(),
+    } });
+  } catch (err) { return next(err); }
+}
+
+const draftUpdateSchema = applicationSubmitSchema.pick({
+  student_name: true, student_email: true, transfer_from_institution: true, transfer_from_program: true,
+  transfer_to_program: true, transfer_to_department: true, expected_start_term: true, applicant_comments: true,
+}).partial();
+
+// The applicant went back and changed their details before submitting
+export async function updateDraft(req, res, next) {
+  try {
+    const parsed = draftUpdateSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Validation failed', parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
+    // A signed-in applicant's email stays their account email
+    if (req.application.student_profile_id) delete parsed.data.student_email;
+    const updated = await applicationService.updateDraft(req.application.id, parsed.data);
+    return res.status(200).json({ data: { reference_number: (updated || req.application).reference_number, status: 'draft' } });
+  } catch (err) { return next(err); }
+}
+
+export async function removeDraftDocument(req, res, next) {
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.documentId)) return next(notFound('Document'));
+    await documentService.removeDraftDocument(req.application, req.params.documentId);
+    return res.status(204).end();
+  } catch (err) { return next(err); }
+}
+
+// -- Public applicant access (no account) ----------------------------------------------------------------
+
+const emailSchema = z.object({ email: z.string().trim().email().max(320) });
+const trackSchema = z.object({ application_number: z.string().trim().min(4).max(40), email: z.string().trim().email().max(320) });
+
+// Before a new application: does this email already have one? Masked numbers only (see tracking.service).
+export async function checkExistingApplications(req, res, next) {
+  try {
+    const parsed = emailSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Enter a valid email address'));
+    return res.status(200).json({ data: await tracking.existingApplications(parsed.data.email) });
+  } catch (err) { return next(err); }
+}
+
+// Emails the address its application numbers. Same response whether or not any exist.
+export async function emailApplicationNumbers(req, res, next) {
+  try {
+    const parsed = emailSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Enter a valid email address'));
+    await tracking.emailApplicationNumbers(parsed.data.email);
+    return res.status(200).json({ data: { message: 'If there are applications for this email address, their numbers have been sent to it.' } });
+  } catch (err) { return next(err); }
+}
+
+// Application number + email -> access to that application's tracking page. One generic answer for any mismatch.
+export async function trackApplication(req, res, next) {
+  try {
+    const parsed = trackSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Enter your application number and the email address you applied with.'));
+    const app = await tracking.findForTracking(parsed.data.application_number, parsed.data.email);
+    if (!app) return next(notFound('Application'));
+    return res.status(200).json({ data: { reference_number: app.reference_number, access_token: app.secure_token } });
+  } catch (err) { return next(err); }
+}
+
+// The signed-in student's applications with their progress, from the persisted course states
+export async function myApplications(req, res, next) {
+  try {
+    const { rows } = await query(
+      `SELECT id, reference_number, status, secure_token, transfer_from_institution, transfer_to_program, expected_start_term, submitted_at, created_at, decision_date
+       FROM applications WHERE student_profile_id = $1 ORDER BY created_at DESC`, [req.user.id]);
+    const data = [];
+    for (const a of rows) {
+      const courses = (await lifecycle.courseStates(a.id)).filter((c) => c.state !== 'withdrawn');
+      data.push({ ...a, summary: lifecycle.summarizeCourses(courses), institutions: [...new Set(courses.map((c) => c.institution))] });
+    }
+    return res.status(200).json({ data });
   } catch (err) { return next(err); }
 }
 
@@ -80,10 +181,12 @@ export async function getApplicationStatus(req, res, next) {
     ]);
     const isDecided = ['approved', 'rejected'].includes(application.status);
     const evalRow = evalResult.rows[0] || null;
+    const progress = await tracking.trackingView(application, await lifecycle.courseStates(application.id));
+    // Applicant-facing fields only: no internal ids, evaluator names, notes, scores or assignment data
     const studentView = {
-      id: application.id, reference_number: application.reference_number, status: application.status,
+      reference_number: application.reference_number, status: application.status, ...progress,
       student_name: application.student_name, student_email: application.student_email,
-      student_phone: application.student_phone, date_of_birth: application.date_of_birth,
+      student_phone: application.student_phone, applicant_comments: application.applicant_comments,
       transfer_from_institution: application.transfer_from_institution,
       transfer_from_program: application.transfer_from_program,
       transfer_to_program: application.transfer_to_program,
@@ -97,11 +200,7 @@ export async function getApplicationStatus(req, res, next) {
       courses: coursesResult.rows,
       results,
       info_requests: infoResult.rows,
-      evaluation: evalRow ? {
-        id: evalRow.id, status: evalRow.status,
-        missing_documents: evalRow.missing_documents,
-        completed_at: evalRow.completed_at,
-      } : null,
+      evaluation: evalRow ? { status: evalRow.status, completed_at: evalRow.completed_at } : null,
       created_at: application.created_at, updated_at: application.updated_at,
     };
     return res.status(200).json({ data: studentView });
@@ -154,4 +253,4 @@ export async function getStudentNotifications(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };
+export default { eligibilityCheck, submitApplication, submitDraft, updateDraft, removeDraftDocument, checkExistingApplications, emailApplicationNumbers, trackApplication, myApplications, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions };

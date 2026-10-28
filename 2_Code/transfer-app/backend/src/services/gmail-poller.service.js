@@ -5,7 +5,7 @@ import { simpleParser } from 'mailparser';
 import { env } from '../config/env.js';
 import { createApplication } from './application.service.js';
 import { uploadDocument } from './document.service.js';
-import { sendApplicationConfirmation, sendInfoRequiredEmail } from './email.service.js';
+import { sendInfoRequiredEmail } from './email.service.js';
 import { isAgentConfigured, getProjectClient } from './ai/agent.service.js';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -151,8 +151,7 @@ async function processEmail(rawSource) {
     }
   }
 
-  // Send confirmation email
-  await sendApplicationConfirmation(studentEmail, studentName || data.student_name, application.reference_number, application.secure_token);
+  // The confirmation email is sent by the submission itself (applicant-notification.service)
 }
 
 // ── IMAP poller ────────────────────────────────────────────────────────────
