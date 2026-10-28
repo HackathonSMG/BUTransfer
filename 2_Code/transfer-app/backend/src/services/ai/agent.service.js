@@ -338,8 +338,9 @@ export async function runAgent(agentCase, { client = getProjectClient().getOpenA
       const textItems = allItems.filter((item) => item.type === 'message');
 
       log(`  Round ${round}: output items=${allItems.length} function_calls=${calls.length} messages=${textItems.length}`);
+      // Log ALL output item types so we can see exactly what the agent returned
+      allItems.forEach((item, i) => log(`    [${i}] type=${item.type} ${item.name ? `name=${item.name}` : ''} content=${JSON.stringify(item.content ?? item.output ?? '').slice(0, 150)}`));
       if (calls.length) log(`    Tool calls: ${calls.map((c) => c.name).join(', ')}`);
-      if (textItems.length) log(`    Agent text: ${textItems.map((t) => String(t.content).slice(0, 120)).join(' | ')}`);
 
       const validationCall = calls.find((c) => c.name === 'submit_validation_error');
       if (validationCall) {
@@ -358,7 +359,19 @@ export async function runAgent(agentCase, { client = getProjectClient().getOpenA
         return { type: 'recommendations', data };
       }
 
-      if (calls.length === 0) throw new Error('The agent finished without submitting recommendations');
+      if (calls.length === 0) {
+        // Validation-only: agent returning text with no tool calls means Phase 1 passed
+        if (agentCase.validation_only) {
+          const agentText = textItems.map((t) => {
+            const c = t.content;
+            return Array.isArray(c) ? c.map((p) => p.text || p.output || '').join('') : String(c ?? '');
+          }).join(' ');
+          log(`  Validation-only case — agent returned no tool calls (validation passed)`);
+          log(`  Agent said: ${agentText.slice(0, 300)}`);
+          return { type: 'validation_ok' };
+        }
+        throw new Error('The agent finished without submitting recommendations');
+      }
 
       const outputs = [];
       for (const c of calls) {
