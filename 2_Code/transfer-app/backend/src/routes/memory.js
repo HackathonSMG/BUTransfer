@@ -5,7 +5,7 @@ import * as memoryService from '../services/credit/memory.service.js';
 
 // The decision memory: equivalencies and precedents. Evaluators can read it; only admins revoke or restore.
 const router = Router();
-router.use(requireAuth, requireRole('evaluator', 'admin'));
+router.use(requireAuth, requireRole('evaluator', 'admin', 'credit_office'));
 
 router.get('/', async (_req, res, next) => {
   try {
@@ -13,7 +13,7 @@ router.get('/', async (_req, res, next) => {
   } catch (err) { return next(err); }
 });
 
-router.put('/:kind/:id/status', requireRole('admin'), async (req, res, next) => {
+router.put('/:kind/:id/status', requireRole('admin', 'credit_office'), async (req, res, next) => {
   try {
     const result = await memoryService.setMemoryStatus(req.params.kind, req.params.id, req.body?.status, req.user);
     return res.status(200).json({ data: result });

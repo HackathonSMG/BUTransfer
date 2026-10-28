@@ -3,7 +3,7 @@ import multer from 'multer';
 import * as documentService from '../services/document.service.js';
 import * as notificationService from '../services/notification.service.js';
 import { query } from '../config/db.js';
-import { badRequest, notFound, unauthorized } from '../utils/errors.js';
+import { badRequest, notFound, unauthorized, forbidden } from '../utils/errors.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -36,6 +36,8 @@ router.post('/', upload.single('file'), async (req, res, next) => {
       if (data?.user) {
         const profileResult = await query(`SELECT id, role FROM profiles WHERE id = $1 LIMIT 1`, [data.user.id]);
         if (profileResult.rows.length > 0) {
+          // Transcripts and syllabi come from the student; evaluators view them but never upload them
+          if (profileResult.rows[0].role === 'evaluator') return next(forbidden('Evaluators cannot upload application documents.'));
           uploadedBy = profileResult.rows[0].id;
           uploadSource = profileResult.rows[0].role === 'student' ? 'student' : 'evaluator';
           isAuthenticated = true;

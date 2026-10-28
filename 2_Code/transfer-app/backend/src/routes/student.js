@@ -1,7 +1,7 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import multer from 'multer';
 import { validateSecureToken } from '../middleware/secure-token.js';
-import { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest } from '../controllers/student.controller.js';
+import { eligibilityCheck, submitApplication, uploadDocument, getApplicationStatus, getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions } from '../controllers/student.controller.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -17,10 +17,14 @@ const upload = multer({
 });
 
 router.post('/eligibility-check', eligibilityCheck);
+// Self-check: guidance from the equivalency database before applying; nothing is stored
+router.get('/self-check/institutions', selfCheckInstitutions);
+router.post('/self-check', selfCheck);
 router.post('/applications', submitApplication);
 router.post('/applications/:token/documents', validateSecureToken, upload.single('file'), uploadDocument);
 router.get('/status/:token', validateSecureToken, getApplicationStatus);
 router.get('/status/:token/notifications', validateSecureToken, getStudentNotifications);
-router.post('/status/:token/info-requests/:requestId/respond', validateSecureToken, respondToInfoRequest);
+// A written reply (JSON) or a file such as the requested syllabus (multipart, field "file")
+router.post('/status/:token/info-requests/:requestId/respond', validateSecureToken, upload.single('file'), respondToInfoRequest);
 
 export default router;

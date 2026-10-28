@@ -1,4 +1,5 @@
-// Imports the staff roster (src/data/staff-roster.json): administrator accounts and the evaluator master data.
+// Imports the staff roster (src/data/staff-roster.json): administrator accounts, Credit Evaluation Office staff
+// and the evaluator master data.
 // New accounts are created through Supabase Auth with the initial password the admin supplies; existing
 // accounts keep their password and get their role, profile and expertise refreshed. Safe to re-run.
 import fs from 'fs';
@@ -7,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { query } from '../../config/db.js';
 import { supabaseAdmin } from '../../config/supabase.js';
 import { log as auditLog } from '../audit.service.js';
-import { assignPendingApplications } from '../workflow/assignment.service.js';
+import { assignPendingApplications, placeOfficeQueue } from '../workflow/assignment.service.js';
 
 const ROSTER_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/staff-roster.json');
 // Construct the auth field name at runtime, as the other account-creating code does
@@ -52,6 +53,17 @@ export async function importRoster({ initialSecret, actor }) {
     accounts.push({ email: a.email, full_name: a.full_name, role: 'admin', created });
   }
 
+  // Credit Evaluation Office staff: process applications, place unassigned courses, post transfer credit
+  for (const c of roster.credit_office || []) {
+    const { id, created } = await ensureAccount(existing, { ...c, role: 'credit_office' }, initialSecret);
+    await query(
+      `INSERT INTO profiles (id, role, full_name, email) VALUES ($1, 'credit_office', $2, $3)
+       ON CONFLICT (id) DO UPDATE SET role = 'credit_office', full_name = EXCLUDED.full_name, is_active = true, updated_at = NOW()`,
+      [id, c.full_name, c.email.toLowerCase()]
+    );
+    accounts.push({ email: c.email, full_name: c.full_name, role: 'credit_office', created });
+  }
+
   for (const ev of roster.evaluators) {
     const { id, created } = await ensureAccount(existing, { ...ev, role: 'evaluator' }, initialSecret);
     await query(
@@ -72,7 +84,9 @@ export async function importRoster({ initialSecret, actor }) {
 
   // With evaluators in place, route any evaluated applications that are still unassigned
   const assignedApps = await assignPendingApplications();
-  const assigned = assignedApps.reduce((n, a) => n + a.created, 0);
+  // Courses that were waiting in the Credit Evaluation Office queue for want of an evaluator
+  const { placed } = await placeOfficeQueue(actor);
+  const assigned = assignedApps.reduce((n, a) => n + a.created, 0) + placed;
 
   await auditLog({
     action: 'staff_roster_imported',

@@ -33,7 +33,25 @@ const ACTIVITY_LABELS = {
   transfer_request_created: 'Application handed to the next evaluator',
   evaluation_assigned: 'New evaluation assigned',
   transfer_request: 'Transfer request received',
-  note_added: 'Note added'
+  note_added: 'Note added',
+  syllabus_requested: 'Syllabus requested from the student',
+  syllabus_received: 'Syllabus received from the student',
+  info_request_responded: 'Student replied',
+  established_outcomes_applied: 'Established equivalencies applied',
+  review_reassigned: 'Course reassigned',
+  credit_posted: 'Transfer credit posted',
+  duplicate_suspected: 'Possible duplicate application flagged',
+  duplicate_resolved: 'Duplicate check resolved',
+  deadline_exception_recorded: 'Deadline exception recorded',
+  conflict_escalated: 'Additional review requested',
+  conflict_resolved: 'Equivalency conflict resolved',
+  conflict_override: 'Earlier decisions overridden',
+  conflict_use_established: 'Established equivalency confirmed',
+  equivalency_standardized: 'Standard equivalency recorded',
+  evaluator_availability_changed: 'Evaluator availability changed',
+  ready_for_posting: 'Ready for posting',
+  assignment_needed: 'Course needs an evaluator',
+  information_received: 'Student answered a request'
 }
 
 export function activityLabel(action) {

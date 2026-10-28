@@ -12,13 +12,14 @@ import {
   ClipboardCheck,
   UserCircle,
   ShieldCheck,
+  Stamp,
   X
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import BUCrest from './BUCrest'
 
 // Detail pages keep their list highlighted: an application under Applications, a review under My Evaluations
-const isApplicationDetail = (path) => /^\/evaluator\/applications\/[^/]+$/.test(path)
+const isApplicationDetail = (path) => /^\/(evaluator|office)\/applications\/[^/]+$/.test(path)
 const isReviewDetail = (path) => path.startsWith('/evaluator/reviews/')
 
 // Evaluators get a short, flat menu; admins a main group plus settings
@@ -33,10 +34,23 @@ const evaluatorSections = [
   }
 ]
 
+// The Credit Evaluation Office processes applications and posts credit; no user or criteria administration
+const officeSections = [
+  {
+    links: [
+      { to: '/office', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
+      { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
+      { to: '/admin/conflicts', label: 'Equivalency Conflicts', icon: GitCompare }
+    ]
+  }
+]
+
 const adminSections = [
   {
     links: [
       { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/office', label: 'Credit Office', icon: Stamp, end: true },
       { to: '/admin/applications', label: 'Applications', icon: FileText, alsoActive: isApplicationDetail },
       { to: '/admin/users', label: 'Evaluators', icon: Users },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
@@ -57,7 +71,8 @@ export default function Sidebar({ open = false, onClose }) {
   const { user } = useAuth()
   const { pathname } = useLocation()
   const isAdmin = user?.role === 'admin'
-  const sections = isAdmin ? adminSections : evaluatorSections
+  const isOffice = user?.role === 'credit_office'
+  const sections = isAdmin ? adminSections : isOffice ? officeSections : evaluatorSections
 
   return (
     <>
@@ -116,11 +131,11 @@ export default function Sidebar({ open = false, onClose }) {
 
         <div className="p-3 border-t border-staff-line2">
           <div className="flex gap-2.5 items-center rounded-lg bg-staff-sunk p-2.5 text-xs leading-snug">
-            <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${isAdmin ? 'bg-brand/10 text-brand' : 'bg-primary-100 text-primary-700'}`}>
-              {isAdmin ? <ShieldCheck className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
+            <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${isAdmin || isOffice ? 'bg-brand/10 text-brand' : 'bg-primary-100 text-primary-700'}`}>
+              {isAdmin ? <ShieldCheck className="w-4 h-4" /> : isOffice ? <Stamp className="w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
             </span>
             <span className="min-w-0">
-              <span className="block font-semibold text-staff-ink">{isAdmin ? 'Administrator' : 'Evaluator'} workspace</span>
+              <span className="block font-semibold text-staff-ink">{isAdmin ? 'Administrator' : isOffice ? 'Credit Office' : 'Evaluator'} workspace</span>
               <span className="block text-staff-muted truncate">{user?.department || 'Transfer Credit Evaluation'}</span>
             </span>
           </div>

@@ -49,9 +49,14 @@ export async function getDocument(documentId, requestorId = null) {
     const profileResult = await query(`SELECT role FROM profiles WHERE id = $1 LIMIT 1`, [requestorId]);
     const role = profileResult.rows[0]?.role;
     const isOwner = document.student_profile_id === requestorId;
-    const isAssignedEvaluator = document.assigned_evaluator_id === requestorId;
-    const isAdminOrEvaluator = role === 'admin' || role === 'evaluator';
-    if (!isOwner && !isAssignedEvaluator && !isAdminOrEvaluator) throw forbidden('You do not have access to this document');
+    const isOffice = role === 'admin' || role === 'credit_office';
+    // An evaluator sees documents only for applications with a course assigned to them
+    let isReviewer = false;
+    if (role === 'evaluator') {
+      const { rows } = await query(`SELECT 1 FROM course_reviews WHERE application_id = $1 AND evaluator_id = $2 LIMIT 1`, [document.application_id, requestorId]);
+      isReviewer = rows.length > 0 || document.assigned_evaluator_id === requestorId;
+    }
+    if (!isOwner && !isOffice && !isReviewer) throw forbidden('You do not have access to this document');
   }
 
   const url = await getFileUrl(document.storage_path, 3600);

@@ -35,6 +35,8 @@ export default function Login() {
       toast.success(`Welcome back, ${user.full_name || user.email}!`)
       if (user.role === 'admin') {
         navigate('/admin')
+      } else if (user.role === 'credit_office') {
+        navigate('/office')
       } else {
         navigate('/evaluator')
       }

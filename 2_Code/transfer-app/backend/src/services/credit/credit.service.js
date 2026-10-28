@@ -84,7 +84,8 @@ export async function evaluateApplicationCredits(application, evaluationId) {
   const engine = await getEngine();
   console.log(`[Credit]   Running evaluateTranscript for program="${application.transfer_to_program}"...`);
   const { results, summary } = engine.evaluateTranscript(
-    courses.map((c) => ({ ...c, source_credits: Number(c.source_credits) })),
+    // Missing credits stay missing (null), never 0
+    courses.map((c) => ({ ...c, source_credits: c.source_credits == null ? null : Number(c.source_credits) })),
     { major: application.transfer_to_program },
   );
   console.log(`[Credit]   Engine done — ${results.length} results`);
@@ -101,15 +102,54 @@ export async function evaluateApplicationCredits(application, evaluationId) {
     const r = results[i];
     const { rows: [row] } = await query(
       `INSERT INTO course_evaluations (application_id, ai_evaluation_id, transcript_course_id, path, outcome, award, suggestion, bu_credits, confidence,
-         rules, precedent_ids, equivalency_id, candidates, reasons, engine_version)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
+         rules, precedent_ids, equivalency_id, candidates, reasons, engine_version, missing_information, combined_with, syllabus_compared)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
       [application.id, evaluationId, courses[i].id, r.path, r.outcome, r.award, r.suggestion, r.bu_credits, r.confidence,
-        r.rules, r.precedent_ids, r.equivalency_id, JSON.stringify(r.candidates), JSON.stringify(r.reasons), ENGINE_VERSION]
+        r.rules, r.precedent_ids, r.equivalency_id, JSON.stringify(r.candidates), JSON.stringify(r.reasons), ENGINE_VERSION,
+        r.missing || [], r.combined_with || [], Boolean(courses[i].syllabus_text)]
     );
     evaluationIds.push(row.id);
+    // The transcript keeps the code as written; the catalog spelling and the counted attempt are recorded beside it
+    await query(`UPDATE transcript_courses SET catalog_code = $1, repeat_of = $2 WHERE id = $3`,
+      [r.matched_code && r.matched_code !== courses[i].course_code ? r.matched_code : null,
+        r.repeat_of != null ? courses[r.repeat_of].id : null, courses[i].id]);
   }
   console.log(`[Credit]   Inserted ${evaluationIds.length} course_evaluations rows: [${evaluationIds.join(', ')}]`);
   return { summary, results, courses, evaluationIds };
+}
+
+/**
+ * Re-runs the evaluation of one transcript course after its syllabus arrives, updating the course's latest
+ * evaluation in place (path, suggestion, candidates, reasons) so the evaluator sees the new evidence.
+ * Decisions are never changed. Returns the updated evaluation, or null when the course has none yet.
+ */
+export async function rematchCourse(transcriptCourseId) {
+  const { rows: [tc] } = await query(
+    `SELECT tc.*, a.transfer_to_program FROM transcript_courses tc JOIN applications a ON a.id = tc.application_id WHERE tc.id = $1`, [transcriptCourseId]);
+  if (!tc) return null;
+  const { rows: [ev] } = await query(
+    `SELECT ce.id FROM course_evaluations ce JOIN ai_evaluations ae ON ae.id = ce.ai_evaluation_id
+     WHERE ce.transcript_course_id = $1 ORDER BY ae.created_at DESC LIMIT 1`, [transcriptCourseId]);
+  if (!ev) return null;
+  // Evaluate it alongside the rest of the transcript so repeats and combined courses still apply
+  const { rows: courses } = await query(`SELECT * FROM transcript_courses WHERE application_id = $1 ORDER BY position`, [tc.application_id]);
+  const engine = await getEngine();
+  const { results } = engine.evaluateTranscript(
+    courses.map((c) => ({ ...c, source_credits: c.source_credits == null ? null : Number(c.source_credits) })),
+    { major: tc.transfer_to_program },
+  );
+  const r = results[courses.findIndex((c) => c.id === transcriptCourseId)];
+  const reasons = [...r.reasons, ...(tc.syllabus_text ? ['The syllabus the student sent was compared with the BU catalog.'] : [])];
+  const { rows: [updated] } = await query(
+    `UPDATE course_evaluations SET path = $1, outcome = $2, award = $3, suggestion = $4, bu_credits = $5, confidence = $6, rules = $7,
+       precedent_ids = $8, equivalency_id = $9, candidates = $10, reasons = $11, missing_information = $12, combined_with = $13,
+       syllabus_compared = $14, engine_version = $15
+     WHERE id = $16 RETURNING *`,
+    [r.path, r.outcome, r.award, r.suggestion, r.bu_credits, r.confidence, r.rules, r.precedent_ids, r.equivalency_id,
+      JSON.stringify(r.candidates), JSON.stringify(reasons), (r.missing || []).filter((m) => !(m === 'syllabus' && tc.syllabus_text)),
+      r.combined_with || [], Boolean(tc.syllabus_text), ENGINE_VERSION, ev.id]
+  );
+  return updated;
 }
 
 /**
@@ -120,7 +160,7 @@ export async function getCourseEvaluations(applicationId, evaluationId = null) {
   const result = await query(
     `SELECT tc.id, tc.position, tc.institution, tc.course_code, tc.title, tc.term, tc.credit_system, tc.source_credits, tc.grade,
             ce.path, ce.outcome, ce.award, ce.suggestion, ce.bu_credits, ce.confidence, ce.rules, ce.precedent_ids, ce.equivalency_id,
-            ce.candidates, ce.reasons,
+            ce.candidates, ce.reasons, ce.missing_information, ce.combined_with, tc.catalog_code, tc.repeat_of,
             ce.agent_outcome, ce.agent_bu_course, ce.agent_confidence, ce.agent_rationale, ce.agent_precedent_ids, ce.agent_missing,
             cd.action AS decision_action, cd.outcome AS decision_outcome, cd.bu_award AS decision_award, cd.reason AS decision_reason,
             cd.matched_recommendation, cd.past_decision_id, cd.decided_at, p.full_name AS decided_by_name
@@ -135,4 +175,4 @@ export async function getCourseEvaluations(applicationId, evaluationId = null) {
   return result.rows;
 }
 
-export default { importTranscript, evaluateApplicationCredits, getCourseEvaluations, invalidateEngine };
+export default { importTranscript, evaluateApplicationCredits, rematchCourse, getCourseEvaluations, invalidateEngine };

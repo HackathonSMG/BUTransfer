@@ -8,6 +8,7 @@ import * as creditService from './credit/credit.service.js';
 import { ENGINE_VERSION } from './credit/engine.js';
 import { recommendationOf } from './credit/memory.service.js';
 import * as assignmentService from './workflow/assignment.service.js';
+import * as lifecycle from './workflow/lifecycle.service.js';
 import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
@@ -42,6 +43,8 @@ export async function createApplication(data, source = 'website', createdBy = nu
 
   await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: application.status }, details: { source } });
   await notificationService.applicationSubmitted(application);
+  // Flag (never block or delete) a second open application from the same student
+  await lifecycle.detectDuplicate(application.id).catch((err) => console.error('[Duplicate] Check failed:', err.message));
 
   // Auto-trigger AI evaluation in the background so evaluators see results immediately
   setImmediate(() => {
@@ -51,6 +54,18 @@ export async function createApplication(data, source = 'website', createdBy = nu
   });
 
   return application;
+}
+
+/**
+ * Plain-language reading of the eligibility check score (criteria passed, 0-1). It describes the initial
+ * eligibility criteria only, never a course match or a credit decision.
+ */
+export function eligibilityLabel(score) {
+  if (score == null) return null;
+  const s = Number(score);
+  return s >= 1 ? { tone: 'ok', text: 'Meets every initial eligibility criterion' }
+    : s >= 0.6 ? { tone: 'warn', text: 'Meets most initial eligibility criteria; some need staff review' }
+      : { tone: 'bad', text: 'Several initial eligibility criteria are not met' };
 }
 
 export async function getApplicationById(id) {
@@ -71,6 +86,10 @@ export async function getApplicationById(id) {
   ]);
 
   application.latest_ai_evaluation = evalResult.rows[0] || null;
+  if (application.latest_ai_evaluation) {
+    // The wording for the eligibility score is decided here, not in the browser
+    application.latest_ai_evaluation.score_label = eligibilityLabel(application.latest_ai_evaluation.confidence_score);
+  }
   application.transcript_courses = (await creditService.getCourseEvaluations(id, application.latest_ai_evaluation?.id || null))
     .map((c) => ({ ...c, recommendation: recommendationOf(c) }));
   application.documents = docsResult.rows;
@@ -79,11 +98,13 @@ export async function getApplicationById(id) {
   return application;
 }
 
-export async function listApplications({ status, source, search, assignedEvaluatorId, dateFrom, dateTo, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
+export async function listApplications({ status, source, search, assignedEvaluatorId, reviewerId, dateFrom, dateTo, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
   const conditions = [];
   const params = [];
   let idx = 1;
 
+  // An evaluator only sees applications with a course assigned to them
+  if (reviewerId) { conditions.push(`EXISTS (SELECT 1 FROM course_reviews rv WHERE rv.application_id = a.id AND rv.evaluator_id = $${idx++})`); params.push(reviewerId); }
   if (status) { conditions.push(`a.status = $${idx++}`); params.push(status); }
   if (source) { conditions.push(`a.source = $${idx++}`); params.push(source); }
   if (assignedEvaluatorId) { conditions.push(`a.assigned_evaluator_id = $${idx++}`); params.push(assignedEvaluatorId); }
@@ -106,7 +127,7 @@ export async function listApplications({ status, source, search, assignedEvaluat
       `SELECT a.id, a.reference_number, a.source, a.status, a.student_name, a.student_email,
               a.transfer_from_institution, a.transfer_to_program, a.transfer_to_department,
               a.expected_start_term, a.submitted_at, a.final_decision, a.decision_date,
-              a.assigned_evaluator_id, a.created_at, a.updated_at, p.full_name AS evaluator_name,
+              a.assigned_evaluator_id, a.created_at, a.updated_at, p.full_name AS evaluator_name, a.duplicate_status,
               ae.confidence_score AS ai_confidence_score
        FROM applications a
        LEFT JOIN profiles p ON p.id = a.assigned_evaluator_id
@@ -158,7 +179,9 @@ export async function triggerEvaluation(applicationId, triggeredBy) {
   const evaluation = evalResult.rows[0];
   console.log(`[Eval]   Evaluation record created: eval_id=${evaluation.id}`);
 
-  await updateApplicationStatus(applicationId, 'under_evaluation', triggeredBy, 'AI evaluation triggered');
+  await updateApplicationStatus(applicationId, 'under_evaluation', triggeredBy, 'Course evaluation started');
+  // Applications loaded in bulk or raised by staff get the same duplicate check as website submissions
+  await lifecycle.detectDuplicate(applicationId).catch((err) => console.error('[Duplicate] Check failed:', err.message));
   await auditLog({ applicationId, action: 'evaluation_triggered', actorId: triggeredBy, details: { evaluation_id: evaluation.id } });
 
   console.log(`[Eval]   Queuing background runEvaluation(${evaluation.id}) via setImmediate`);
@@ -212,9 +235,9 @@ function buildEvaluationResult(application, documents, eligibility, credit, cred
     const disputed = results.filter((r) => r.reasons.some((t) => t.startsWith('Past decisions disagree')));
     if (disputed.length) flags.push({ type: 'critical', title: 'Conflicting precedents', description: `${disputed.length} course(s) have past decisions that disagree; the department must decide.` });
     if (agent.status === 'completed') {
-      flags.push({ type: 'positive', title: 'Agent review', description: `The Foundry agent (${env.FOUNDRY_AGENT_NAME}) reviewed ${agent.reviewed} of the ${agent.sent} course(s) left open, using past decisions and the BU catalog.` });
+      flags.push({ type: 'positive', title: 'Additional course review', description: `${agent.reviewed} of the ${agent.sent} course(s) left open were reviewed against past decisions and the BU catalog.` });
     } else if (agent.status === 'failed') {
-      flags.push({ type: 'concern', title: 'Agent unavailable', description: `The agent review did not complete (${agent.error}); the engine's suggestions are shown.` });
+      flags.push({ type: 'concern', title: 'Additional course review unavailable', description: `The additional review did not complete (${agent.error}); the course-match suggestions are shown.` });
     }
 
     recommendations = `${s.transferred_credits} credits transfer as BU courses and ${s.elective_credits} as elective credit. `
@@ -367,11 +390,12 @@ export async function runEvaluation(evaluationId) {
     await notificationService.evaluationComplete(application, evaluationId);
     console.log(`[Eval]   Notification sent`);
 
-    // ── Step 6: Assign ───────────────────────────────────────────────────────
+    // ── Step 6: Apply established equivalencies then assign to evaluators ────
     if (credit) {
       console.log(`[Eval] STEP 6: Assigning application to evaluators`);
       try {
-        await assignmentService.assignApplication(applicationId);
+        const { held } = await lifecycle.applyEstablished(applicationId);
+        await assignmentService.assignApplication(applicationId, { held });
         console.log(`[Eval]   Assignment complete`);
       } catch (err) {
         console.error(`[Eval] STEP 6 FAILED: Assignment error — ${err.message}`);

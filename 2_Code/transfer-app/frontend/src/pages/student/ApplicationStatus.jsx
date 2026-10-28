@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  CheckCircle, Clock, FileText, AlertCircle, Award, Upload, Bell,
-  ChevronDown, ChevronUp, RefreshCw, Send
+  CheckCircle, Clock, AlertCircle, Upload, Bell, ChevronDown, ChevronUp, RefreshCw, Send, CalendarClock, Info, Paperclip
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getApplicationStatus, uploadStudentDocument, getStudentNotifications, respondToInfoRequest } from '../../api/student'
+import { getApplicationStatus, uploadStudentDocument, getStudentNotifications, respondToInfoRequest, uploadInfoResponse } from '../../api/student'
 import StatusBadge from '../../components/application/StatusBadge'
 import DocumentList from '../../components/application/DocumentList'
 import Spinner from '../../components/ui/Spinner'
@@ -14,22 +13,25 @@ import FileUpload from '../../components/ui/FileUpload'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
 
+// Where the application is in the process the student knows (MyBU Student posting is the last step)
 const TIMELINE_STAGES = [
   { key: 'submitted', label: 'Submitted' },
-  { key: 'under_evaluation', label: 'Under Evaluation' },
-  { key: 'under_evaluator_review', label: 'Evaluator Review' },
-  { key: 'approved', label: 'Decision' }
+  { key: 'evaluation', label: 'Course Evaluation' },
+  { key: 'review', label: 'Department Review' },
+  { key: 'posted', label: 'Credit Posted' }
 ]
 
 const STATUS_STAGE_MAP = {
   submitted: 0,
-  information_required: 1,
   under_evaluation: 1,
-  evaluation_completed: 2,
+  evaluation_completed: 1,
+  information_required: 2,
   under_evaluator_review: 2,
-  approved: 3,
-  rejected: 3,
-  closed: 3
+  ready_for_posting: 3,
+  credit_posted: 4,
+  approved: 4,
+  rejected: 4,
+  closed: 4
 }
 
 const DOC_TYPES = [
@@ -39,33 +41,40 @@ const DOC_TYPES = [
   { value: 'other', label: 'Other Document' }
 ]
 
-function formatDate(d) {
+// Course status colours; the wording comes from the API
+const TONE_CLASSES = {
+  done: 'bg-green-50 text-green-800 border-green-200',
+  action: 'bg-amber-50 text-amber-900 border-amber-300',
+  progress: 'bg-blue-50 text-blue-800 border-blue-200',
+  waiting: 'bg-gray-50 text-gray-700 border-gray-200'
+}
+
+function formatDate(d, withTime = true) {
   if (!d) return '—'
-  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(d))
+  return new Intl.DateTimeFormat('en-US', withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }).format(new Date(d))
 }
 
 function Timeline({ status }) {
   const currentStage = STATUS_STAGE_MAP[status] ?? 0
-  const isFinal = ['approved', 'rejected', 'closed'].includes(status)
+  const isFinal = currentStage >= TIMELINE_STAGES.length
 
   return (
     <div className="flex items-center gap-2">
       {TIMELINE_STAGES.map((stage, i) => {
         const done = currentStage > i
         const active = currentStage === i && !isFinal
-        const isFinalStage = i === TIMELINE_STAGES.length - 1
 
         return (
           <React.Fragment key={stage.key}>
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                done || (isFinal && isFinalStage)
+                done
                   ? 'bg-green-500 text-white'
                   : active
                   ? 'bg-primary-600 text-white ring-4 ring-primary-100'
                   : 'bg-gray-200 text-gray-400'
               }`}>
-                {(done || (isFinal && isFinalStage)) ? <CheckCircle className="w-4 h-4" /> : i + 1}
+                {done ? <CheckCircle className="w-4 h-4" /> : i + 1}
               </div>
               <span className={`text-xs mt-1 whitespace-nowrap font-medium ${
                 done || active ? 'text-gray-700' : 'text-gray-400'
@@ -99,6 +108,90 @@ function Section({ title, children, defaultOpen = true }) {
   )
 }
 
+// Answer one request: a file (the syllabus) and/or a written reply
+function RequestResponse({ token, request, onDone }) {
+  const [file, setFile] = useState(null)
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+  const syllabus = request.kind === 'syllabus'
+
+  const send = async () => {
+    if (!file && !reply.trim()) { toast.error(syllabus ? 'Choose the syllabus file' : 'Write your reply'); return }
+    setSending(true)
+    try {
+      if (file) await uploadInfoResponse(token, request.id, file, reply.trim())
+      else await respondToInfoRequest(token, request.id, { response: reply.trim() })
+      toast.success(syllabus ? 'Syllabus received' : 'Reply sent')
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.error?.message || 'Could not send. Please try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {syllabus && <FileUpload label="" onFileSelect={setFile} maxSizeMB={10} />}
+      <Textarea
+        placeholder={syllabus ? 'Note for the evaluator (optional)' : 'Your reply...'}
+        rows={syllabus ? 2 : 3}
+        value={reply}
+        onChange={e => setReply(e.target.value)}
+      />
+      <Button size="sm" onClick={send} loading={sending}>
+        {syllabus ? <Upload className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+        {syllabus ? 'Send syllabus' : 'Send reply'}
+      </Button>
+    </div>
+  )
+}
+
+function SummaryTile({ label, value, hint }) {
+  return (
+    <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2.5">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-lg font-bold text-gray-900 tabular-nums">{value}</p>
+      {hint && <p className="text-[11px] text-gray-400">{hint}</p>}
+    </div>
+  )
+}
+
+function CourseResult({ c, token, onChanged }) {
+  const [open, setOpen] = useState(c.status === 'information_requested')
+  return (
+    <li className="py-3">
+      <button type="button" onClick={() => setOpen(!open)} className="w-full text-left flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="font-mono text-xs text-gray-900">{c.course_code}</span>
+          <span className="text-sm text-gray-700 ml-2">{c.title}</span>
+          <span className="block text-xs text-gray-400">
+            {[c.term, c.source_credits != null ? `${c.source_credits} ${c.credit_system === 'Quarter' ? 'quarter ' : ''}credits` : null, c.grade && `grade ${c.grade}`].filter(Boolean).join(' · ')}
+          </span>
+        </span>
+        <span className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${TONE_CLASSES[c.tone] || TONE_CLASSES.waiting}`}>{c.status_label}</span>
+          <span className="text-xs text-gray-600 tabular-nums">
+            {c.units} BU unit{c.units === 1 ? '' : 's'}{c.transfer_grade ? ` · grade ${c.transfer_grade}` : ''}
+          </span>
+        </span>
+      </button>
+      {open && (
+        <div className="mt-2 pl-0.5 space-y-2">
+          {c.decision && <p className="text-sm font-medium text-gray-900">{c.decision}</p>}
+          <p className="text-sm text-gray-600">{c.explanation}</p>
+          {c.information_request && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+              <p className="text-sm text-amber-900">{c.information_request.message}</p>
+              <RequestResponse token={token} request={c.information_request} onDone={onChanged} />
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}
+
 export default function ApplicationStatus() {
   const { token } = useParams()
   const [state, setState] = useState({ loading: true, data: null, error: null })
@@ -107,8 +200,6 @@ export default function ApplicationStatus() {
   const [uploadFile, setUploadFile] = useState(null)
   const [uploadType, setUploadType] = useState('')
   const [showUpload, setShowUpload] = useState(false)
-  const [infoResponse, setInfoResponse] = useState('')
-  const [respondingTo, setRespondingTo] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -119,20 +210,26 @@ export default function ApplicationStatus() {
     }
   }, [token])
 
+  const loadNotifications = useCallback(() => {
+    getStudentNotifications(token).then(d => setNotifications(d.data || d.notifications || [])).catch(() => {})
+  }, [token])
+
   useEffect(() => {
     load()
-    getStudentNotifications(token).then(d => setNotifications(d.data || d.notifications || [])).catch(() => {})
-  }, [token, load])
+    loadNotifications()
+  }, [load, loadNotifications])
 
-  // Auto-refresh during evaluation
+  // Auto-refresh while the courses are being read and evaluated
   useEffect(() => {
     const app = state.data?.data || state.data
     if (!app) return
-    if (['under_evaluation', 'submitted'].includes(app.status)) {
+    if (['under_evaluation', 'submitted', 'evaluation_completed'].includes(app.status)) {
       const timer = setInterval(load, 30000)
       return () => clearInterval(timer)
     }
   }, [state.data, load])
+
+  const refreshAll = () => { load(); loadNotifications() }
 
   const handleUpload = async (e) => {
     e.preventDefault()
@@ -187,13 +284,14 @@ export default function ApplicationStatus() {
   if (!app) return null
 
   const documents = app.documents || []
-  const courses = app.courses || []
-  const infoRequests = app.info_requests || []
-  const evaluation = app.evaluation || null
-  // Decision is available inline on the app object once status is approved/rejected
-  const isDecided = ['approved', 'rejected'].includes(app.status)
-
-  const openInfoRequests = infoRequests.filter(r => r.status === 'pending')
+  const results = app.results || { summary: null, courses: [] }
+  const summary = results.summary
+  const courseResults = results.courses || []
+  // Requests not tied to a course (written replies); course requests are answered on the course itself
+  const openGeneralRequests = (app.info_requests || []).filter(r => r.status === 'pending' && !r.transcript_course_id)
+  const needsAction = courseResults.filter(c => c.status === 'information_requested')
+  const evaluating = ['under_evaluation', 'submitted', 'evaluation_completed'].includes(app.status) && courseResults.every(c => c.status === 'processing')
+  const byInstitution = courseResults.reduce((acc, c) => { (acc[c.institution] = acc[c.institution] || []).push(c); return acc }, {})
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
@@ -209,10 +307,7 @@ export default function ApplicationStatus() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <StatusBadge status={app.status} />
-            <button
-              onClick={load}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={refreshAll} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
               <RefreshCw className="w-3 h-3" /> Refresh
             </button>
           </div>
@@ -223,151 +318,84 @@ export default function ApplicationStatus() {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Application Progress</h2>
         <Timeline status={app.status} />
-        {app.status === 'information_required' && (
+        {needsAction.length > 0 && (
           <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
             <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
-              Additional information is required. See below.
+              {needsAction.length === 1 ? 'One course needs' : `${needsAction.length} courses need`} something from you. See below.
             </p>
           </div>
         )}
       </div>
 
       <div className="space-y-4">
-        {/* Decision */}
-        {isDecided && (
-          <div className={`rounded-xl border p-4 ${
-            app.final_decision === 'approved'
-              ? 'bg-green-50 border-green-200'
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              {app.final_decision === 'approved'
-                ? <Award className="w-5 h-5 text-green-600" />
-                : <AlertCircle className="w-5 h-5 text-red-600" />
-              }
-              <h3 className={`font-bold ${app.final_decision === 'approved' ? 'text-green-800' : 'text-red-800'}`}>
-                {app.final_decision === 'approved' ? 'Application Approved!' : 'Application Not Approved'}
-              </h3>
-            </div>
-            {app.evaluator_comments && (
-              <p className={`text-sm ${app.final_decision === 'approved' ? 'text-green-700' : 'text-red-700'}`}>
-                {app.evaluator_comments}
-              </p>
-            )}
-            {app.decision_date && (
-              <p className="text-xs text-gray-500 mt-2">Decision date: {formatDate(app.decision_date)}</p>
-            )}
-          </div>
-        )}
-
-        {/* Info Requests */}
-        {openInfoRequests.length > 0 && (
+        {/* Requests not tied to a course */}
+        {openGeneralRequests.length > 0 && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
             <h3 className="font-semibold text-amber-900 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
-              Action Required — Additional Information Needed
+              Action Required: Additional Information Needed
             </h3>
-            {openInfoRequests.map(req => (
+            {openGeneralRequests.map(req => (
               <div key={req.id} className="bg-white rounded-lg border border-amber-200 p-3">
-                <p className="text-sm text-gray-700 mb-2">{req.message_to_student || req.message}</p>
-                {(req.requested_items || req.items) && (
+                <p className="text-sm text-gray-700 mb-2">{req.message}</p>
+                {req.items?.length > 0 && (
                   <ul className="space-y-1 mb-3">
-                    {(req.requested_items || req.items).map((item, i) => (
+                    {req.items.map((item, i) => (
                       <li key={i} className="text-sm text-amber-800 flex items-center gap-2">
                         <span className="text-amber-500">•</span>{typeof item === 'string' ? item : item.description}
                       </li>
                     ))}
                   </ul>
                 )}
-                {respondingTo === req.id ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      placeholder="Your response..."
-                      rows={3}
-                      value={infoResponse}
-                      onChange={e => setInfoResponse(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={async () => {
-                        if (!infoResponse.trim()) { toast.error('Please enter a response'); return }
-                        try {
-                          await respondToInfoRequest(token, req.id, { response: infoResponse })
-                          toast.success('Response sent')
-                          setRespondingTo(null)
-                          setInfoResponse('')
-                          load()
-                        } catch { toast.error('Failed to send response') }
-                      }}>
-                        <Send className="w-3.5 h-3.5" /> Send Response
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => setRespondingTo(null)}>Cancel</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button size="sm" onClick={() => setRespondingTo(req.id)}>
-                    Respond
-                  </Button>
-                )}
+                <RequestResponse token={token} request={req} onDone={refreshAll} />
               </div>
             ))}
           </div>
         )}
 
-        {/* Evaluation Progress */}
-        {['under_evaluation', 'submitted'].includes(app.status) && !evaluation && (
-          <Section title="AI Evaluation">
+        {/* Courses still being read */}
+        {evaluating && (
+          <Section title="Course Evaluation">
             <div className="text-center py-6">
               <Spinner size="lg" className="text-primary-600 mx-auto mb-3" />
-              <p className="font-medium text-gray-700">AI is evaluating your application...</p>
-              <p className="text-sm text-gray-500 mt-1">This typically takes a few minutes. The page will auto-refresh.</p>
+              <p className="font-medium text-gray-700">We are reading your transcript and checking each course...</p>
+              <p className="text-sm text-gray-500 mt-1">This usually takes a few minutes. The page refreshes on its own.</p>
             </div>
           </Section>
         )}
 
-        {/* Evaluation Results — student-safe view */}
-        {evaluation && evaluation.status !== 'pending' && evaluation.status !== 'running' && (
-          <Section title="Evaluation Summary">
-            <div className="pt-4 space-y-3">
-              {evaluation.confidence_score != null && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-600">Overall Assessment</span>
-                    <span className={`text-sm font-semibold ${
-                      evaluation.confidence_score >= 0.8 ? 'text-green-700'
-                      : evaluation.confidence_score >= 0.6 ? 'text-yellow-700'
-                      : 'text-red-700'
-                    }`}>
-                      {evaluation.confidence_score >= 0.8 ? 'Strong'
-                       : evaluation.confidence_score >= 0.6 ? 'Moderate'
-                       : 'Needs Review'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        evaluation.confidence_score >= 0.8 ? 'bg-green-500'
-                        : evaluation.confidence_score >= 0.6 ? 'bg-yellow-400'
-                        : 'bg-red-500'
-                      }`}
-                      style={{ width: `${Math.round(evaluation.confidence_score * 100)}%` }}
-                    />
-                  </div>
+        {/* Transfer credit results */}
+        {courseResults.length > 0 && !evaluating && (
+          <Section title="Your Transfer Credit">
+            <div className="pt-4 space-y-4">
+              {summary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <SummaryTile label="Courses submitted" value={summary.courses} />
+                  <SummaryTile label="Evaluated" value={summary.decided} />
+                  <SummaryTile label="Still pending" value={summary.pending} hint={summary.pending ? 'shown as 0 units' : null} />
+                  <SummaryTile label="Credits posted" value={summary.credits_posted} hint={summary.credits_approved ? `+${summary.credits_approved} being posted` : null} />
                 </div>
               )}
-              {evaluation.missing_documents?.length > 0 && (
-                <div className="bg-amber-50 rounded-lg p-3">
-                  <p className="text-sm font-medium text-amber-800 mb-1">Missing Documents:</p>
-                  <ul className="text-sm text-amber-700 space-y-0.5">
-                    {evaluation.missing_documents.map((d, i) => (
-                      <li key={i}>• {typeof d === 'string' ? d : d.name || d.document_type}</li>
-                    ))}
+              {results.deadline?.deadline && (
+                <p className={`text-xs flex items-start gap-1.5 ${results.deadline.status === 'passed' ? 'text-red-700' : results.deadline.status === 'approaching' ? 'text-amber-700' : 'text-gray-500'}`}>
+                  <CalendarClock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{results.deadline.explanation}
+                </p>
+              )}
+              {Object.entries(byInstitution).map(([institution, list]) => (
+                <div key={institution}>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{institution}</p>
+                  <ul className="divide-y divide-gray-100">
+                    {list.map(c => <CourseResult key={c.id} c={c} token={token} onChanged={refreshAll} />)}
                   </ul>
                 </div>
-              )}
-              <p className="text-xs text-gray-400">
-                Evaluated: {formatDate(evaluation.evaluated_at)}
-              </p>
+              ))}
+              <div className="rounded-lg bg-gray-50 px-3 py-2.5 space-y-1">
+                {(results.policy_notes || []).map((n, i) => (
+                  <p key={i} className="text-xs text-gray-500 flex gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{n}</p>
+                ))}
+                <p className="text-xs text-gray-500 flex gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />Academic departments make the final decision on every course.</p>
+              </div>
             </div>
           </Section>
         )}
@@ -381,6 +409,7 @@ export default function ApplicationStatus() {
               ['Phone', app.student_phone],
               ['From Institution', app.transfer_from_institution],
               ['Program Requested', app.transfer_to_program],
+              ['BU Start Term', app.expected_start_term],
               ['GPA', app.academic_history?.gpa],
               ['Total Credits', app.academic_history?.credits_completed]
             ].map(([label, value]) => (
@@ -392,33 +421,11 @@ export default function ApplicationStatus() {
           </dl>
         </Section>
 
-        {/* Courses read from the transcript */}
-        {courses.length > 0 && (
-          <Section title={`Courses on your transcript (${courses.length})`} defaultOpen={false}>
-            <div className="pt-4">
-              <p className="text-xs text-gray-500 mb-3">
-                We read these courses from your transcript. Each one is reviewed by BU's Credit Evaluation team.
-              </p>
-              <ul className="divide-y divide-gray-100">
-                {courses.map(c => (
-                  <li key={c.id} className="py-2 flex items-start justify-between gap-3">
-                    <div>
-                      <span className="font-mono text-xs text-gray-900">{c.course_code}</span>
-                      <span className="text-sm text-gray-700 ml-2">{c.title}</span>
-                      <div className="text-xs text-gray-400">{c.institution} · {c.term}</div>
-                    </div>
-                    <span className="text-xs text-gray-500 whitespace-nowrap">{isDecided ? 'Reviewed' : 'Under review'}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Section>
-        )}
-
         {/* Documents */}
         <Section title={`Documents (${documents.length})`} defaultOpen={false}>
           <div className="pt-4 space-y-4">
             <DocumentList documents={documents} token={token} />
+            <p className="text-xs text-gray-500 flex gap-1.5"><Paperclip className="w-3.5 h-3.5 mt-0.5" />Send official final transcripts from every college you attended. Syllabi requested for a course are uploaded on that course above.</p>
 
             <Button variant="secondary" size="sm" onClick={() => setShowUpload(!showUpload)} className="w-full">
               <Upload className="w-4 h-4" />
@@ -460,6 +467,16 @@ export default function ApplicationStatus() {
               ))}
             </div>
           </Section>
+        )}
+
+        {app.status === 'credit_posted' && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex gap-2">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <p className="text-sm text-green-800">Your transfer credit evaluation is complete and every course has been posted to your record{app.decision_date ? ` (${formatDate(app.decision_date, false)})` : ''}.</p>
+          </div>
+        )}
+        {app.status !== 'credit_posted' && summary?.pending > 0 && (
+          <p className="text-xs text-gray-400 flex items-center gap-1.5 justify-center"><Clock className="w-3.5 h-3.5" />Courses still pending show 0 units until they are evaluated.</p>
         )}
       </div>
     </div>
