@@ -1,0 +1,20 @@
+{
+  "name": "bu-portal-qa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright tests for the BU Transfer Credit Portal, reported by the Foundry QA agent",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "qa:report": "node foundry/analyze-results.mjs test-results/results.json qa-report.md"
+  },
+  "dependencies": {
+    "@azure/ai-projects": "^2.9.0",
+    "@azure/identity": "^4.14.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "dotenv": "^16.4.5"
+  }
+}
