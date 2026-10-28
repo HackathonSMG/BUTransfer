@@ -20,6 +20,7 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
 import Textarea from '../../components/ui/Textarea'
+import ReviewAssignment from '../../components/staff/ReviewAssignment'
 
 const SOURCE_CONFIG = {
   website: { Icon: Globe, label: 'Web Portal' },
@@ -201,6 +202,9 @@ export default function ApplicationDetail() {
         </Button>
       </div>
 
+      {/* Where the application is and who holds each course */}
+      <ReviewAssignment ownership={app.ownership} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-5">
@@ -339,11 +343,14 @@ export default function ApplicationDetail() {
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
               <User className="w-4 h-4" />
-              Assigned Evaluator
+              Currently With
             </h3>
-            <p className="text-sm text-gray-700">
-              {app.evaluator_name || 'Unassigned'}
-            </p>
+            {(app.ownership?.owners || []).length ? app.ownership.owners.map(o => (
+              <p key={o.name} className="text-sm text-gray-700">
+                <span className="font-medium text-gray-900">{o.name}</span>{o.department ? ` — ${o.department}` : ''}
+                <span className="block text-xs text-gray-500">{o.courses.join(', ')}</span>
+              </p>
+            )) : <p className="text-sm text-gray-700">{app.ownership?.stage_label || 'No evaluator'}</p>}
           </div>
 
           {/* Student status link: lets staff hand the link to students they applied for */}

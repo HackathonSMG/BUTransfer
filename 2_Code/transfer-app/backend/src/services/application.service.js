@@ -10,6 +10,7 @@ import { ENGINE_VERSION } from './credit/engine.js';
 import { recommendationOf } from './credit/memory.service.js';
 import * as assignmentService from './workflow/assignment.service.js';
 import * as lifecycle from './workflow/lifecycle.service.js';
+import { OWNERSHIP_FROM, ATTENTION_STAGES, ownershipView } from './workflow/ownership.service.js';
 import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
@@ -138,13 +139,29 @@ export async function getApplicationById(id) {
   application.documents = docsResult.rows;
   application.information_requests = infoResult.rows;
   application.recent_audit = auditResult.rows;
+  application.ownership = await ownershipView(id);
   return application;
 }
 
-export async function listApplications({ status, source, search, assignedEvaluatorId, reviewerId, dateFrom, dateTo, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
+/**
+ * Staff list and Application Lookup. Each row carries its ownership (current evaluator, department, pending course,
+ * pending since, stage; see ownership.service). stage: one stage or 'needs_attention' (every stage needing office
+ * action). ownerId / department: an open course review held by that evaluator / department. minAgeDays: pending
+ * for at least that many days (operational information, not an SLA).
+ */
+export async function listApplications({ status, source, search, assignedEvaluatorId, reviewerId, dateFrom, dateTo, stage, ownerId, department, minAgeDays, page = 1, limit = 20, sort = 'created_at', order = 'DESC' } = {}) {
   const conditions = [];
   const params = [];
   let idx = 1;
+
+  if (stage === 'needs_attention') { conditions.push(`(a.stage = ANY($${idx++}) OR a.duplicate_status = 'suspected')`); params.push(ATTENTION_STAGES); }
+  else if (stage) { conditions.push(`a.stage = $${idx++}`); params.push(stage); }
+  if (ownerId) { conditions.push(`EXISTS (SELECT 1 FROM course_reviews ow WHERE ow.application_id = a.id AND ow.evaluator_id = $${idx++} AND ow.status IN ('queued', 'new', 'in_progress', 'info_requested'))`); params.push(ownerId); }
+  if (department) {
+    conditions.push(`EXISTS (SELECT 1 FROM course_reviews ow JOIN evaluators oe ON oe.id = ow.evaluator_id WHERE ow.application_id = a.id AND oe.department = $${idx++} AND ow.status IN ('queued', 'new', 'in_progress', 'info_requested'))`);
+    params.push(department);
+  }
+  if (minAgeDays) { conditions.push(`a.pending_since <= NOW() - make_interval(days => $${idx++})`); params.push(minAgeDays); }
 
   // An evaluator only sees applications with a course assigned to them
   if (reviewerId) { conditions.push(`EXISTS (SELECT 1 FROM course_reviews rv WHERE rv.application_id = a.id AND rv.evaluator_id = $${idx++})`); params.push(reviewerId); }
@@ -160,7 +177,7 @@ export async function listApplications({ status, source, search, assignedEvaluat
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const allowedSortCols = ['created_at', 'submitted_at', 'status', 'student_name', 'reference_number'];
+  const allowedSortCols = ['created_at', 'submitted_at', 'status', 'student_name', 'reference_number', 'pending_since'];
   const sortCol = allowedSortCols.includes(sort) ? sort : 'created_at';
   const sortDir = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const offset = (page - 1) * limit;
@@ -171,22 +188,45 @@ export async function listApplications({ status, source, search, assignedEvaluat
               a.transfer_from_institution, a.transfer_to_program, a.transfer_to_department,
               a.expected_start_term, a.submitted_at, a.final_decision, a.decision_date,
               a.assigned_evaluator_id, a.created_at, a.updated_at, p.full_name AS evaluator_name, a.duplicate_status,
-              ae.confidence_score AS ai_confidence_score
-       FROM applications a
+              ae.confidence_score AS ai_confidence_score,
+              a.stage, a.open_reviews, a.unassigned_reviews, a.owners_count, a.current_owner_id, a.current_owner_name,
+              a.current_owner_department, a.pending_course, a.pending_review_status, a.pending_since
+       FROM ${OWNERSHIP_FROM}
        LEFT JOIN profiles p ON p.id = a.assigned_evaluator_id
        LEFT JOIN LATERAL (
          SELECT confidence_score FROM ai_evaluations
          WHERE application_id = a.id AND status = 'completed'
          ORDER BY created_at DESC LIMIT 1
        ) ae ON true
-       ${where} ORDER BY a.${sortCol} ${sortDir} LIMIT $${idx} OFFSET $${idx + 1}`,
+       ${where} ORDER BY a.${sortCol} ${sortDir} NULLS LAST LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, limit, offset]
     ),
-    query(`SELECT COUNT(*) AS total FROM applications a ${where}`, params),
+    query(`SELECT COUNT(*) AS total FROM ${OWNERSHIP_FROM} ${where}`, params),
   ]);
 
   const total = parseInt(countResult.rows[0].total, 10);
   return { applications: dataResult.rows, total, page, limit, pages: Math.ceil(total / limit) };
+}
+
+/**
+ * Counts by stage, the evaluators and departments currently holding courses (the queue's filter options), and
+ * the number needing office attention. Independent of the list's filters and paging.
+ */
+export async function getOwnershipStats() {
+  const [{ rows: stages }, { rows: owners }, { rows: [attention] }, { rows: [unassigned] }] = await Promise.all([
+    query(`SELECT a.stage, COUNT(*)::int AS count FROM ${OWNERSHIP_FROM} GROUP BY a.stage`),
+    query(`SELECT DISTINCT r.evaluator_id AS id, p.full_name AS name, e.department FROM course_reviews r JOIN profiles p ON p.id = r.evaluator_id
+           LEFT JOIN evaluators e ON e.id = r.evaluator_id WHERE r.status IN ('queued', 'new', 'in_progress', 'info_requested') ORDER BY p.full_name`),
+    query(`SELECT COUNT(*)::int AS n FROM ${OWNERSHIP_FROM} WHERE a.stage = ANY($1) OR a.duplicate_status = 'suspected'`, [ATTENTION_STAGES]),
+    query(`SELECT COUNT(*)::int AS n FROM course_reviews WHERE evaluator_id IS NULL AND status IN ('queued', 'new', 'in_progress', 'info_requested')`),
+  ]);
+  return {
+    by_stage: Object.fromEntries(stages.map((r) => [r.stage, r.count])),
+    needs_attention: attention.n,
+    unassigned_reviews: unassigned.n,
+    owners: owners.map((o) => ({ id: o.id, name: o.name, department: o.department })),
+    departments: [...new Set(owners.map((o) => o.department).filter(Boolean))].sort(),
+  };
 }
 
 /** Queue-wide counts for the staff dashboard; independent of the list's filters and paging. */
@@ -536,4 +576,4 @@ export async function assignEvaluator(applicationId, evaluatorId, assignedBy) {
   await auditLog({ applicationId, action: 'evaluator_assigned', actorId: assignedBy, newValue: { assigned_evaluator_id: evaluatorId } });
 }
 
-export default { createApplication, submitApplication, updateDraft, getApplicationById, listApplications, getApplicationStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };
+export default { createApplication, submitApplication, updateDraft, getApplicationById, listApplications, getApplicationStats, getOwnershipStats, triggerEvaluation, runEvaluation, submitDecision, createInfoRequest, updateApplicationStatus, assignEvaluator, addNote };

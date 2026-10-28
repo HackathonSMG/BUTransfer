@@ -144,6 +144,26 @@ New on the Credit Office application page:
 - **Additional information from the applicant** (their comments);
 - **Applicant updates**: every notification sent to the applicant, with its email delivery status (sent, logged, will retry, failed, or not sent for a test address).
 
+### Where is an application, and who has it?
+
+Staff never need the database for this:
+- **Credit Office / admin:** **Applications**.
+  - Each row shows the stage (e.g. *Pending Evaluator Review*), the current evaluator and department, the pending course, and how long it has been pending.
+  - Filter by stage, evaluator, department or age.
+  - **Needs attention** and **Unassigned reviews** show applications needing intervention.
+- **Any application page:** **Current Review Assignment**.
+  - Where it is, who has it, which course is blocking completion, and for how long.
+  - Every course with its evaluator.
+  - The full assignment history, including reassignments.
+- **Evaluators:** **Application Lookup** in the left menu.
+  - Search by application number, applicant name or email.
+  - Covers applications they have, or had, a course on.
+
+Try it after step 10 of the walkthrough:
+1. Sign in as the Credit Office and find the new application in **Applications**. It shows *Pending Evaluator Review* with the CS evaluator and CSC 220.
+2. Sign in as `evaluator.cs@bu-transfer.local`, open **Application Lookup** and search for the applicant's name.
+3. After the CS decision, the application shows the next evaluator as the current owner.
+
 ## 12. Final decision
 
 When every course is posted the application becomes **Completed** (`credit_posted`) and the applicant is emailed. If only some courses are posted, the others remain pending at 0 units, and the applicant is told which were posted.

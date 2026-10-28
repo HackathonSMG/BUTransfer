@@ -24,6 +24,7 @@ import MyDashboard from './pages/evaluator/MyDashboard'
 import MyEvaluations from './pages/evaluator/MyEvaluations'
 import MyProfile from './pages/evaluator/MyProfile'
 import ReviewDetail from './pages/evaluator/ReviewDetail'
+import ApplicationLookup from './pages/evaluator/ApplicationLookup'
 import Reports from './pages/admin/Reports'
 import Conflicts from './pages/admin/Conflicts'
 import NotFound from './pages/NotFound'
@@ -85,6 +86,17 @@ export default function App() {
             <ProtectedRoute allowedRoles={['evaluator']}>
               <Layout>
                 <ReviewDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        {/* Application Lookup: where an application is and who has it (evaluators are scoped by the API) */}
+        <Route
+          path="/evaluator/lookup"
+          element={
+            <ProtectedRoute allowedRoles={['evaluator', 'admin', 'credit_office']}>
+              <Layout>
+                <ApplicationLookup />
               </Layout>
             </ProtectedRoute>
           }

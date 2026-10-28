@@ -13,6 +13,7 @@ import {
   UserCircle,
   ShieldCheck,
   Stamp,
+  FileSearch,
   X
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -27,7 +28,8 @@ const evaluatorSections = [
   {
     links: [
       { to: '/evaluator', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: (p) => isReviewDetail(p) || isApplicationDetail(p) },
+      { to: '/evaluator/my-evaluations', label: 'My Evaluations', icon: ClipboardCheck, alsoActive: isReviewDetail },
+      { to: '/evaluator/lookup', label: 'Application Lookup', icon: FileSearch, alsoActive: isApplicationDetail },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/evaluator/profile', label: 'My Profile', icon: UserCircle }
     ]
