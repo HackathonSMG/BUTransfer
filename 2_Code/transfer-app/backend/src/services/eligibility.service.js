@@ -8,7 +8,13 @@ export async function getCriteria() {
   return result.rows;
 }
 
-export async function checkEligibility({ gpa, credits, institution, program, hasTranscripts }) {
+/**
+ * @param {object} input
+ * @param {boolean} [input.missingAsUnknown] the staff evaluation of an application: a GPA or credit total that was
+ *   not asked for (the applicant form does not collect them; the transcript carries them) is "to be verified",
+ *   not a failed criterion. The public eligibility check keeps treating a missing value as not met.
+ */
+export async function checkEligibility({ gpa, credits, institution, program, hasTranscripts, missingAsUnknown = false }) {
   const criteria = await getCriteria();
   const criteriaResults = [];
   const reasons = [];
@@ -24,7 +30,7 @@ export async function checkEligibility({ gpa, credits, institution, program, has
       case 'gpa': {
         const minGpa = parseFloat(ruleConfig.min_gpa ?? 2.5);
         const studentGpa = parseFloat(gpa);
-        if (isNaN(studentGpa)) { result = false; reason = 'GPA not provided'; }
+        if (isNaN(studentGpa)) { result = missingAsUnknown ? null : false; reason = missingAsUnknown ? 'GPA will be verified from the transcript' : 'GPA not provided'; }
         else if (studentGpa >= minGpa) { result = true; reason = `GPA ${studentGpa.toFixed(2)} meets minimum of ${minGpa.toFixed(2)}`; }
         else { result = false; reason = `GPA ${studentGpa.toFixed(2)} is below minimum of ${minGpa.toFixed(2)}`; }
         break;
@@ -32,7 +38,7 @@ export async function checkEligibility({ gpa, credits, institution, program, has
       case 'credits': {
         const minCredits = parseInt(ruleConfig.min_credits ?? 30, 10);
         const studentCredits = parseInt(credits, 10);
-        if (isNaN(studentCredits)) { result = false; reason = 'Credit hours not provided'; }
+        if (isNaN(studentCredits)) { result = missingAsUnknown ? null : false; reason = missingAsUnknown ? 'Credit hours will be verified from the transcript' : 'Credit hours not provided'; }
         else if (studentCredits >= minCredits) { result = true; reason = `${studentCredits} credit hours meets minimum of ${minCredits}`; }
         else { result = false; reason = `${studentCredits} credit hours is below minimum of ${minCredits}`; }
         break;

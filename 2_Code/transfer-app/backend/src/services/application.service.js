@@ -384,6 +384,7 @@ export async function runEvaluation(evaluationId) {
       institution: application.transfer_from_institution,
       program: application.transfer_to_program,
       hasTranscripts: documents.some((d) => d.document_type === 'transcript'),
+      missingAsUnknown: true,
     });
     console.log(`[Eval]   Eligibility result: eligible=${eligibility.eligible} score=${eligibility.score}`);
     if (eligibility.reasons?.length) console.log(`[Eval]   Reasons: ${eligibility.reasons.join('; ')}`);

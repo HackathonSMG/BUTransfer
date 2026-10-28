@@ -54,10 +54,10 @@ function Progress({ stages }) {
       <ol className="hidden md:flex items-start">
         {stages.map((s, i) => (
           <li key={s.key} className="flex-1 flex flex-col items-center relative text-center" aria-current={s.state === 'current' ? 'step' : undefined}>
-            {i > 0 && <span className={`absolute top-4 right-1/2 w-full h-0.5 ${s.state === 'upcoming' ? 'bg-gray-200' : 'bg-green-500'}`} aria-hidden="true" />}
+            {i > 0 && <span className={`absolute top-4 right-1/2 w-full h-0.5 ${s.state === 'upcoming' || (s.state === 'skipped' && stages[i + 1]?.state === 'upcoming') ? 'bg-gray-200' : 'bg-green-500'}`} aria-hidden="true" />}
             <StageDot state={s.state} n={i + 1} />
-            <span className={`mt-2 text-xs font-medium leading-tight px-1 ${s.state === 'upcoming' ? 'text-gray-400' : 'text-gray-900'}`}>{s.label}</span>
-            <span className="text-[11px] text-gray-500 mt-0.5 h-4">{s.state === 'current' ? 'In progress' : s.at ? fmt(s.at) : ''}</span>
+            <span className={`mt-2 text-xs font-medium leading-tight px-1 ${['upcoming', 'skipped'].includes(s.state) ? 'text-gray-400' : 'text-gray-900'}`}>{s.label}</span>
+            <span className="text-[11px] text-gray-500 mt-0.5 h-4">{stageNote(s)}</span>
           </li>
         ))}
       </ol>
@@ -70,8 +70,8 @@ function Progress({ stages }) {
               {i < stages.length - 1 && <span className={`w-0.5 flex-1 min-h-[18px] ${stages[i + 1].state === 'upcoming' ? 'bg-gray-200' : 'bg-green-500'}`} />}
             </span>
             <span className="pb-4">
-              <span className={`block text-sm font-medium ${s.state === 'upcoming' ? 'text-gray-400' : 'text-gray-900'}`}>{s.label}</span>
-              <span className="block text-xs text-gray-500">{s.state === 'current' ? 'In progress' : s.at ? fmt(s.at) : ''}</span>
+              <span className={`block text-sm font-medium ${['upcoming', 'skipped'].includes(s.state) ? 'text-gray-400' : 'text-gray-900'}`}>{s.label}</span>
+              <span className="block text-xs text-gray-500">{stageNote(s)}</span>
             </span>
           </li>
         ))}
@@ -80,7 +80,10 @@ function Progress({ stages }) {
   )
 }
 
+const stageNote = (s) => (s.state === 'current' ? 'In progress' : s.state === 'skipped' ? (s.note || 'Not needed') : s.at ? fmt(s.at) : '')
+
 function StageDot({ state, n }) {
+  if (state === 'skipped') return <span className="relative z-10 w-8 h-8 rounded-full bg-gray-50 border-2 border-dashed border-gray-300 text-gray-400 grid place-items-center text-xs font-semibold ring-4 ring-white">—</span>
   if (state === 'done') return <span className="relative z-10 w-8 h-8 rounded-full bg-green-600 text-white grid place-items-center ring-4 ring-white"><Check className="w-4 h-4" /></span>
   if (state === 'current') return <span className="relative z-10 w-8 h-8 rounded-full bg-white border-2 border-brand text-brand grid place-items-center text-sm font-bold ring-4 ring-red-50">{n}</span>
   return <span className="relative z-10 w-8 h-8 rounded-full bg-white border-2 border-gray-200 text-gray-400 grid place-items-center text-sm font-semibold ring-4 ring-white">{n}</span>
@@ -117,37 +120,48 @@ function RequestResponse({ token, request, onDone }) {
   )
 }
 
-function ResultCell({ c }) {
-  if (c.outcome === 'transfer') return <span><span className="block text-sm font-semibold text-gray-900">{c.result_label}</span><span className="block text-xs text-gray-500">{c.credit_type}</span></span>
-  if (c.outcome === 'elective') return <span><span className="block text-sm font-semibold text-gray-900">{c.result_label}</span><span className="block text-xs text-gray-500">{c.credit_type}</span></span>
-  if (c.outcome === 'no_credit') return <span className="text-sm font-medium text-gray-700">{c.result_label}</span>
-  return <span className="text-sm text-gray-500">{c.result_label}</span>
+// The result of one course, in the applicant's terms (the outcome comes from the API)
+const RESULT = {
+  transfer: { label: 'Equivalent', tone: 'done' },
+  elective: { label: 'Elective Credit', tone: 'done' },
+  no_credit: { label: 'Not Accepted', tone: 'waiting' }
+}
+function resultOf(c) {
+  if (c.outcome) return RESULT[c.outcome]
+  if (c.status === 'information_requested') return { label: 'Action Needed', tone: 'action' }
+  return { label: 'Pending', tone: 'progress' }
 }
 
 function CourseRow({ c, token, onChanged }) {
   const [open, setOpen] = useState(c.status === 'information_requested')
-  const credits = c.source_credits != null ? `${c.source_credits} ${c.credit_system === 'Quarter' ? 'quarter ' : ''}credits` : null
+  const result = resultOf(c)
+  const credits = c.source_credits != null
+    ? `${c.source_credits}${c.credit_system === 'Quarter' ? ' qtr' : ''}`
+    : '—'
+  const awarded = c.outcome ? c.units : 0
   return (
-    <li className={`py-3.5 ${c.status === 'information_requested' ? 'bg-amber-50/40 -mx-5 sm:-mx-6 px-5 sm:px-6' : ''}`}>
+    <li className={c.status === 'information_requested' ? 'bg-amber-50/50' : ''}>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
-        className="w-full text-left grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.3fr)_72px_20px] gap-x-4 gap-y-1.5 items-start">
+        className="w-full text-left px-5 sm:px-6 py-3.5 grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_4.5rem_minmax(0,1.4fr)_8.5rem_5rem_1.25rem] gap-x-4 gap-y-1.5 items-center hover:bg-gray-50/80 transition-colors">
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-gray-900"><span className="font-mono">{c.course_code}</span> <span className="font-normal text-gray-700">{c.title}</span></span>
-          <span className="block text-xs text-gray-500 mt-0.5">{[c.term, credits, c.grade && `grade ${c.grade}`].filter(Boolean).join(' · ')}</span>
+          <span className="block text-xs text-gray-500 mt-0.5">{[c.term, c.grade && `Grade ${c.grade}`].filter(Boolean).join(' · ')}<span className="md:hidden">{c.source_credits != null ? ` · ${credits} credits` : ''}</span></span>
         </span>
-        <span className="md:order-none order-first col-start-2 row-start-1 md:col-auto md:row-auto justify-self-end md:justify-self-start">
-          <Badge tone={c.tone}>{c.status === 'information_requested' ? 'Action needed' : c.status_label}</Badge>
+        <span className="hidden md:block text-sm text-gray-700 tabular-nums text-right">{credits}</span>
+        <span className="col-span-2 md:col-span-1 min-w-0 text-sm order-3 md:order-none">
+          {c.outcome === 'transfer' ? <span className="font-semibold text-gray-900">{c.bu_course}</span>
+            : c.outcome === 'elective' ? <span className="font-medium text-gray-900">{c.result_label}</span>
+              : <span className="text-gray-400">—</span>}
         </span>
-        <span className="col-span-2 md:col-span-1 flex items-start justify-between gap-3">
-          <ResultCell c={c} />
-          <span className="md:hidden text-xs text-gray-600 tabular-nums whitespace-nowrap">{c.units} BU unit{c.units === 1 ? '' : 's'}</span>
-        </span>
-        <span className="hidden md:block text-sm text-gray-900 tabular-nums text-right">{c.units}<span className="text-xs text-gray-500"> unit{c.units === 1 ? '' : 's'}</span></span>
-        <ChevronDown className={`hidden md:block w-4 h-4 text-gray-400 mt-0.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="justify-self-end md:justify-self-start row-start-1 col-start-2 md:row-auto md:col-auto"><Badge tone={result.tone}>{result.label}</Badge></span>
+        <span className="hidden md:block text-sm font-semibold text-gray-900 tabular-nums text-right">{awarded}</span>
+        <ChevronDown className={`hidden md:block w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="md:hidden col-span-2 order-4 text-xs text-gray-600">BU units: <span className="font-semibold text-gray-900 tabular-nums">{awarded}</span></span>
       </button>
       {open && (
-        <div className="mt-3 space-y-2">
-          <p className="text-sm text-gray-600">{c.explanation}</p>
+        <div className="px-5 sm:px-6 pb-4 -mt-1 space-y-2">
+          <p className="text-xs font-medium text-gray-500">{c.status_label}</p>
+          <p className="text-sm text-gray-700">{c.explanation}</p>
           {c.transfer_grade && <p className="text-xs text-gray-500">Posted with a grade of {c.transfer_grade}; not counted in the BU GPA; no BU Hub units.</p>}
           {c.information_request && (
             <div className="bg-white border border-amber-200 rounded-xl p-3.5 space-y-2.5">
@@ -158,6 +172,50 @@ function CourseRow({ c, token, onChanged }) {
         </div>
       )}
     </li>
+  )
+}
+
+// Transfer Credit Summary: every figure is from the API's course summary (lifecycle.summarizeCourses)
+function CreditSummary({ summary, complete }) {
+  if (!summary) return null
+  const tiles = [
+    { label: 'Credits Accepted', value: summary.credits_accepted, hint: 'BU units from accepted courses' },
+    { label: 'Credits Awarded', value: summary.credits_posted, hint: 'Posted to your record, grade T' },
+    { label: 'Credits Pending', value: summary.credits_pending, hint: summary.pending_without_credits ? `+ ${summary.pending_without_credits} course${summary.pending_without_credits === 1 ? '' : 's'} awaiting credit details` : 'Under evaluation; 0 units until decided' }
+  ]
+  const counts = [
+    ['Courses Evaluated', `${summary.decided} of ${summary.courses}`],
+    ['Courses Accepted', summary.courses_accepted],
+    ['Equivalent / Elective', `${summary.courses_equivalent} / ${summary.courses_elective}`],
+    ['Not Accepted', summary.courses_not_accepted],
+    ['Courses Pending', summary.pending]
+  ]
+  return (
+    <section className={`rounded-2xl border ${complete ? 'border-green-200 bg-gradient-to-b from-green-50 to-white' : 'border-gray-200 bg-white'}`} aria-labelledby="credit-summary">
+      <div className="px-5 sm:px-6 pt-5 pb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="credit-summary" className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          {complete && <CheckCircle2 className="w-5 h-5 text-green-600" />}Transfer Credit Summary
+        </h2>
+        {complete && <span className="text-xs font-medium text-green-800">Evaluation complete</span>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-5 sm:px-6 py-4">
+        {tiles.map(t => (
+          <div key={t.label} className="rounded-xl border border-gray-200 bg-white px-4 py-3.5">
+            <p className="text-xs font-medium text-gray-500">{t.label}</p>
+            <p className="text-[28px] font-bold text-gray-900 tabular-nums leading-tight mt-0.5">{t.value}</p>
+            <p className="text-[11.5px] text-gray-500 mt-0.5">{t.hint}</p>
+          </div>
+        ))}
+      </div>
+      <dl className="grid grid-cols-2 sm:grid-cols-5 border-t border-gray-100">
+        {counts.map(([k, v]) => (
+          <div key={k} className="px-5 sm:px-6 py-3 border-gray-100 [&:not(:last-child)]:sm:border-r">
+            <dt className="text-[11.5px] text-gray-500">{k}</dt>
+            <dd className="text-base font-semibold text-gray-900 tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   )
 }
 
@@ -227,9 +285,6 @@ export default function ApplicationTracker({ token, headerAction = null }) {
   const generalRequests = (app.info_requests || []).filter(r => r.status === 'pending' && !r.transcript_course_id)
   const processing = PROCESSING.includes(app.status) && courses.every(c => c.status === 'processing')
   const complete = app.status === 'credit_posted'
-  const awarded = courses.filter(c => ['transfer', 'elective'].includes(c.outcome))
-  const notAccepted = courses.filter(c => c.outcome === 'no_credit')
-  const pending = courses.filter(c => !c.outcome)
   const byInstitution = courses.reduce((acc, c) => { (acc[c.institution] = acc[c.institution] || []).push(c); return acc }, {})
   const transcriptsRead = courses.length > 0
 
@@ -288,17 +343,10 @@ export default function ApplicationTracker({ token, headerAction = null }) {
         </section>
       )}
 
-      {/* Final outcome */}
+      {/* Transfer Credit Summary */}
+      {courses.length > 0 && !processing && <CreditSummary summary={summary} complete={complete} />}
       {complete && (
-        <section className="rounded-2xl border border-green-200 bg-green-50 px-5 sm:px-6 py-5">
-          <p className="font-semibold text-green-900 flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />Your transfer credit evaluation is complete</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-            <Stat label="BU credits awarded" value={summary?.credits_posted ?? 0} />
-            <Stat label="Courses accepted" value={awarded.length} />
-            <Stat label="Courses not accepted" value={notAccepted.length} />
-          </div>
-          <p className="text-xs text-green-900/80 mt-3">Credit was posted{app.decision_date ? ` on ${fmt(app.decision_date)}` : ''} with a grade of T. Transfer grades do not count toward your BU GPA.</p>
-        </section>
+        <p className="text-xs text-gray-500 -mt-2 px-1">Credit was posted{app.decision_date ? ` on ${fmt(app.decision_date)}` : ''} with a grade of T. Transfer grades do not count toward your BU GPA.</p>
       )}
 
       {/* Course evaluation */}
@@ -317,13 +365,6 @@ export default function ApplicationTracker({ token, headerAction = null }) {
           </div>
         ) : (
           <div className="space-y-5">
-            {!complete && summary && (
-              <div className="grid grid-cols-3 gap-3">
-                <Stat label="Courses" value={summary.courses} muted />
-                <Stat label="Evaluated" value={summary.decided} muted />
-                <Stat label="Pending" value={pending.length} muted hint={pending.length ? '0 BU units until evaluated' : null} />
-              </div>
-            )}
             {results.deadline?.deadline && (
               <p className={`text-xs flex items-start gap-1.5 ${results.deadline.status === 'passed' ? 'text-red-700' : results.deadline.status === 'approaching' ? 'text-amber-700' : 'text-gray-500'}`}>
                 <CalendarClock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{results.deadline.explanation}
@@ -332,12 +373,14 @@ export default function ApplicationTracker({ token, headerAction = null }) {
             {Object.entries(byInstitution).map(([institution, list]) => (
               <div key={institution}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{institution}</p>
-                <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.3fr)_72px_20px] gap-x-4 mt-3 pb-2 border-b border-gray-100 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                  <span>Previous course</span><span>Evaluation status</span><span>Transfer result</span><span className="text-right">BU units</span><span />
+                <div className="-mx-5 sm:-mx-6 mt-2 border-y border-gray-100">
+                <div className="hidden md:grid grid-cols-[minmax(0,2fr)_4.5rem_minmax(0,1.4fr)_8.5rem_5rem_1.25rem] gap-x-4 px-6 py-2 bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <span>Previous course</span><span className="text-right">Credits</span><span>BU equivalent</span><span>Result</span><span className="text-right">BU units</span><span />
                 </div>
                 <ul className="divide-y divide-gray-100">
                   {list.map(c => <CourseRow key={c.id} c={c} token={token} onChanged={load} />)}
                 </ul>
+                </div>
               </div>
             ))}
             <div className="rounded-xl bg-gray-50 px-4 py-3 space-y-1">
@@ -418,16 +461,6 @@ export default function ApplicationTracker({ token, headerAction = null }) {
           </ul>
         </Card>
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value, hint, muted }) {
-  return (
-    <div className={`rounded-xl px-3.5 py-3 ${muted ? 'bg-gray-50 border border-gray-100' : 'bg-white border border-green-200'}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 tabular-nums leading-tight mt-0.5">{value}</p>
-      {hint && <p className="text-[11px] text-gray-400">{hint}</p>}
     </div>
   )
 }

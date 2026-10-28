@@ -4,7 +4,8 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const TERM = /^(Winter|Spring|Summer|Fall)\s+\d{4}$/;
-const GRADE = /^(A|A-|B\+|B|B-|C\+|C|C-|D\+|D|D-|F|W|P|I)$/;
+// A+ is a valid letter grade (policy.js scores it 4.3); without it an A+ row was silently dropped
+const GRADE = /^(A\+|A|A-|B\+|B|B-|C\+|C|C-|D\+|D|D-|F|W|P|I)$/;
 const COLUMNS = ['COURSE', 'TITLE', 'ATTEMPTED', 'EARNED', 'GRADE', 'QUALITY PTS'];
 
 async function readLines(buffer) {
@@ -63,8 +64,10 @@ function parseStructured(lines) {
     }
     const code = cells.COURSE.join(' ').replace(/\s+/g, ' ').trim();
     const grade = cells.GRADE.join('').trim();
-    const attempted = Number(cells.ATTEMPTED.join('').replace(/[^0-9.]/g, ''));
-    if (!code || !GRADE.test(grade) || !Number.isFinite(attempted)) continue;
+    // A blank credits cell stays null (the engine then asks for the credits); it is never read as 0 credits
+    const creditsText = cells.ATTEMPTED.join('').replace(/[^0-9.]/g, '');
+    const attempted = creditsText === '' ? null : Number(creditsText);
+    if (!code || !GRADE.test(grade) || (attempted !== null && !Number.isFinite(attempted))) continue;
     courses.push({ course_code: code, title: cells.TITLE.join(' ').trim(), term, source_credits: attempted, grade });
   }
   return { institution, credit_system, courses };
@@ -78,7 +81,7 @@ const AI_SYSTEM_PROMPT = `Extract transcript data from the text and return ONLY 
     { "course_code": "DEPT 101", "title": "Course Title", "term": "Fall 2023", "source_credits": 3, "grade": "A" }
   ]
 }
-Rules: grade must be one of A A- B+ B B- C+ C C- D+ D D- F W P I. source_credits must be a number.
+Rules: grade must be one of A+ A A- B+ B B- C+ C C- D+ D D- F W P I. source_credits must be a number.
 Omit any row where grade or credits are missing. Do not include student name, ID, or contact info.`;
 
 /**
@@ -101,7 +104,7 @@ async function aiParseTranscript(rawText, openaiClient) {
   });
 
   const parsed = JSON.parse(response.choices[0].message.content);
-  const VALID_GRADE = /^(A|A-|B\+|B|B-|C\+|C|C-|D\+|D|D-|F|W|P|I)$/;
+  const VALID_GRADE = /^(A\+|A|A-|B\+|B|B-|C\+|C|C-|D\+|D|D-|F|W|P|I)$/;
   return {
     institution: parsed.institution || null,
     credit_system: parsed.credit_system || null,

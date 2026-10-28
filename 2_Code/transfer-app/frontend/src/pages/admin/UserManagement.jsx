@@ -438,7 +438,7 @@ function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling, onA
 
   if (!evaluatorId) return null
   const workload = p ? [
-    ['New', p.new_reviews], ['In progress', p.in_progress_reviews], ['Waiting on student', p.waiting_reviews], ['Upcoming', p.queued_reviews]
+    ['New', p.new_reviews], ['In progress', p.in_progress_reviews], ['Waiting on applicant', p.waiting_reviews], ['Upcoming', p.queued_reviews]
   ] : []
 
   return (

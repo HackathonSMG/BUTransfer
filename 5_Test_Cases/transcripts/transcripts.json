@@ -1,0 +1,532 @@
+[
+ {
+  "file": "TC01_Established_Equivalencies_Northeastern.pdf",
+  "student": "Elena Park",
+  "student_id": "TST-101",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": 5,
+    "grade": "A"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "CS 1800",
+    "title": "Discrete Structures",
+    "credits": 4,
+    "grade": "B+"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "ECON 1116",
+    "title": "Principles of Microeconomics",
+    "credits": 4,
+    "grade": "A-"
+   }
+  ]
+ },
+ {
+  "file": "TC02_Elective_Equivalency_Riverside.pdf",
+  "student": "Jonah Castillo",
+  "student_id": "TST-102",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Riverside Community College",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "ENG 101",
+    "title": "English Composition I",
+    "credits": 3,
+    "grade": "B+"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "CSC 110",
+    "title": "Programming Fundamentals with Python",
+    "credits": 4,
+    "grade": "A"
+   }
+  ]
+ },
+ {
+  "file": "TC03_Elective_and_Different_Course_Northeastern.pdf",
+  "student": "Priya Natarajan",
+  "student_id": "TST-103",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "DS 3000",
+    "title": "Mathematical Foundations of Artificial Intelligence",
+    "credits": 4,
+    "grade": "A"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "PSYC 2320",
+    "title": "Statistics in Psychological Research",
+    "credits": 4,
+    "grade": "B+"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "CS 3800",
+    "title": "Theory of Computation",
+    "credits": 4,
+    "grade": "A-"
+   }
+  ]
+ },
+ {
+  "file": "TC04_No_Credit_Rules_NYU.pdf",
+  "student": "Daniel Okoro",
+  "student_id": "TST-104",
+  "major": "Psychology",
+  "start": "Fall 2027",
+  "institution": "New York University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "BIOL-UA 11",
+    "title": "Principles of Biology I",
+    "credits": 4,
+    "grade": "D"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MATH-UA 121",
+    "title": "Calculus I",
+    "credits": 4,
+    "grade": "C-"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "CHEM-UA 125",
+    "title": "General Chemistry I",
+    "credits": 5,
+    "grade": "W"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "PSYCH-UA 1",
+    "title": "Intro to Psychology",
+    "credits": 4,
+    "grade": "A"
+   }
+  ]
+ },
+ {
+  "file": "TC05_Information_Required_NYU.pdf",
+  "student": "Sofia Lindqvist",
+  "student_id": "TST-105",
+  "major": "Mathematics",
+  "start": "Fall 2027",
+  "institution": "New York University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "MATH-UA 122",
+    "title": "Calculus II",
+    "credits": 4,
+    "grade": "B+"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "MATH-UA 235",
+    "title": "Probability & Statistics",
+    "credits": 4,
+    "grade": "A-"
+   }
+  ]
+ },
+ {
+  "file": "TC07_Conflicting_Precedents_Northeastern.pdf",
+  "student": "Mateus Ribeiro",
+  "student_id": "TST-107",
+  "major": "Biology",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CHEM 1161",
+    "title": "General Chemistry for Science Majors",
+    "credits": 5,
+    "grade": "B"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MATH 1365",
+    "title": "Introduction to Mathematical Reasoning",
+    "credits": 4,
+    "grade": "A-"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "ECON 2560",
+    "title": "Applied Econometrics",
+    "credits": 4,
+    "grade": "A-"
+   }
+  ]
+ },
+ {
+  "file": "TC08_Grade_Rules_Northeastern.pdf",
+  "student": "Hannah Weiss",
+  "student_id": "TST-108",
+  "major": "Mathematics",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 1800",
+    "title": "Discrete Structures",
+    "credits": 4,
+    "grade": "A+"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MATH 1341",
+    "title": "Calculus 1 for Science and Engineering",
+    "credits": 4,
+    "grade": "P"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "ECON 1116",
+    "title": "Principles of Microeconomics",
+    "credits": 4,
+    "grade": "C-"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "MATH 2341",
+    "title": "Differential Equations and Linear Algebra for Engineering",
+    "credits": 4,
+    "grade": "B"
+   }
+  ]
+ },
+ {
+  "file": "TC11_Repeated_Course_Northeastern.pdf",
+  "student": "Theo Grant",
+  "student_id": "TST-111",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": 5,
+    "grade": "C+"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "CS 1800",
+    "title": "Discrete Structures",
+    "credits": 4,
+    "grade": "B"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "CS 2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": 5,
+    "grade": "A-"
+   }
+  ]
+ },
+ {
+  "file": "TC12_Course_Code_Formats_Northeastern.pdf",
+  "student": "Aisha Bello",
+  "student_id": "TST-112",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": 5,
+    "grade": "A"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "cs-1800",
+    "title": "Discrete Structures",
+    "credits": 4,
+    "grade": "B+"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "ECON1116",
+    "title": "Principles of Microeconomics",
+    "credits": 4,
+    "grade": "A-"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "math 1341",
+    "title": "Calculus 1 for Science and Engineering",
+    "credits": 4,
+    "grade": "B"
+   }
+  ]
+ },
+ {
+  "file": "TC13_Missing_Credits_Northeastern.pdf",
+  "student": "Lucas Moreau",
+  "student_id": "TST-113",
+  "major": "Economics",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": null,
+    "grade": "A"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "ECON 1116",
+    "title": "Principles of Microeconomics",
+    "credits": 4,
+    "grade": "B"
+   }
+  ]
+ },
+ {
+  "file": "TC14_Unknown_Course_Northeastern.pdf",
+  "student": "Grace Adeyemi",
+  "student_id": "TST-114",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 2000",
+    "title": "Introduction to Program Design and Implementation",
+    "credits": 5,
+    "grade": "A"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "CS 4973",
+    "title": "Topics in Quantum Software Engineering",
+    "credits": 4,
+    "grade": "A"
+   }
+  ]
+ },
+ {
+  "file": "TC15_No_Subject_Specialist_Riverside.pdf",
+  "student": "Oliver Bennett",
+  "student_id": "TST-115",
+  "major": "Liberal Arts",
+  "start": "Fall 2027",
+  "institution": "Riverside Community College",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "PHIL 101",
+    "title": "Introduction to Philosophy",
+    "credits": 3,
+    "grade": "A-"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MUS 110",
+    "title": "Music Appreciation",
+    "credits": 3,
+    "grade": "B+"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "KIN 105",
+    "title": "Fitness and Wellness",
+    "credits": 1,
+    "grade": "A"
+   }
+  ]
+ },
+ {
+  "file": "TC16_Multiple_Institutions_Riverside.pdf",
+  "student": "Nadia Haddad",
+  "student_id": "TST-116",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Riverside Community College",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2023",
+    "code": "CSC 110",
+    "title": "Programming Fundamentals with Python",
+    "credits": 4,
+    "grade": "A"
+   },
+   {
+    "term": "Fall 2023",
+    "code": "MAT 151",
+    "title": "Calculus I",
+    "credits": 4,
+    "grade": "B+"
+   }
+  ]
+ },
+ {
+  "file": "TC16_Multiple_Institutions_PacificCoast.pdf",
+  "student": "Nadia Haddad",
+  "student_id": "TST-116",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Pacific Coast State University",
+  "calendar": "Quarter",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "PSYC 1",
+    "title": "Introduction to Psychology",
+    "credits": 5,
+    "grade": "B"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MATH 19A",
+    "title": "Calculus for Science I",
+    "credits": 5,
+    "grade": "B+"
+   }
+  ]
+ },
+ {
+  "file": "TC17_Multiple_Evaluators_Northeastern.pdf",
+  "student": "Ethan Sato",
+  "student_id": "TST-117",
+  "major": "Computer Science",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "CS 2100",
+    "title": "Program Design and Implementation 1",
+    "credits": 5,
+    "grade": "B+"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "BIOL 2301",
+    "title": "Genetics and Molecular Biology",
+    "credits": 5,
+    "grade": "A-"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "MATH 2331",
+    "title": "Linear Algebra",
+    "credits": 4,
+    "grade": "A"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "CS 2700",
+    "title": "Data Structures and Analysis",
+    "credits": 5,
+    "grade": "B"
+   },
+   {
+    "term": "Spring 2025",
+    "code": "PSYC 2320",
+    "title": "Statistics in Psychological Research",
+    "credits": 4,
+    "grade": "B"
+   }
+  ]
+ },
+ {
+  "file": "TC26_Economics_Cap_PacificCoast.pdf",
+  "student": "Ivy Chen-Morales",
+  "student_id": "TST-126",
+  "major": "Economics",
+  "start": "Fall 2027",
+  "institution": "Pacific Coast State University",
+  "calendar": "Quarter",
+  "courses": [
+   {
+    "term": "Fall 2024",
+    "code": "ECON 100A",
+    "title": "Intermediate Microeconomics",
+    "credits": 5,
+    "grade": "A-"
+   },
+   {
+    "term": "Fall 2024",
+    "code": "ECON 100B",
+    "title": "Intermediate Macroeconomics",
+    "credits": 5,
+    "grade": "B+"
+   },
+   {
+    "term": "Winter 2025",
+    "code": "ECON 113",
+    "title": "Introduction to Econometrics",
+    "credits": 5,
+    "grade": "A"
+   },
+   {
+    "term": "Winter 2025",
+    "code": "ECON 136",
+    "title": "Behavioral Economics",
+    "credits": 5,
+    "grade": "A"
+   }
+  ]
+ },
+ {
+  "file": "TC26_Economics_Cap_Northeastern.pdf",
+  "student": "Ivy Chen-Morales",
+  "student_id": "TST-126",
+  "major": "Economics",
+  "start": "Fall 2027",
+  "institution": "Northeastern University",
+  "calendar": "Semester",
+  "courses": [
+   {
+    "term": "Spring 2025",
+    "code": "ECON 2560",
+    "title": "Applied Econometrics",
+    "credits": 4,
+    "grade": "A-"
+   }
+  ]
+ }
+]
