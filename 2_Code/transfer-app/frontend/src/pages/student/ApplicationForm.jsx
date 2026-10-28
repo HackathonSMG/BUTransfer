@@ -98,8 +98,10 @@ export default function ApplicationForm() {
       if (!data.gpa || isNaN(data.gpa) || data.gpa < 0 || data.gpa > 4.0) {
         errs.gpa = 'Valid GPA (0.0–4.0) is required'
       }
-      if (!data.total_credits || isNaN(data.total_credits)) {
-        errs.total_credits = 'Total credits is required'
+      if (!data.total_credits || isNaN(data.total_credits) || Number(data.total_credits) < 0) {
+        errs.total_credits = Number(data.total_credits) < 0
+          ? 'Total credits cannot be negative'
+          : 'Total credits is required'
       }
     }
     if (s === 3) {
