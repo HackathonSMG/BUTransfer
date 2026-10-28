@@ -324,8 +324,11 @@ export async function runAgent(agentCase, { client = getProjectClient().getOpenA
   }
 
   try {
-    const initialInput = [{ type: 'message', role: 'user', content: JSON.stringify(agentCase) }];
-    log(`  Sending initial message (${JSON.stringify(agentCase).length} bytes)...`);
+    const caseText = JSON.stringify(agentCase);
+    // Responses API requires content as an array of typed parts, not a plain string
+    const initialInput = [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: caseText }] }];
+    log(`  Sending initial message (${caseText.length} bytes)...`);
+    log(`  Input format: ${JSON.stringify(initialInput[0]).slice(0, 200)}`);
     let response = await client.responses.create({ conversation: conversation.id, input: initialInput }, agentRef);
     log(`  Initial response received — output items: ${response.output?.length ?? 0}`);
 
