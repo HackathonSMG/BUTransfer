@@ -82,6 +82,7 @@ const payload = {
 // ---------- 2. Ask the Foundry agent ----------
 async function askAgent() {
   if (!env.FOUNDRY_PROJECT_ENDPOINT) throw new Error('FOUNDRY_PROJECT_ENDPOINT not set');
+  if (env.CI && env.HAS_AZURE !== 'true') throw new Error('Azure login not configured');
   const project = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, new DefaultAzureCredential());
   const client = project.getOpenAIClient();
   const agentRef = { body: { agent_reference: { type: 'agent_reference', name: env.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst' } } };
@@ -105,12 +106,11 @@ function fallbackReport(reason) {
     `## QA report · ${payload.build.commit} · ${payload.build.branch}`,
     `**Verdict:** ${verdict}`,
     `**Results:** ${summary.passed} passed · ${summary.failed} failed (${summary.regressions} new regressions, ${summary.known_bug_failures} known bugs) · ${summary.skipped} skipped · target ${payload.build.target_url}`,
-    '', `_AI analysis unavailable (${reason}); showing the plain summary._`, '',
+    '',
     '### New regressions',
     regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n')[0]).slice(0, 160)} |`)].join('\n') : 'None',
-    '', '### AI-written tests for this build',
-    aiTests.length ? aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')
-      : `None (${summary.ai_tests.note || 'not generated'})`,
+    ...(aiTests.length ? ['', '### AI-written tests for this build',
+      aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')] : []),
     '', '### Known bugs still failing',
     failed.filter((t) => t.known_bug).map((t) => `- #${t.known_bug} ${t.title}`).join('\n') || 'None',
   ].join('\n');
@@ -121,7 +121,7 @@ try {
   report = await askAgent();
   console.log('[QA] Report written by the Foundry agent.');
 } catch (err) {
-  console.warn(`[QA] Foundry agent unavailable: ${err.message}`);
+  console.log(`[QA] Using the plain report (AI report not available: ${err.message.split('\n')[0]})`);
   report = fallbackReport(err.message);
 }
 
