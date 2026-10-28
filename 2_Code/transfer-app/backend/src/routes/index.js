@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import authRoutes from './auth.js';
 import studentRoutes from './student.js';
 import applicationsRoutes from './applications.js';
@@ -9,6 +9,7 @@ import notificationsRoutes from './notifications.js';
 import intakeRoutes from './intake.js';
 import memoryRoutes from './memory.js';
 import myRoutes from './my.js';
+import officeRoutes from './office.js';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use('/notifications', notificationsRoutes);
 router.use('/intake', intakeRoutes);
 router.use('/memory', memoryRoutes);
 router.use('/my', myRoutes);
+router.use('/office', officeRoutes);
 
 router.use((_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'The requested API endpoint does not exist' } });

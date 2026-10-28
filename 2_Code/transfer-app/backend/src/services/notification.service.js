@@ -17,6 +17,8 @@ function buildTitle(type, referenceNumber) {
     decision_made: `Decision Made: ${referenceNumber}`,
     document_uploaded: `New Document: ${referenceNumber}`,
     status_changed: `Status Update: ${referenceNumber}`,
+    syllabus_required: `Syllabus Needed: ${referenceNumber}`,
+    credit_posted: `Transfer Credit Posted: ${referenceNumber}`,
   };
   return map[type] || `Notification: ${referenceNumber}`;
 }
@@ -55,14 +57,14 @@ export async function applicationSubmitted(application) {
 export async function evaluationComplete(application, evaluationId) {
   if (application.assigned_evaluator_id) {
     await notifyEvaluator(application.assigned_evaluator_id, application, 'evaluation_completed',
-      `AI evaluation for application ${application.reference_number} completed and ready for your review.`);
+      `The course evaluation for application ${application.reference_number} is complete and ready for your review.`);
   }
   return { evaluationId };
 }
 
 export async function infoRequired(application, requestId) {
   return notifyStudent(application, 'information_required',
-    `Additional information is needed for your transfer application (${application.reference_number}). Please log in to respond.`);
+    `Additional information is needed for your transfer application (${application.reference_number}). Open your status page to respond.`);
 }
 
 export async function decisionMade(application) {

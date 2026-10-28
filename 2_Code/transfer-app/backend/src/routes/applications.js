@@ -1,19 +1,24 @@
 ﻿import { Router } from 'express';
 import { requireAuth } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/require-role.js';
-import { listApplications, getApplication, createApplication, triggerEvaluation, createInfoRequest, submitDecision, updateStatus, getAuditLog, addNote, decideCourse, approveAutomaticCourses } from '../controllers/applications.controller.js';
+import { listApplications, getApplication, createApplication, triggerEvaluation, createInfoRequest, submitDecision, updateStatus, getAuditLog, addNote, decideCourse, approveAutomaticCourses, requireApplicationAccess } from '../controllers/applications.controller.js';
+
+// Staff only. Evaluators see (read-only) just the applications with a course assigned to them and decide courses
+// from their own reviews (/api/my); the Credit Evaluation Office and administrators manage every application.
+const STAFF = ['evaluator', 'admin', 'credit_office'];
+const OFFICE = ['admin', 'credit_office'];
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requireRole(...STAFF));
 router.get('/', listApplications);
-router.get('/:id', getApplication);
-router.post('/', requireRole('evaluator', 'admin'), createApplication);
-router.post('/:id/evaluate', requireRole('evaluator', 'admin'), triggerEvaluation);
-router.post('/:id/info-request', requireRole('evaluator', 'admin'), createInfoRequest);
-router.post('/:id/decision', requireRole('evaluator', 'admin'), submitDecision);
-router.post('/:id/courses/approve-automatic', requireRole('evaluator', 'admin'), approveAutomaticCourses);
-router.post('/:id/courses/:courseId/decision', requireRole('evaluator', 'admin'), decideCourse);
+router.get('/:id', requireApplicationAccess, getApplication);
+router.post('/', requireRole(...OFFICE), createApplication);
+router.post('/:id/evaluate', requireRole(...OFFICE), triggerEvaluation);
+router.post('/:id/info-request', requireRole(...OFFICE), createInfoRequest);
+router.post('/:id/decision', requireRole(...OFFICE), submitDecision);
+router.post('/:id/courses/approve-automatic', requireRole(...OFFICE), approveAutomaticCourses);
+router.post('/:id/courses/:courseId/decision', requireRole(...OFFICE), decideCourse);
 router.put('/:id/status', requireRole('admin'), updateStatus);
-router.get('/:id/audit-log', requireRole('evaluator', 'admin'), getAuditLog);
-router.post('/:id/notes', requireRole('evaluator', 'admin'), addNote);
+router.get('/:id/audit-log', requireApplicationAccess, getAuditLog);
+router.post('/:id/notes', requireApplicationAccess, addNote);
 export default router;

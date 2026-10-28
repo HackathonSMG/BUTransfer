@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, CheckCircle2, BadgeCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getConflicts, recordStandardEquivalency } from '../../api/admin'
+import { resolveConflict } from '../../api/office'
 import PageHeader from '../../components/staff/PageHeader'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -18,6 +19,7 @@ const TITLES = {
 export default function Conflicts() {
   const [state, setState] = useState({ loading: true, rows: [], error: null })
   const [resolving, setResolving] = useState(null)
+  const [marking, setMarking] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -66,7 +68,10 @@ export default function Conflicts() {
                     ))}
                   </ul>
                 </div>
-                <Button onClick={() => setResolving(c)}>Record standard</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={() => setMarking(c)}>Mark as resolved</Button>
+                  <Button onClick={() => setResolving(c)}>Record standard</Button>
+                </div>
               </div>
 
               <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-staff-line2 border-t border-staff-line2">
@@ -100,6 +105,7 @@ export default function Conflicts() {
       )}
 
       <StandardModal conflict={resolving} onClose={() => setResolving(null)} onDone={() => { setResolving(null); load() }} />
+      <ResolveModal conflict={marking} onClose={() => setMarking(null)} onDone={() => { setMarking(null); load() }} />
     </div>
   )
 }
@@ -165,6 +171,42 @@ function StandardModal({ conflict, onClose, onDone }) {
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} loading={saving} disabled={!choice || (choice === 'custom' && !custom.trim())}>Record standard</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Closes a conflict without changing the standard (e.g. each outcome was right for its syllabus); a later
+// disagreeing decision opens it again
+function ResolveModal({ conflict, onClose, onDone }) {
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setNote('') }, [conflict])
+  if (!conflict) return null
+  const save = async () => {
+    setSaving(true)
+    try {
+      await resolveConflict({ institution: conflict.institution, course_code: conflict.course_code, note: note.trim() })
+      toast.success('Conflict marked as resolved')
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'The conflict could not be resolved')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <Modal isOpen onClose={() => !saving && onClose()} title="Mark conflict as resolved" size="sm">
+      <div className="space-y-4">
+        <p className="text-[14px] text-staff-ink2">
+          <span className="font-mono font-semibold text-staff-ink">{conflict.course_code}</span> at {conflict.institution}. The standard stays as it is; a later decision that disagrees will raise the conflict again.
+        </p>
+        <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} autoFocus placeholder="How was it resolved? e.g. The two outcomes reflect different syllabus versions."
+          className="w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100" />
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} loading={saving} disabled={note.trim().length < 3}>Mark as resolved</Button>
         </div>
       </div>
     </Modal>

@@ -13,11 +13,17 @@ export const getReview = (id) =>
 export const startReview = (id) =>
   client.post(`/my/reviews/${id}/start`).then(r => r.data)
 
-export const decideReview = (id, decision, reason) =>
-  client.post(`/my/reviews/${id}/decision`, { decision, reason }).then(r => r.data)
+// payload: { decision: equivalent | different_course | elective | no_credit, reason, bu_course, elective_label, units, conflict_action }
+export const decideReview = (id, payload) =>
+  client.post(`/my/reviews/${id}/decision`, payload).then(r => r.data)
 
-export const requestReviewInfo = (id, message) =>
-  client.post(`/my/reviews/${id}/request-info`, { message }).then(r => r.data)
+// kind: 'syllabus' asks the student for the course syllabus; 'information' for anything else
+export const requestReviewInfo = (id, message, kind = 'information') =>
+  client.post(`/my/reviews/${id}/request-info`, { message, kind }).then(r => r.data)
+
+// BU catalog search for choosing a different BU course
+export const searchBuCourses = (search) =>
+  client.get('/my/bu-courses', { params: { search } }).then(r => r.data)
 
 // Short-lived link to an uploaded document (the transcript PDF)
 export const getDocumentLink = (documentId) =>

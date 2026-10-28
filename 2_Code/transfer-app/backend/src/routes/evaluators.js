@@ -6,7 +6,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import * as rosterService from '../services/staff/roster.service.js';
-import { assignPendingApplications } from '../services/workflow/assignment.service.js';
+import { assignPendingApplications, releaseEvaluator } from '../services/workflow/assignment.service.js';
 
 const PW = ['pass', 'word'].join('');
 
@@ -40,13 +40,14 @@ const updateEvaluatorSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-const EVALUATOR_COLUMNS = `p.*, e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases`;
+const EVALUATOR_COLUMNS = `p.*, e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases, e.availability, e.unavailable_until`;
 
 // Evaluators whose work needs an administrator's attention, and why (business rules live here, not in the UI)
 const STALE_DAYS = 7;
 function attentionFlags(r) {
   const flags = [];
   if (!r.is_active && (r.open_reviews > 0 || r.queued_reviews > 0)) flags.push('Inactive with assigned courses');
+  if (r.is_active && r.availability === 'unavailable' && (r.open_reviews > 0 || r.queued_reviews > 0)) flags.push('Unavailable with assigned courses');
   if (r.is_active && r.max_concurrent_cases && r.open_reviews >= 0.8 * r.max_concurrent_cases) flags.push('Near capacity');
   if (r.oldest_open_days != null && r.oldest_open_days >= STALE_DAYS) flags.push(`Oldest open review waiting ${r.oldest_open_days} days`);
   return flags;
@@ -69,6 +70,7 @@ router.get('/', async (req, res, next) => {
       // Inactive evaluators are listed too, so they can be reactivated; their history stays intact
       `SELECT p.id, p.full_name, p.email, p.phone, p.created_at, (p.is_active AND e.is_active) AS is_active,
               e.evaluator_code, e.title, e.department, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
+              e.availability, e.unavailable_until,
               (SELECT COUNT(*)::int FROM applications a WHERE a.assigned_evaluator_id = e.id AND a.status NOT IN ('approved', 'rejected', 'closed')) AS current_case_count,
               ${REVIEW_COUNTS}
        FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
@@ -105,7 +107,7 @@ router.get('/:id/profile', async (req, res, next) => {
     const [base, recent] = await Promise.all([
       query(
         `SELECT p.id, p.full_name, p.email, p.created_at, (p.is_active AND e.is_active) AS is_active, e.evaluator_code, e.title, e.department,
-                e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
+                e.availability, e.unavailable_until, e.specializations, e.expertise_subjects, e.expertise_courses, e.max_concurrent_cases,
                 ${REVIEW_COUNTS},
                 ROUND(AVG(EXTRACT(EPOCH FROM (r.completed_at - r.assigned_at)) / 86400) FILTER (WHERE r.completed_at IS NOT NULL AND r.assigned_at IS NOT NULL)::numeric, 1) AS avg_days_to_decide
          FROM evaluators e JOIN profiles p ON p.id = e.id LEFT JOIN course_reviews r ON r.evaluator_id = e.id
@@ -202,9 +204,11 @@ router.put('/:id', async (req, res, next) => {
     if (fields.max_concurrent_cases !== undefined) { eClauses.push(`max_concurrent_cases = $${eidx++}`); eParams.push(fields.max_concurrent_cases); }
     if (fields.is_active !== undefined) { eClauses.push(`is_active = $${eidx++}`); eParams.push(fields.is_active); }
     if (eClauses.length > 0) { eParams.push(id); await query(`UPDATE evaluators SET ${eClauses.join(', ')} WHERE id = $${eidx}`, eParams); }
+    // A deactivated evaluator's open courses go to the best eligible evaluator; their history stays
+    const moved = fields.is_active === false ? await releaseEvaluator(id, req.user, 'Evaluator deactivated') : null;
 
     const updated = await query(`SELECT ${EVALUATOR_COLUMNS} FROM profiles p JOIN evaluators e ON e.id = p.id WHERE p.id = $1`, [id]);
-    return res.status(200).json({ data: updated.rows[0] });
+    return res.status(200).json({ data: { ...updated.rows[0], reassigned: moved?.reassigned ?? 0 } });
   } catch (err) { return next(err); }
 });
 
@@ -217,7 +221,8 @@ router.delete('/:id', async (req, res, next) => {
       query(`UPDATE evaluators SET is_active = false WHERE id = $1`, [id]),
       query(`UPDATE profiles SET is_active = false, updated_at = NOW() WHERE id = $1`, [id]),
     ]);
-    return res.status(200).json({ data: { message: 'Evaluator deactivated successfully' } });
+    const moved = await releaseEvaluator(id, req.user, 'Evaluator deactivated');
+    return res.status(200).json({ data: { message: 'Evaluator deactivated successfully', reassigned: moved.reassigned } });
   } catch (err) { return next(err); }
 });
 

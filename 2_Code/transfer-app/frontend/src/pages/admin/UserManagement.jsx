@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile } from '../../api/admin'
+import { setEvaluatorAvailability } from '../../api/office'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
@@ -314,7 +315,7 @@ function ImportRosterModal({ isOpen, onClose, onDone }) {
                   <span className="block text-xs text-staff-muted truncate">{a.email}</span>
                 </span>
                 <span className="flex items-center gap-1.5 flex-shrink-0">
-                  <StatusPill tone={a.role === 'admin' ? 'bad' : 'info'}>{a.role === 'admin' ? 'Admin' : 'Evaluator'}</StatusPill>
+                  <StatusPill tone={a.role === 'admin' ? 'bad' : 'info'}>{a.role === 'admin' ? 'Admin' : a.role === 'credit_office' ? 'Credit Office' : 'Evaluator'}</StatusPill>
                   <StatusPill tone={a.created ? 'ok' : 'neutral'}>{a.created ? 'Created' : 'Updated'}</StatusPill>
                 </span>
               </li>
@@ -391,7 +392,38 @@ function EvaluatorRow({ ev, onOpen }) {
 }
 
 // Side panel with one evaluator's profile, loaded from the API
-function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling }) {
+// Available or on leave. Going on leave moves the evaluator's open courses to the best eligible evaluators
+// (the API does the reassignment and keeps the history); returning lets queued office work be placed again.
+function AvailabilityControl({ p, onChange }) {
+  const [until, setUntil] = useState(p.unavailable_until?.slice(0, 10) || '')
+  const [saving, setSaving] = useState(false)
+  const away = p.availability === 'unavailable'
+  const save = async (availability) => {
+    setSaving(true)
+    try { await onChange(p, availability, until) } finally { setSaving(false) }
+  }
+  return (
+    <section className={`rounded-lg border px-4 py-3 ${away ? 'border-amber-200 bg-amber-50/70' : 'border-staff-line2 bg-staff-bg'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[14px] text-staff-ink">
+          <span className="font-semibold">{away ? 'Unavailable' : 'Available for new courses'}</span>
+          {away && p.unavailable_until && <span className="text-staff-ink2"> until {p.unavailable_until.slice(0, 10)}</span>}
+        </p>
+        {away ? (
+          <Button size="sm" variant="secondary" loading={saving} onClick={() => save('available')}>Mark available</Button>
+        ) : (
+          <span className="flex items-center gap-2">
+            <input type="date" value={until} onChange={e => setUntil(e.target.value)} className="px-2 py-1.5 text-[13px] border border-staff-line rounded-lg" aria-label="Unavailable until" />
+            <Button size="sm" variant="secondary" loading={saving} onClick={() => save('unavailable')}>Mark unavailable</Button>
+          </span>
+        )}
+      </div>
+      {!away && <p className="text-[12.5px] text-staff-muted mt-1">Marking unavailable moves open courses to other qualified evaluators.</p>}
+    </section>
+  )
+}
+
+function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling, onAvailability }) {
   const [p, setP] = useState(null)
   const [error, setError] = useState(null)
 
@@ -428,6 +460,8 @@ function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling }) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+              {p.is_active && <AvailabilityControl p={p} onChange={onAvailability} />}
+
               {p.attention.length > 0 && (
                 <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-[14px] text-amber-900 space-y-1">
                   {p.attention.map(a => <p key={a} className="flex gap-2"><AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />{a}</p>)}
@@ -538,11 +572,26 @@ export default function UserManagement() {
 
   useEffect(() => { load() }, [])
 
+  const handleAvailability = async (ev, availability, until) => {
+    try {
+      const res = await setEvaluatorAvailability(ev.id, availability, until)
+      const d = res.data
+      toast.success(availability === 'unavailable'
+        ? `Marked unavailable${d.reassigned ? `; ${d.reassigned} open course${d.reassigned === 1 ? '' : 's'} reassigned` : ''}`
+        : `Marked available${d.placed ? `; ${d.placed} queued course${d.placed === 1 ? '' : 's'} assigned` : ''}`)
+      await load()
+      setDrawerKey(k => k + 1)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Availability could not be changed')
+    }
+  }
+
   const handleToggle = async (ev) => {
     setToggling(ev.id)
     try {
-      await updateEvaluator(ev.id, { is_active: !ev.is_active })
-      toast.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}`)
+      const res = await updateEvaluator(ev.id, { is_active: !ev.is_active })
+      const moved = res.data?.reassigned || 0
+      toast.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}${moved ? `; ${moved} open course${moved === 1 ? '' : 's'} reassigned` : ''}`)
       await load()
       setDrawerKey(k => k + 1)
     } catch {
@@ -633,6 +682,7 @@ export default function UserManagement() {
         onClose={() => setOpenId(null)}
         onEdit={e => setModal({ open: true, evaluator: e })}
         onToggle={handleToggle}
+        onAvailability={handleAvailability}
         toggling={toggling === openId}
       />
       <EvaluatorModal

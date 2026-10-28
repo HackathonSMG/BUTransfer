@@ -41,6 +41,17 @@ async function waitForEvaluation(evaluationId) {
   return { status: 'timeout' };
 }
 
+// After the evaluation completes, established equivalencies are applied and courses assigned in the background;
+// that ends by moving the application out of 'evaluation_completed'. Wait for it so the pool isn't closed mid-way.
+async function waitForAssignment(applicationId) {
+  for (let i = 0; i < 60; i++) {
+    const { rows } = await query(`SELECT status FROM applications WHERE id = $1`, [applicationId]);
+    if (!['evaluation_completed', 'under_evaluation', 'submitted'].includes(rows[0]?.status)) return rows[0]?.status;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return 'timeout';
+}
+
 async function seed() {
   const { students, transcripts } = loadSampleData();
   const files = fs.readdirSync(TRANSCRIPTS_DIR).filter((f) => f.endsWith('.pdf')).sort();
@@ -76,12 +87,26 @@ async function seed() {
 
     const { evaluation_id: evaluationId } = await applicationService.triggerEvaluation(app.id, null);
     const evaluation = await waitForEvaluation(evaluationId);
+    if (evaluation.status === 'completed') await waitForAssignment(app.id);
     const summary = (await query(`SELECT credit_summary FROM ai_evaluations WHERE id = $1`, [evaluationId])).rows[0]?.credit_summary;
     console.log(`  ${st.student_id} ${name.padEnd(15)} ${app.reference_number}  ${courses} courses read  evaluation ${evaluation.status}`
       + (summary ? `  → ${summary.transferred_credits} transfer, ${summary.elective_credits} elective, ${summary.pending_credits} pending, ${summary.no_credit_courses} no credit` : ''));
   }
 }
 
+// New applications also start an evaluation on their own; let every background evaluation and assignment finish
+async function settle() {
+  for (let i = 0; i < 60; i++) {
+    const { rows: [r] } = await query(
+      `SELECT (SELECT COUNT(*) FROM ai_evaluations WHERE status IN ('pending', 'running'))::int
+            + (SELECT COUNT(*) FROM applications WHERE status IN ('evaluation_completed', 'under_evaluation'))::int AS busy`);
+    if (!r.busy) break;
+    await new Promise((res) => setTimeout(res, 500));
+  }
+  await new Promise((res) => setTimeout(res, 1000));
+}
+
 seed()
+  .then(settle)
   .catch((err) => { console.error('[Seed samples] Fatal error:', err.message); process.exitCode = 1; })
   .finally(() => pool.end());

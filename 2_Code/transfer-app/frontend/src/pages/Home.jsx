@@ -1,34 +1,34 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  CheckSquare, FileText, Brain, Award,
+  CheckSquare, FileText, Scale, Award, BookOpen,
   ArrowRight, Search, ExternalLink, Shield
 } from 'lucide-react'
 
 const PROCESS_STEPS = [
   {
-    icon: CheckSquare,
+    icon: BookOpen,
     step: '01',
-    title: 'Check Eligibility',
-    description: 'Answer a few quick questions to see if you meet the initial transfer requirements.'
+    title: 'Self-Check',
+    description: 'Preview how your courses are likely to transfer and which ones may need a syllabus.'
   },
   {
     icon: FileText,
     step: '02',
-    title: 'Submit Application',
-    description: 'Complete the multi-step application form and upload your academic documents.'
+    title: 'Send Transcripts',
+    description: 'Apply and upload official final transcripts from every college you attended.'
   },
   {
-    icon: Brain,
+    icon: Scale,
     step: '03',
-    title: 'AI Evaluation',
-    description: 'Our AI system evaluates your application against all eligibility criteria.'
+    title: 'Course Evaluation',
+    description: 'Established equivalencies apply straight away; other courses go to department evaluators.'
   },
   {
     icon: Award,
     step: '04',
-    title: 'Evaluator Decision',
-    description: "A BU evaluator reviews the AI's analysis and makes the final admission decision."
+    title: 'Credit Posted',
+    description: 'Each decided course is posted with a grade of T. Track every course on your status page.'
   }
 ]
 
@@ -56,8 +56,8 @@ export default function Home() {
             Check Your Transfer<br />Eligibility Today
           </h1>
           <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
-            Start your BU transfer journey. Our AI-powered evaluation system helps you understand
-            your eligibility and streamlines the transfer process.
+            Start your BU transfer journey. Preview how your courses are likely to transfer, then follow
+            every course through evaluation until your credit is posted.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -66,6 +66,13 @@ export default function Home() {
             >
               <CheckSquare className="w-5 h-5" />
               Check Eligibility
+            </Link>
+            <Link
+              to="/self-check"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
+            >
+              <BookOpen className="w-5 h-5" />
+              Preview Course Credit
             </Link>
             <Link
               to="/apply"

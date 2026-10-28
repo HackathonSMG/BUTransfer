@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare } from 'lucide-react'
+import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare, Stamp, Copy, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOverview, assignPendingApplications } from '../../api/admin'
 import { useAuth } from '../../hooks/useAuth'
@@ -54,6 +54,23 @@ export default function AdminDashboard() {
 
   // Only what an administrator should act on, each one click from where it's handled
   const items = [
+    a.ready_for_posting > 0 && {
+      icon: Stamp, tone: 'neutral',
+      title: `${a.ready_for_posting} application${a.ready_for_posting === 1 ? ' is' : 's are'} fully decided and ready to post`,
+      detail: 'Post the transfer credit to the student record.',
+      to: '/office', cta: 'Credit Office'
+    },
+    a.suspected_duplicates > 0 && {
+      icon: Copy, tone: 'warn',
+      title: `${a.suspected_duplicates} possible duplicate application${a.suspected_duplicates === 1 ? '' : 's'}`,
+      detail: 'Keep them separate or close the duplicate.',
+      to: '/office', cta: 'Credit Office'
+    },
+    a.syllabi_pending > 0 && {
+      icon: FileText, tone: 'neutral',
+      title: `${a.syllabi_pending} syllabus request${a.syllabi_pending === 1 ? '' : 's'} waiting on students`,
+      detail: 'The courses return to their evaluators when the syllabus arrives.'
+    },
     a.conflicts > 0 && {
       icon: GitCompare, tone: 'warn',
       title: `${a.conflicts} transfer course${a.conflicts === 1 ? ' has' : 's have'} conflicting equivalency decisions`,
@@ -114,7 +131,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <Metric label="Applications" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
         <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
-        <Metric label="Completed" value={d.completed_applications} detail={`${n('approved')} approved · ${n('rejected')} rejected`} />
+        <Metric label="Completed" value={d.completed_applications} detail={`${d.credits_posted ?? 0} credits posted · ${d.established_applied ?? 0} courses by established equivalency`} />
         <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />
       </div>
 

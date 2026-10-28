@@ -150,7 +150,7 @@ export default function ApplicationsList() {
               {apps.map(app => (
                 <li key={app.id}>
                   <Link
-                    to={`/evaluator/applications/${app.id}`}
+                    to={`/office/applications/${app.id}`}
                     className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_11rem_8rem_1rem] gap-x-4 gap-y-1.5 items-center px-6 py-4 hover:bg-staff-bg focus:outline-none focus-visible:bg-staff-bg"
                   >
                     <span className="min-w-0">
@@ -168,6 +168,7 @@ export default function ApplicationsList() {
                     </span>
                     <span className="flex flex-col items-end md:items-start gap-1">
                       <StatusPill status={app.status} />
+                      {app.duplicate_status === 'suspected' && <StatusPill tone="warn">Possible duplicate</StatusPill>}
                       {app.evaluator_name && <span className="text-[12px] text-staff-muted truncate max-w-[11rem]">{app.evaluator_name}</span>}
                     </span>
                     <span className="hidden md:block text-[13px] text-staff-ink2 whitespace-nowrap">{formatDate(app.submitted_at || app.created_at)}</span>

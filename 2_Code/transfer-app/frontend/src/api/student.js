@@ -23,3 +23,20 @@ export const getStudentNotifications = (token) =>
 
 export const respondToInfoRequest = (token, requestId, data) =>
   client.post(`/student/status/${token}/info-requests/${requestId}/respond`, data).then(r => r.data)
+
+// Answer a course request with a file (e.g. the syllabus) and an optional note
+export const uploadInfoResponse = (token, requestId, file, response = '') => {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (response) fd.append('response', response)
+  return client.post(`/student/status/${token}/info-requests/${requestId}/respond`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(r => r.data)
+}
+
+// Self-check: guidance before applying, not an official decision
+export const getSelfCheckInstitutions = () =>
+  client.get('/student/self-check/institutions').then(r => r.data)
+
+export const runSelfCheck = (body) =>
+  client.post('/student/self-check', body).then(r => r.data)

@@ -1,18 +1,18 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { requireAuth } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/require-role.js';
 import { z } from 'zod';
-import { listConflicts, recordStandard } from '../services/workflow/knowledge.service.js';
+import { listConflicts, recordStandard, recordResolution } from '../services/workflow/knowledge.service.js';
 import { badRequest } from '../utils/errors.js';
 import { getReports, getOverview, getAuditLogs, listCriteria, createCriterion, updateCriterion, deleteCriterion } from '../controllers/admin.controller.js';
 
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
-router.get('/reports', getReports);
-router.get('/overview', getOverview);
+router.use(requireAuth);
 
-// Equivalency conflicts derived from decisions, equivalencies and open reviews
-router.get('/conflicts', async (_req, res, next) => {
+// Equivalency conflicts derived from decisions, equivalencies and open reviews. Administrators and the Credit
+// Evaluation Office resolve them; everything else on this router is administrators only.
+const CONFLICT_ROLES = requireRole('admin', 'credit_office');
+router.get('/conflicts', CONFLICT_ROLES, async (_req, res, next) => {
   try { return res.status(200).json({ data: await listConflicts() }); } catch (err) { return next(err); }
 });
 
@@ -25,7 +25,7 @@ const standardSchema = z.object({
 });
 
 // Records the standard equivalency that resolves a conflict; applies to future transcripts only
-router.post('/conflicts/standard', async (req, res, next) => {
+router.post('/conflicts/standard', CONFLICT_ROLES, async (req, res, next) => {
   try {
     const parsed = standardSchema.safeParse(req.body);
     if (!parsed.success) return next(badRequest('Choose the source course and the standard outcome'));
@@ -34,6 +34,19 @@ router.post('/conflicts/standard', async (req, res, next) => {
     return res.status(200).json({ data: eq });
   } catch (err) { return next(err); }
 });
+// Marks a conflict resolved without changing the standard (e.g. both outcomes were right for their syllabi)
+router.post('/conflicts/resolve', CONFLICT_ROLES, async (req, res, next) => {
+  try {
+    const parsed = z.object({ institution: z.string().min(1).max(200), course_code: z.string().min(1).max(60), note: z.string().trim().min(3).max(1000) }).safeParse(req.body);
+    if (!parsed.success) return next(badRequest('Choose the course and explain the resolution'));
+    const d = parsed.data;
+    return res.status(200).json({ data: await recordResolution({ institution: d.institution, courseCode: d.course_code, action: 'resolved', note: d.note }, req.user) });
+  } catch (err) { return next(err); }
+});
+
+router.use(requireRole('admin'));
+router.get('/reports', getReports);
+router.get('/overview', getOverview);
 router.get('/audit-logs', getAuditLogs);
 router.get('/criteria', listCriteria);
 router.post('/criteria', createCriterion);

@@ -59,7 +59,7 @@ function CourseRow({ c }) {
             </ul>
             {c.candidates?.length > 0 && (
               <p className="text-xs text-gray-500 mt-2">
-                Closest BU courses by content: {c.candidates.map(k => `${k.code} ${k.title} (${Math.round(k.score * 100)}%)`).join(' · ')}
+                Closest BU courses by content: {c.candidates.map(k => `${k.code} ${k.title}`).join(' · ')}
               </p>
             )}
           </td>
