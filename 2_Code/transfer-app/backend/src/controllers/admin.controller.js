@@ -89,8 +89,11 @@ export async function getOverview(req, res, next) {
                                (SELECT COUNT(*) FROM course_reviews r WHERE r.evaluator_id = e.id AND r.status IN ('new', 'in_progress', 'info_requested'))::int AS open
                         FROM evaluators e JOIN profiles p ON p.id = e.id WHERE e.is_active AND p.is_active) x
                   WHERE x.open >= 0.8 * x.cap) AS high_workload`),
-      listConflicts(),
+      // The conflict count and the impact figures are supplementary: if one fails, the dashboard still loads and the
+      // server log names the part that failed
+      listConflicts().catch((err) => { console.error('[Admin overview] Conflict count unavailable:', err.message, err.stack); return null; }),
     ]);
+    const impact = await impactMetrics().catch((err) => { console.error('[Admin overview] Impact figures unavailable:', err.message, err.stack); return null; });
     return res.status(200).json({
       data: {
         ...counts.rows[0],
@@ -99,9 +102,9 @@ export async function getOverview(req, res, next) {
         reviews: reviews.rows[0],
         evaluator_workload: workload.rows,
         recent_activity: activity.rows,
-        attention: { ...attention.rows[0], conflicts: conflicts.length },
+        attention: { ...attention.rows[0], conflicts: conflicts ? conflicts.length : null },
         // The measured outcome (impact.service): automation rate and how courses were decided
-        impact: await impactMetrics(),
+        impact,
       },
     });
   } catch (err) { return next(err); }
