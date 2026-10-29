@@ -1,5 +1,7 @@
-// Reads course rows from a transcript PDF. First tries the structured column-layout parser for the
-// hackathon sample format; falls back to an AI-based extraction (via Azure OpenAI) for any other layout.
+// Reads course rows from a transcript PDF. First tries the structured column-layout parser: terms ("Fall 2024")
+// followed by a course table whose headings may use the common registrar variants ("Credits Att", "Course Title",
+// "Quality Points"…), with the institution either as "Course record from …" or as the page title. Falls back to an
+// AI-based extraction (via Azure OpenAI, when configured) for any other layout.
 // The structured parser also reads the header block (student name, student ID, BU major, BU start term) so the
 // student can confirm it instead of typing it; the AI fallback never extracts identity.
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -8,6 +10,30 @@ const TERM = /^(Winter|Spring|Summer|Fall)\s+\d{4}$/;
 // A+ is a valid letter grade (policy.js scores it 4.3); without it an A+ row was silently dropped
 const GRADE = /^(A\+|A|A-|B\+|B|B-|C\+|C|C-|D\+|D|D-|F|W|P|I)$/;
 const COLUMNS = ['COURSE', 'TITLE', 'ATTEMPTED', 'EARNED', 'GRADE', 'QUALITY PTS'];
+// Column headings registrars commonly print, compared without case or punctuation -> the column they mean.
+// A course table needs a course, a title, a grade and a credits column (attempted, or earned when only that exists).
+const COLUMN_ALIASES = {
+  COURSE: 'COURSE', 'COURSE CODE': 'COURSE', 'COURSE NO': 'COURSE', 'COURSE NUMBER': 'COURSE', 'COURSE ID': 'COURSE', SUBJECT: 'COURSE',
+  TITLE: 'TITLE', 'COURSE TITLE': 'TITLE', DESCRIPTION: 'TITLE', 'COURSE NAME': 'TITLE',
+  ATTEMPTED: 'ATTEMPTED', 'CREDITS ATT': 'ATTEMPTED', 'CREDITS ATTEMPTED': 'ATTEMPTED', 'ATT CREDITS': 'ATTEMPTED', 'ATT HRS': 'ATTEMPTED',
+  'HOURS ATTEMPTED': 'ATTEMPTED', 'UNITS ATTEMPTED': 'ATTEMPTED', CREDITS: 'ATTEMPTED', CREDIT: 'ATTEMPTED', UNITS: 'ATTEMPTED', HOURS: 'ATTEMPTED',
+  'CREDIT HOURS': 'ATTEMPTED', CR: 'ATTEMPTED', HRS: 'ATTEMPTED',
+  EARNED: 'EARNED', 'CREDITS EARNED': 'EARNED', 'EARNED CREDITS': 'EARNED', 'HOURS EARNED': 'EARNED', 'UNITS EARNED': 'EARNED', 'ERN HRS': 'EARNED',
+  GRADE: 'GRADE', 'FINAL GRADE': 'GRADE', GRD: 'GRADE',
+  'QUALITY PTS': 'QUALITY PTS', 'QUALITY POINTS': 'QUALITY PTS', 'GRADE POINTS': 'QUALITY PTS', POINTS: 'QUALITY PTS', QP: 'QUALITY PTS', QPTS: 'QUALITY PTS',
+};
+const headingKey = (text) => String(text).toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** The columns of a course-table heading line, by x position, or null when the line is not one. */
+function tableColumns(line) {
+  const found = new Map();
+  for (const it of line.items) {
+    const name = COLUMN_ALIASES[headingKey(it.s)];
+    if (name && !found.has(name)) found.set(name, it.x);
+  }
+  if (!found.has('COURSE') || !found.has('TITLE') || !found.has('GRADE') || !(found.has('ATTEMPTED') || found.has('EARNED'))) return null;
+  return [...found.entries()].map(([name, x]) => ({ name, x })).sort((a, b) => a.x - b.x);
+}
 
 async function readLines(buffer) {
   const doc = await getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, verbosity: 0 }).promise;
@@ -78,19 +104,19 @@ function parseHeader(lines) {
  */
 function parseStructured(lines) {
   const header = lines.find((l) => l.text.startsWith('Course record from '));
-  const institution = header ? header.text.replace('Course record from ', '').trim() : null;
+  const institution = header ? header.text.replace('Course record from ', '').trim() : institutionTitle(lines);
   const calendar = lines.find((l) => /Calendar:\s*(Quarter|Semester) system/i.test(l.text));
-  const credit_system = calendar ? (/Quarter/i.test(calendar.text) ? 'Quarter' : 'Semester') : null;
+  const student = { ...parseInlineHeader(lines), ...parseHeader(lines) };
+  const credit_system = calendar ? (/Quarter/i.test(calendar.text) ? 'Quarter' : 'Semester') : student.calendar || null;
+  delete student.calendar;
 
   const courses = [];
   let term = null;
   let columns = null;
   for (const line of lines) {
     if (TERM.test(line.text)) { term = line.text; columns = null; continue; }
-    if (COLUMNS.every((c) => line.items.some((i) => i.s === c))) {
-      columns = COLUMNS.map((name) => ({ name, x: line.items.find((i) => i.s === name).x }));
-      continue;
-    }
+    const heading = tableColumns(line);
+    if (heading) { columns = heading; continue; }
     if (!columns || !term) continue;
     const cells = Object.fromEntries(COLUMNS.map((c) => [c, []]));
     for (const it of line.items) {
@@ -99,13 +125,57 @@ function parseStructured(lines) {
     }
     const code = cells.COURSE.join(' ').replace(/\s+/g, ' ').trim();
     const grade = cells.GRADE.join('').trim();
-    // A blank credits cell stays null (the engine then asks for the credits); it is never read as 0 credits
-    const creditsText = cells.ATTEMPTED.join('').replace(/[^0-9.]/g, '');
+    // A blank credits cell stays null (the engine then asks for the credits); it is never read as 0 credits.
+    // Credits attempted are used; a table that only prints credits earned uses those.
+    const creditsText = (columns.some((c) => c.name === 'ATTEMPTED') ? cells.ATTEMPTED : cells.EARNED).join('').replace(/[^0-9.]/g, '');
     const attempted = creditsText === '' ? null : Number(creditsText);
     if (!code || !GRADE.test(grade) || (attempted !== null && !Number.isFinite(attempted))) continue;
     courses.push({ course_code: code, title: cells.TITLE.join(' ').trim(), term, source_credits: attempted, grade });
   }
-  return { institution, credit_system, courses, student: parseHeader(lines) };
+  return { institution, credit_system, courses, student };
+}
+
+const INSTITUTION_WORDS = /\b(college|university|institute|school|academy|polytechnic)\b/i;
+const NOT_A_NAME = /\b(office|registrar|transcript|department|record|issued|page|sample|synthetic|student)\b/i;
+
+/**
+ * The issuing institution when the transcript prints it as the page title rather than "Course record from …":
+ * the first line on page 1, above the first term, that names a college or university and nothing else.
+ */
+function institutionTitle(lines) {
+  const firstTerm = lines.findIndex((l) => TERM.test(l.text));
+  const top = lines.slice(0, firstTerm === -1 ? 8 : firstTerm).filter((l) => l.page === 1);
+  const line = top.find((l) => l.items.length === 1 && INSTITUTION_WORDS.test(l.text) && !NOT_A_NAME.test(l.text) && l.text.length <= 90);
+  return line ? line.text.trim() : null;
+}
+
+// Header labels printed beside their value ("Student  Maya Chen  Student ID  RFCC-204871"). A plain "Program" here
+// is the program at the previous college, never the BU major, so only explicit BU labels fill the BU program.
+const INLINE_LABELS = {
+  STUDENT: 'name', 'STUDENT NAME': 'name', NAME: 'name', 'STUDENT ID': 'student_id', ID: 'student_id', 'STUDENT NUMBER': 'student_id',
+  'INTENDED BU MAJOR': 'program', 'BU MAJOR': 'program', 'BU PROGRAM': 'program', 'BU START': 'start_term', 'BU START TERM': 'start_term',
+  'ACADEMIC CALENDAR': 'calendar', CALENDAR: 'calendar',
+};
+const ANY_LABEL = new Set([...Object.keys(INLINE_LABELS), ...Object.keys(HEADER_LABELS), 'PROGRAM', 'DATE ISSUED', 'STATUS', 'INSTITUTION']);
+
+/** Label/value pairs on the same line, above the first term. Returns only the fields found. */
+function parseInlineHeader(lines) {
+  const out = {};
+  const firstTerm = lines.findIndex((l) => TERM.test(l.text));
+  for (const line of lines.slice(0, firstTerm === -1 ? 12 : firstTerm)) {
+    line.items.forEach((it, j) => {
+      const key = INLINE_LABELS[labelKey(it.s).replace(/:$/, '')];
+      const value = line.items[j + 1]?.s?.trim();
+      if (!key || !value || ANY_LABEL.has(labelKey(value).replace(/:$/, '')) || out[key]) return;
+      if (key === 'calendar') {
+        if (/quarter/i.test(value)) out.calendar = 'Quarter';
+        else if (/semester/i.test(value)) out.calendar = 'Semester';
+        return;
+      }
+      out[key] = value;
+    });
+  }
+  return out;
 }
 
 const AI_SYSTEM_PROMPT = `Extract transcript data from the text and return ONLY valid JSON with this exact structure:
