@@ -623,7 +623,7 @@ This round followed the read-only review of Problem 1. Only misaligned parts wer
 - Shown on Reports and the Credit Office dashboard, and per application on the Credit Office application page. For the 6-course STU-001 demo: 6 courses, 3 resolved automatically, 3 with departments, 1 quarter course, 50%.
 
 **Student transparency**
-- The tracking summary adds Matched Automatically, With Department Review and Waiting for Your Syllabus.
+- The tracking summary adds With Department Review and Waiting for Your Syllabus. How a course was decided (established equivalency, policy rule or evaluator) stays internal: the student summary has no "matched automatically" count.
 - A plain next-step line says what, if anything, the student needs to do.
 
 ## 15. Seventh round: transcript-first submission and Transfer Credit ID
