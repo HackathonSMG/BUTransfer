@@ -52,7 +52,7 @@ jobs:
       QA_AGENT_SECRET: ${{ secrets.QA_AGENT_SECRET }}
       # Fallback, API-key mode: Foundry resource → Keys and Endpoint → KEY 1
       FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}
-      FOUNDRY_MODEL_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-4.1-mini' }}
+      FOUNDRY_MODEL_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-5-mini' }}
 
     steps:
       - uses: actions/checkout@v4
