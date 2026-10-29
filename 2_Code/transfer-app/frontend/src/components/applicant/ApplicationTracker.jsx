@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   CheckCircle2, Circle, AlertCircle, Upload, Send, RefreshCw, CalendarClock, Info, ChevronDown, FileText, Bell, Copy, Check
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getApplicationStatus, uploadStudentDocument, getStudentNotifications, respondToInfoRequest, uploadInfoResponse } from '../../api/student'
 import DocumentList from '../application/DocumentList'
 import Spinner from '../ui/Spinner'
@@ -96,15 +96,15 @@ function RequestResponse({ token, request, onDone }) {
   const [sending, setSending] = useState(false)
   const syllabus = request.kind === 'syllabus'
   const send = async () => {
-    if (!file && !reply.trim()) { toast.error(syllabus ? 'Choose the syllabus file' : 'Write your reply'); return }
+    if (!file && !reply.trim()) { notify.error(syllabus ? 'Choose the syllabus file' : 'Write your reply'); return }
     setSending(true)
     try {
       if (file) await uploadInfoResponse(token, request.id, file, reply.trim())
       else await respondToInfoRequest(token, request.id, { response: reply.trim() })
-      toast.success(syllabus ? 'Syllabus received' : 'Reply sent')
+      notify.success(syllabus ? 'Syllabus received' : 'Reply sent')
       onDone()
     } catch (err) {
-      toast.error(errMessage(err, 'Could not send. Please try again.'))
+      notify.error(errMessage(err, 'Could not send. Please try again.'))
     } finally {
       setSending(false)
     }
@@ -256,15 +256,15 @@ export default function ApplicationTracker({ token, headerAction = null }) {
 
   const upload = async (e) => {
     e.preventDefault()
-    if (!uploadFile || !uploadType) { toast.error('Choose the document type and a file'); return }
+    if (!uploadFile || !uploadType) { notify.error('Choose the document type and a file'); return }
     setUploading(true)
     try {
       await uploadStudentDocument(token, uploadFile, uploadType)
-      toast.success('Document received')
+      notify.success('Document received')
       setShowUpload(false); setUploadFile(null); setUploadType('')
       load()
     } catch (err) {
-      toast.error(errMessage(err, 'The document could not be uploaded'))
+      notify.error(errMessage(err, 'The document could not be uploaded'))
     } finally {
       setUploading(false)
     }

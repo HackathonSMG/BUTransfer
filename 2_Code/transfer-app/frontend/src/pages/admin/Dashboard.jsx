@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare, Stamp, Copy, FileText } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { getOverview, assignPendingApplications } from '../../api/admin'
+import notify from '../../lib/notify'
+import { getOverview, assignPendingApplications, getAdminCounts } from '../../api/admin'
+import PeriodCounts from '../../components/staff/PeriodCounts'
 import { useAuth } from '../../hooks/useAuth'
 import PageHeader from '../../components/staff/PageHeader'
 import Metric from '../../components/staff/Metric'
@@ -10,6 +11,18 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
+
+// Counted per course or per evaluation by the API; "now" cards are open work, the others follow the chosen period
+const ADMIN_CARDS = [
+  { key: 'transcripts', label: 'Transcripts received', detail: c => `${c.evaluations_received} evaluation${c.evaluations_received === 1 ? '' : 's'}` },
+  { key: 'courses', label: 'Courses received' },
+  { key: 'pending', label: 'Pending evaluations', now: true, detail: () => 'not started' },
+  { key: 'in_progress', label: 'In progress', now: true },
+  { key: 'completed', label: 'Completed evaluations', detail: c => `${c.completed_by_department} by departments` },
+  { key: 'reassigned', label: 'Reassigned' },
+  { key: 'awaiting_credit_office', label: 'Awaiting Credit Office', now: true, detail: c => `${c.awaiting_credit_office_courses} courses`, to: '/office' },
+  { key: 'credit_transfers_completed', label: 'Credit transfers completed', detail: c => `${c.credits_posted} credits posted` }
+]
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -32,10 +45,10 @@ export default function AdminDashboard() {
     setAssigning(true)
     try {
       const res = await assignPendingApplications()
-      toast.success(`${res.data.courses} course${res.data.courses === 1 ? '' : 's'} assigned across ${res.data.applications} evaluation${res.data.applications === 1 ? '' : 's'}`)
+      notify.success(`${res.data.courses} course${res.data.courses === 1 ? '' : 's'} assigned across ${res.data.applications} evaluation${res.data.applications === 1 ? '' : 's'}`)
       load()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Courses could not be assigned')
+      notify.error(err.response?.data?.message || 'Courses could not be assigned')
     } finally {
       setAssigning(false)
     }
@@ -134,6 +147,8 @@ export default function AdminDashboard() {
         <Metric label="Completed" value={d.completed_applications} detail={`${d.credits_posted ?? 0} credits posted · ${d.established_applied ?? 0} courses by established equivalency`} />
         <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />
       </div>
+
+      <PeriodCounts title="Transfer credit by period" fetchCounts={getAdminCounts} cards={ADMIN_CARDS} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 items-start">
         <section className="staff-card">

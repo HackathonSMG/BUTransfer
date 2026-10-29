@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { getReview, startReview, decideReview, checkReviewDecision, requestReviewInfo, escalateReview, searchBuCourses, getDocumentLink } from '../../api/my'
+import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck, UserCog } from 'lucide-react'
+import notify from '../../lib/notify'
+import { getReview, startReview, decideReview, checkReviewDecision, requestReviewInfo, escalateReview, requestReassignment, searchBuCourses, getDocumentLink } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
 import TranscriptDrawer from '../../components/evaluator/TranscriptDrawer'
 import Button from '../../components/ui/Button'
@@ -14,6 +14,13 @@ import { activityLabel } from '../../lib/staffFormat'
 import CourseComparison from '../../components/evaluator/CourseComparison'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
+// Why an evaluator hands a course back (the API decides where it goes: another evaluator or the office queue)
+const REASSIGN_REASONS = [
+  { key: 'different_department', label: 'Belongs to a different department', hint: 'It goes to the best-matched evaluator in that subject, or the Credit Evaluation Office.' },
+  { key: 'outside_expertise', label: 'Outside my area of expertise', hint: 'It goes to an evaluator with the right expertise, or the Credit Evaluation Office.' },
+  { key: 'additional_review', label: 'Needs additional review', hint: 'The Credit Evaluation Office decides who reviews it.', noteRequired: true },
+  { key: 'correction', label: 'Needs correction', hint: 'The Credit Evaluation Office follows up and reassigns it.', noteRequired: true }
+]
 const INFO_SUGGESTIONS = ['Detailed course description', 'Learning outcomes', 'Contact hours', 'Lab component']
 const FIELD = 'w-full px-3 py-2 text-sm border border-staff-line rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
 
@@ -58,7 +65,8 @@ export default function ReviewDetail() {
   const navigate = useNavigate()
   const [state, setState] = useState({ loading: true, data: null, error: null })
   const [transcriptOpen, setTranscriptOpen] = useState(false)
-  const [dialog, setDialog] = useState(null) // 'decide' | 'info' | 'escalate'
+  const [dialog, setDialog] = useState(null) // 'decide' | 'info' | 'escalate' | 'reassign'
+  const [reassignReason, setReassignReason] = useState('different_department')
   const [text, setText] = useState('')
   const [infoKind, setInfoKind] = useState('syllabus')
   const [form, setForm] = useState({ outcome: 'equivalent', courses: [], elective: '', units: '', conflictAction: null })
@@ -101,31 +109,43 @@ export default function ReviewDetail() {
     const suggested = kind === 'info' ? state.data?.suggested_request : null
     setText(suggested?.message || '')
     setInfoKind(suggested?.kind || 'syllabus')
+    setReassignReason('different_department')
     setDialog(kind)
   }
 
   const submit = async () => {
+    const d0 = state.data
     setSubmitting(true)
     try {
       if (dialog === 'info') {
         await requestReviewInfo(id, text, infoKind)
-        toast.success(infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
+        notify.success(infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else if (dialog === 'escalate') {
         await escalateReview(id, text)
-        toast.success('Sent to the Credit Evaluation Office')
+        notify.success('Sent to the Credit Evaluation Office')
+      } else if (dialog === 'reassign') {
+        // The course leaves this evaluator, so the confirmation is shown on My Evaluations
+        const res = await requestReassignment(id, reassignReason, text.trim() || null)
+        notify.success(`${d0.source_course?.course_code || 'The course'} was handed back${res.data.to ? ` and reassigned to ${res.data.to}` : ' to the Credit Evaluation Office for reassignment'}.`, { keepOnNavigate: true })
+        setDialog(null)
+        navigate('/evaluator/my-evaluations')
+        return
       } else if (form.outcome === 'request_info') {
         await requestReviewInfo(id, text, form.infoKind)
-        toast.success(form.infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
+        notify.success(form.infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else {
         const res = await decideReview(id, decisionPayload(form, text))
-        toast.success(form.outcome === 'no_credit' ? 'Recorded: no credit' : 'Decision recorded')
-        if (res.data.transfer) toast(`Evaluation handed to the next evaluator (${res.data.transfer.request_number})`)
-        if (res.data.application_status === 'ready_for_posting') toast('Every course on this application is decided. It is ready for posting.')
+        // One confirmation for everything the decision caused; the decision banner below shows the outcome itself
+        notify.success([
+          form.outcome === 'no_credit' ? 'Recorded: no credit.' : 'Decision recorded.',
+          res.data.transfer && `The remaining courses were handed to the next evaluator (${res.data.transfer.request_number}).`,
+          res.data.application_status === 'ready_for_posting' && 'Every course on this application is decided; it is ready for the Credit Evaluation Office.'
+        ].filter(Boolean).join(' '))
       }
       setDialog(null)
       await load()
     } catch (err) {
-      toast.error(err.response?.data?.message || err.response?.data?.error?.message || 'The decision could not be saved')
+      notify.error(err.response?.data?.message || err.response?.data?.error?.message || 'The decision could not be saved')
     } finally {
       setSubmitting(false)
     }
@@ -151,6 +171,7 @@ export default function ReviewDetail() {
   const mapping = `${src?.course_code} → ${proposed?.award || r.target_bu_course || 'no BU course'}`
   const canSubmit = (() => {
     if (dialog === 'escalate') return true
+    if (dialog === 'reassign') return !REASSIGN_REASONS.find(o => o.key === reassignReason)?.noteRequired || text.trim()
     if (dialog === 'info') return infoKind === 'syllabus' || text.trim()
     if (form.outcome === 'request_info') return form.infoKind === 'syllabus' || text.trim()
     if (units?.required && form.outcome !== 'no_credit' && !(Number(form.units) > 0)) return false
@@ -305,6 +326,10 @@ export default function ReviewDetail() {
                 <p className="text-[15px] font-semibold text-staff-ink truncate font-mono">{mapping}</p>
               </div>
               <span className="sm:hidden flex-1" />
+              <Button variant="secondary" onClick={() => openDialog('reassign')} title="Hand this course back for another evaluator">
+                <UserCog className="w-4 h-4" />
+                <span className="hidden sm:inline">Request reassignment</span><span className="sm:hidden">Reassign</span>
+              </Button>
               <Button variant="secondary" onClick={() => openDialog('info')}>
                 <MessageSquare className="w-4 h-4" />
                 <span className="hidden sm:inline">Request information</span><span className="sm:hidden">Request info</span>
@@ -317,7 +342,7 @@ export default function ReviewDetail() {
             <>
               <p className="flex-1 text-[15px] text-staff-ink2">
                 {r.status === 'queued'
-                  ? 'This course opens for your decision once the earlier review of this evaluation is finished.'
+                  ? 'This course opens for your decision shortly.'
                   : r.status === 'withdrawn' ? 'This course no longer needs a decision.' : 'This course has been decided.'}
               </p>
               {d.next_review_id ? (
@@ -343,7 +368,7 @@ export default function ReviewDetail() {
       <Modal
         isOpen={dialog !== null}
         onClose={() => !submitting && setDialog(null)}
-        title={dialog === 'decide' ? 'Department decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
+        title={dialog === 'decide' ? 'Department decision' : dialog === 'escalate' ? 'Request additional review' : dialog === 'reassign' ? 'Request reassignment' : 'Request information from the student'}
         size={dialog === 'decide' ? 'md' : 'sm'}
       >
         <div className="space-y-4">
@@ -358,6 +383,30 @@ export default function ReviewDetail() {
                 placeholder="e.g. Earlier decisions award different BU courses. Which should be the standard?" />
               <span className="block text-[12.5px] text-staff-muted mt-1.5">The office can record a standard equivalency for future transcripts. Your decision on this course stays yours.</span>
             </label>
+          )}
+          {dialog === 'reassign' && (
+            <>
+              <fieldset className="space-y-2">
+                <legend className="block text-sm font-medium text-gray-700 mb-1.5">Why should {d.source_course?.course_code} go to someone else?</legend>
+                {REASSIGN_REASONS.map(o => (
+                  <label key={o.key} className={`flex gap-3 rounded-lg border px-3.5 py-2.5 cursor-pointer ${reassignReason === o.key ? 'border-primary-500 bg-primary-50/50' : 'border-staff-line hover:bg-staff-bg'}`}>
+                    <input type="radio" name="reassign-reason" className="mt-1" checked={reassignReason === o.key} onChange={() => setReassignReason(o.key)} />
+                    <span className="min-w-0">
+                      <span className="block text-[14px] font-semibold text-staff-ink">{o.label}</span>
+                      <span className="block text-[12.5px] text-staff-muted">{o.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Note {REASSIGN_REASONS.find(o => o.key === reassignReason)?.noteRequired ? <span className="text-red-500">*</span> : <span className="text-staff-muted font-normal">(optional)</span>}
+                </span>
+                <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
+                  placeholder="e.g. This is a statistics course; the Mathematics department should evaluate it." />
+              </label>
+              <p className="text-[12.5px] text-staff-muted">The course leaves your queue. Its evaluation history keeps you as an earlier evaluator with this reason; nothing about the course is decided.</p>
+            </>
           )}
           {dialog === 'info' && (
             <>
@@ -398,7 +447,7 @@ export default function ReviewDetail() {
               disabled={!canSubmit}
               variant={dialog === 'decide' ? (form.outcome === 'no_credit' ? 'danger' : 'success') : 'primary'}
             >
-              {dialog === 'decide' ? (form.outcome === 'request_info' ? 'Send request' : 'Confirm decision') : dialog === 'escalate' ? 'Send to the office' : 'Send request'}
+              {dialog === 'decide' ? (form.outcome === 'request_info' ? 'Send request' : 'Confirm decision') : dialog === 'escalate' ? 'Send to the office' : dialog === 'reassign' ? 'Hand back for reassignment' : 'Send request'}
             </Button>
           </div>
         </div>
@@ -424,7 +473,7 @@ function DocumentButton({ id, label, icon: Icon = FileText }) {
       const res = await getDocumentLink(id)
       window.open(res.data.download_url, '_blank', 'noopener')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The document could not be opened')
+      notify.error(err.response?.data?.message || 'The document could not be opened')
     } finally {
       setBusy(false)
     }
@@ -1092,7 +1141,9 @@ function History({ d }) {
   const rows = [
     ...d.history.map(h => ({ when: h.created_at, label: activityLabel(h.action), who: h.actor, note: h.details?.reason })),
     ...(reassigned
-      ? d.assignments.map(a => ({ when: a.assigned_at, label: `Assigned to ${a.evaluator}`, who: null, note: a.reason }))
+      // Each holder in turn; an earlier holder's end reason says why it moved on (e.g. handed back: different department)
+      ? d.assignments.map(a => ({ when: a.assigned_at, label: `Assigned to ${a.evaluator}`, who: null,
+          note: [a.reason, a.ended_at && a.end_reason ? `Ended ${formatDate(a.ended_at)}: ${a.end_reason}` : null].filter(Boolean).join(' · ') }))
       : r.assigned_at ? [{ when: r.assigned_at, label: 'Assigned to you', who: null, note: r.assignment_context?.join(' · ') }] : [])
   ].sort((a, b) => new Date(a.when) - new Date(b.when))
   if (rows.length === 0) return <p className="text-[14px] text-staff-muted">No history yet.</p>

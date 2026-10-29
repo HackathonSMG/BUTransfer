@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Power, Trash2, Settings } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getCriteria, createCriterion, updateCriterion, deleteCriterion } from '../../api/admin'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -83,15 +83,15 @@ function CriterionModal({ isOpen, onClose, criterion, onSave }) {
       }
       if (isEdit) {
         await updateCriterion(criterion.id, payload)
-        toast.success('Criterion updated')
+        notify.success('Criterion updated')
       } else {
         await createCriterion(payload)
-        toast.success('Criterion created')
+        notify.success('Criterion created')
       }
       onSave()
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save criterion')
+      notify.error(err.response?.data?.message || 'Failed to save criterion')
     } finally {
       setSaving(false)
     }
@@ -183,7 +183,7 @@ export default function EligibilityCriteria() {
       const data = await getCriteria()
       setCriteria(data.data || data.criteria || [])
     } catch {
-      toast.error('Failed to load criteria')
+      notify.error('Failed to load criteria')
     } finally {
       setLoading(false)
     }
@@ -195,10 +195,10 @@ export default function EligibilityCriteria() {
     setToggling(c.id)
     try {
       await updateCriterion(c.id, { ...c, is_active: !c.is_active })
-      toast.success(`Criterion ${!c.is_active ? 'activated' : 'deactivated'}`)
+      notify.success(`Criterion ${!c.is_active ? 'activated' : 'deactivated'}`)
       await load()
     } catch {
-      toast.error('Failed to update criterion')
+      notify.error('Failed to update criterion')
     } finally {
       setToggling(null)
     }
@@ -209,10 +209,10 @@ export default function EligibilityCriteria() {
     setDeleting(id)
     try {
       await deleteCriterion(id)
-      toast.success('Criterion deleted')
+      notify.success('Criterion deleted')
       setCriteria(prev => prev.filter(c => c.id !== id))
     } catch {
-      toast.error('Failed to delete criterion')
+      notify.error('Failed to delete criterion')
     } finally {
       setDeleting(null)
     }

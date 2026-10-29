@@ -33,8 +33,10 @@ client.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('transfer_user')
+      // The signed-in user held in memory goes too, so no page keeps showing an expired session
+      window.dispatchEvent(new Event('auth:expired'))
       // Redirect to login only if not already there
-      const publicPage = ['/login', '/status', '/track', '/apply'].some(p => window.location.pathname.startsWith(p)) || window.location.pathname === '/'
+      const publicPage = ['/login', '/status', '/track', '/apply', '/self-check'].some(p => window.location.pathname.startsWith(p)) || window.location.pathname === '/'
       if (!publicPage) {
         window.location.href = '/login'
       }

@@ -3,8 +3,9 @@
 // from the evaluator master data (expertise courses, expertise subjects, department/specializations) among
 // active, available evaluators, preferring lighter workloads. A course with no suitable subject specialist
 // goes to a general credit evaluator with capacity, otherwise to the Credit Evaluation Office queue for manual
-// assignment; it is never given to an evaluator from an unrelated subject. The evaluator whose subject matches
-// the student's major reviews first; other evaluators' courses wait (queued) and are handed over in order.
+// assignment; it is never given to an evaluator from an unrelated subject. Departments review in parallel: every
+// evaluator's courses open at assignment, and the application is ready for the Credit Evaluation Office once every
+// course has a decision. The sequence only orders evaluators for display (the major's subject first).
 // Courses whose content cannot be compared (no description, no syllabus) get a syllabus request to the student.
 import { query } from '../../config/db.js';
 import { log as auditLog } from '../audit.service.js';
@@ -275,15 +276,14 @@ export async function assignApplication(applicationId, { held = new Map() } = {}
   const syllabusNeeded = [];
   for (const p of planned) {
     const sequence = p.evaluator ? sequences.get(p.evaluator.id) : firstSequence;
-    // Courses in the Credit Evaluation Office queue are open straight away; they don't wait for a hand-off
-    const startsNow = !p.evaluator || sequence === firstSequence;
     const { rows: [row] } = await query(
       `INSERT INTO course_reviews (application_id, transcript_course_id, evaluator_id, status, sequence, priority, target_bu_course, match_score,
          match_basis, sponsor_match_level, assignment_reason, assignment_context, queue, assigned_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        ON CONFLICT (transcript_course_id) DO NOTHING RETURNING id`,
-      [applicationId, p.course.id, p.evaluator?.id || null, startsNow ? 'new' : 'queued', sequence, p.rec.priority, p.rec.target, p.rec.score,
-        p.rec.basis, p.rec.level, p.reason, JSON.stringify(p.context), p.evaluator ? 'evaluator' : 'credit_office', startsNow ? new Date() : null]
+      // Parallel review: every course opens now, for its evaluator or in the Credit Evaluation Office queue
+      [applicationId, p.course.id, p.evaluator?.id || null, 'new', sequence, p.rec.priority, p.rec.target, p.rec.score,
+        p.rec.basis, p.rec.level, p.reason, JSON.stringify(p.context), p.evaluator ? 'evaluator' : 'credit_office', new Date()]
     );
     if (!row) continue;
     created += 1;
@@ -314,10 +314,10 @@ export async function assignApplication(applicationId, { held = new Map() } = {}
     },
   });
 
-  // Tell each evaluator whose courses start now, and the Credit Evaluation Office about courses it must place
+  // Tell each evaluator about their courses (all start now), and the Credit Evaluation Office about courses it must place
   const starting = new Map();
   for (const p of planned) {
-    if (p.evaluator && sequences.get(p.evaluator.id) === firstSequence) starting.set(p.evaluator.id, (starting.get(p.evaluator.id) || 0) + 1);
+    if (p.evaluator) starting.set(p.evaluator.id, (starting.get(p.evaluator.id) || 0) + 1);
   }
   for (const [evaluatorId, n] of starting) {
     await sendNotification({
@@ -371,6 +371,36 @@ async function openNextSequenceIfIdle(application) {
       data: { reference_number: application.reference_number },
     });
   }
+}
+
+/**
+ * Opens courses still waiting for a hand-off (queued under the earlier sequential review), so every department
+ * reviews in parallel. Each evaluator is told; the audit trail records it per application. Safe to run again.
+ */
+export async function openQueuedReviews(user = null) {
+  const { rows } = await query(
+    `UPDATE course_reviews SET status = 'new', assigned_at = NOW() WHERE status = 'queued' AND evaluator_id IS NOT NULL
+     RETURNING id, application_id, evaluator_id`);
+  const byApplication = new Map();
+  for (const r of rows) {
+    if (!byApplication.has(r.application_id)) byApplication.set(r.application_id, []);
+    byApplication.get(r.application_id).push(r);
+  }
+  for (const [applicationId, reviews] of byApplication) {
+    const { rows: [app] } = await query(`SELECT reference_number, student_name FROM applications WHERE id = $1`, [applicationId]);
+    await auditLog({ applicationId, action: 'queued_reviews_opened', actorId: user?.id || null, actorEmail: user?.email || null,
+      details: { reviews: reviews.length, reason: 'Departments review in parallel' } });
+    for (const evaluatorId of [...new Set(reviews.map((r) => r.evaluator_id))]) {
+      const n = reviews.filter((r) => r.evaluator_id === evaluatorId).length;
+      await sendNotification({
+        recipientId: evaluatorId, applicationId, type: 'evaluation_assigned',
+        title: `New Evaluation Assigned: ${app.reference_number}`,
+        message: `${n} course${n === 1 ? '' : 's'} from ${app.student_name} ${n === 1 ? 'is' : 'are'} ready for your review.`,
+        data: { reference_number: app.reference_number },
+      });
+    }
+  }
+  return { opened: rows.length, applications: byApplication.size };
 }
 
 /** Assigns every evaluated application that still has courses without a review (used by the seed/backfill script). */
@@ -520,4 +550,4 @@ export async function releaseEvaluator(evaluatorId, user, why = 'Evaluator unava
   return { reassigned: moved.length, to_office: moved.filter((m) => !m.evaluator_id).length, moves: moved };
 }
 
-export default { assignApplication, assignPendingApplications, buSubject, chooseEvaluator, eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, SPONSOR_LEVELS };
+export default { assignApplication, assignPendingApplications, buSubject, chooseEvaluator, eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, openQueuedReviews, SPONSOR_LEVELS };

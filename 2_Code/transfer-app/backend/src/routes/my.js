@@ -6,6 +6,7 @@ import { query } from '../config/db.js';
 import { badRequest } from '../utils/errors.js';
 import * as reviewService from '../services/workflow/review.service.js';
 import { matchLabel, courseKnowledge } from '../services/workflow/knowledge.service.js';
+import { filterSchema, evaluatorCounts, startTerms } from '../services/workflow/period-counts.service.js';
 
 // The match label is decided here, not in the browser. Catalog levels and approved equivalencies are named
 // levels (no percentage); only a computed content similarity carries a score.
@@ -40,7 +41,12 @@ const REVIEW_SELECT = `
          r.assigned_at, r.started_at, r.completed_at, r.created_at, r.assignment_reason, r.returned_reason,
          a.id AS application_id, a.reference_number, a.student_name, a.student_email, a.transfer_to_program,
          tc.institution, tc.course_code, COALESCE(src.title, tc.title) AS course_title, tc.term, tc.grade, tc.source_credits,
-         bu.title AS target_title, bu.credits AS target_credits
+         bu.title AS target_title, bu.credits AS target_credits,
+         -- This evaluator's courses on the same application, counted per course (for the grouped list's progress)
+         (SELECT COUNT(*)::int FROM course_reviews x WHERE x.application_id = r.application_id AND x.evaluator_id = r.evaluator_id
+            AND x.status <> 'withdrawn') AS my_courses_on_application,
+         (SELECT COUNT(*)::int FROM course_reviews x WHERE x.application_id = r.application_id AND x.evaluator_id = r.evaluator_id
+            AND x.status IN ('approved', 'rejected')) AS my_evaluated_on_application
   FROM course_reviews r
   JOIN applications a ON a.id = r.application_id
   JOIN transcript_courses tc ON tc.id = r.transcript_course_id
@@ -107,6 +113,16 @@ router.get('/dashboard', async (req, res, next) => {
         recent_activity: activity.rows,
       },
     });
+  } catch (err) { return next(err); }
+});
+
+// The evaluator's course counts for a period and a BU start term (dashboard filter bar)
+router.get('/counts', async (req, res, next) => {
+  try {
+    const parsed = filterSchema.safeParse(req.query);
+    if (!parsed.success) return next(badRequest('Use a term and dates as YYYY-MM-DD'));
+    const [counts, terms] = await Promise.all([evaluatorCounts(req.user.id, parsed.data), startTerms()]);
+    return res.status(200).json({ data: { counts, terms, filters: parsed.data } });
   } catch (err) { return next(err); }
 });
 
@@ -200,6 +216,19 @@ router.get('/bu-courses', async (req, res, next) => {
        WHERE institution = 'Boston University' AND ($1 = '' OR course_code ILIKE $2 OR title ILIKE $2)
        ORDER BY course_code LIMIT 25`, [q, `%${q}%`]);
     return res.status(200).json({ data: rows });
+  } catch (err) { return next(err); }
+});
+
+// Hand an open course back for reassignment (different department, outside expertise, additional review, correction)
+router.post('/reviews/:id/reassign', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    const parsed = z.object({
+      reason: z.enum(Object.keys(reviewService.REASSIGN_REASONS)),
+      note: z.string().trim().max(1000).optional().nullable(),
+    }).safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Choose why the course should be reassigned'));
+    return res.status(200).json({ data: await reviewService.requestReassignment(req.params.id, parsed.data, req.user) });
   } catch (err) { return next(err); }
 });
 

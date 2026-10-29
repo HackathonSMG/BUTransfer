@@ -1,5 +1,5 @@
 import React from 'react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { FileText, Image, File, Download, Calendar } from 'lucide-react'
 import client from '../../api/client'
 
@@ -23,7 +23,7 @@ async function openDocument(doc, token) {
     tab.location.href = data.data.download_url
   } catch {
     tab?.close()
-    toast.error('Could not open document')
+    notify.error('Could not open document')
   }
 }
 

@@ -232,7 +232,10 @@ export async function refreshApplicationStatus(applicationId, actorId = null) {
   else next = 'under_evaluator_review';
   if (next === app.status) return next;
 
-  await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [next, applicationId]);
+  // Only one caller moves the status: evaluators finishing their courses at the same moment would otherwise all
+  // see the old status and each log the change and notify the student and the Credit Evaluation Office
+  const { rowCount } = await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3`, [next, applicationId, app.status]);
+  if (!rowCount) return (await query(`SELECT status FROM applications WHERE id = $1`, [applicationId])).rows[0]?.status || next;
   await auditLog({ applicationId, action: 'status_changed', actorId, oldValue: { status: app.status }, newValue: { status: next }, details: { reason: 'Course progress' } });
   await onStatusChange(applicationId, app.status, next);
   if (next === 'ready_for_posting') {

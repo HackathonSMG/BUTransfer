@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile } from '../../api/admin'
 import { setEvaluatorAvailability } from '../../api/office'
 import Button from '../../components/ui/Button'
@@ -135,15 +135,15 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
       if (!payload.password) delete payload.password
       if (isEdit) {
         await updateEvaluator(evaluator.id, payload)
-        toast.success('Evaluator updated successfully')
+        notify.success('Evaluator updated successfully')
       } else {
         await createEvaluator(payload)
-        toast.success('Evaluator account created')
+        notify.success('Evaluator account created')
       }
       onSave()
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save evaluator')
+      notify.error(err.response?.data?.message || 'Failed to save evaluator')
     } finally {
       setSaving(false)
     }
@@ -270,7 +270,7 @@ function ImportRosterModal({ isOpen, onClose, onDone }) {
       setResult(res.data)
       onDone()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The roster could not be imported')
+      notify.error(err.response?.data?.message || 'The roster could not be imported')
     } finally {
       setRunning(false)
     }
@@ -564,7 +564,7 @@ export default function UserManagement() {
       setEvaluators(data.data || [])
       setSummary(data.meta?.summary || null)
     } catch {
-      toast.error('Failed to load evaluators')
+      notify.error('Failed to load evaluators')
     } finally {
       setLoading(false)
     }
@@ -576,13 +576,13 @@ export default function UserManagement() {
     try {
       const res = await setEvaluatorAvailability(ev.id, availability, until)
       const d = res.data
-      toast.success(availability === 'unavailable'
+      notify.success(availability === 'unavailable'
         ? `Marked unavailable${d.reassigned ? `; ${d.reassigned} open course${d.reassigned === 1 ? '' : 's'} reassigned` : ''}`
         : `Marked available${d.placed ? `; ${d.placed} queued course${d.placed === 1 ? '' : 's'} assigned` : ''}`)
       await load()
       setDrawerKey(k => k + 1)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Availability could not be changed')
+      notify.error(err.response?.data?.message || 'Availability could not be changed')
     }
   }
 
@@ -591,11 +591,11 @@ export default function UserManagement() {
     try {
       const res = await updateEvaluator(ev.id, { is_active: !ev.is_active })
       const moved = res.data?.reassigned || 0
-      toast.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}${moved ? `; ${moved} open course${moved === 1 ? '' : 's'} reassigned` : ''}`)
+      notify.success(`Evaluator ${!ev.is_active ? 'reactivated' : 'deactivated'}${moved ? `; ${moved} open course${moved === 1 ? '' : 's'} reassigned` : ''}`)
       await load()
       setDrawerKey(k => k + 1)
     } catch {
-      toast.error('Failed to update evaluator status')
+      notify.error('Failed to update evaluator status')
     } finally {
       setToggling(null)
     }

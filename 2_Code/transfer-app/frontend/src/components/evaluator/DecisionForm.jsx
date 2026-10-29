@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -31,11 +31,11 @@ export default function DecisionForm({ applicationId, onSuccess, onClose, isOpen
     setLoading(true)
     try {
       await submitDecision(applicationId, { decision, comments })
-      toast.success(`Evaluation ${decision === 'approved' ? 'approved' : 'rejected'}`)
+      notify.success(`Evaluation ${decision === 'approved' ? 'approved' : 'rejected'}`)
       onSuccess && onSuccess({ decision, comments })
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit decision')
+      notify.error(err.response?.data?.message || 'Failed to submit decision')
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { Plus, X } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -47,11 +47,11 @@ export default function InfoRequestForm({ applicationId, onSuccess, onClose, isO
         items: validItems.map(description => ({ type: 'other', description })),
         message
       })
-      toast.success('Information request sent to student')
+      notify.success('Information request sent to student')
       onSuccess && onSuccess()
       handleClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send information request')
+      notify.error(err.response?.data?.message || 'Failed to send information request')
     } finally {
       setLoading(false)
     }

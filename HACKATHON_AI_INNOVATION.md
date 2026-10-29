@@ -18,7 +18,7 @@ The portal already ran the whole process in the problem statement, from self-che
 - **Course comparison.** Each BU learning outcome and topic is marked covered, partly covered or not evident.
 - **Decision memory.** Every department decision becomes a precedent. When two different evaluators agree, the precedent is promoted to an equivalency, which is applied automatically from then on.
 - **Conflict detection** with resolution tracking.
-- **Explainable evaluator assignment**, based on expertise, workload, availability and hand-offs.
+- **Explainable evaluator assignment**, based on expertise, workload and availability, with reassignment history.
 - **An optional Microsoft Foundry agent** that recommends outcomes for open courses and validates transcripts. It is not configured in local environments.
 
 Measured on the STU-001 demo, 3 of 6 courses settled without department work (50%).

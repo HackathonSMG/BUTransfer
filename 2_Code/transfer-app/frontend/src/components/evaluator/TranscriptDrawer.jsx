@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { X, FileText, ExternalLink } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getDocumentLink } from '../../api/my'
 
 // Side panel with the transcript as it was read: every course by institution and term, the course under review
@@ -30,7 +30,7 @@ export default function TranscriptDrawer({ open, onClose, student, courses, docu
       const res = await getDocumentLink(doc.id)
       window.open(res.data.download_url, '_blank', 'noopener')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The document could not be opened')
+      notify.error(err.response?.data?.message || 'The document could not be opened')
     } finally {
       setOpening(null)
     }

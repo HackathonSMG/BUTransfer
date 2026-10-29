@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react'
-import { getMyDashboard } from '../../api/my'
+import { getMyDashboard, getMyCounts } from '../../api/my'
+import PeriodCounts from '../../components/staff/PeriodCounts'
 import { useAuth } from '../../hooks/useAuth'
 import PageHeader from '../../components/staff/PageHeader'
 import Metric from '../../components/staff/Metric'
@@ -12,6 +13,15 @@ import { REVIEW_STATUS } from '../../lib/reviews'
 import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+// Counted per course by the API; "now" cards are current work, the others follow the chosen period
+const EVALUATOR_CARDS = [
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'not_started', label: 'Not started', now: true, to: '/evaluator/my-evaluations?status=new' },
+  { key: 'in_progress', label: 'In progress', now: true, to: '/evaluator/my-evaluations?status=in_progress' },
+  { key: 'needs_review', label: 'Needs review', now: true, detail: () => 'student replied or returned' },
+  { key: 'completed', label: 'Completed', to: '/evaluator/my-evaluations?status=completed' }
+]
 
 export default function MyDashboard() {
   const { user } = useAuth()
@@ -54,6 +64,8 @@ export default function MyDashboard() {
           detail={c.conflicts ? `${plural(c.conflicts, 'course')} with a potential equivalency conflict` : 'No potential equivalency conflicts'}
         />
       </div>
+
+      <PeriodCounts title="My courses by period" fetchCounts={getMyCounts} cards={EVALUATOR_CARDS} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-6 items-start">
         <section className="staff-card">
