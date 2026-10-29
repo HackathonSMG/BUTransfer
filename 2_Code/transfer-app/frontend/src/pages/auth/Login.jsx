@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogIn, Eye, EyeOff, Check, Search } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
@@ -38,8 +37,8 @@ export default function Login() {
 
     setLoading(true)
     try {
+      // The dashboard's greeting confirms the sign-in; no pop-up
       const user = await login(email, password)
-      toast.success(`Welcome back, ${user.full_name || user.email}!`)
       navigate(next?.startsWith('/') && !next.startsWith('//') ? next : homeFor(user.role))
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error?.message || 'Invalid email or password'

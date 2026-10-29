@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react'
 import client from '../api/client'
-import toast from 'react-hot-toast'
+import notify from '../lib/notify'
 
 export const AuthContext = createContext(null)
 
@@ -52,6 +52,12 @@ export function AuthProvider({ children }) {
     setToken(null)
   }, [])
 
+  // The API client signals an expired or rejected session (401); forget the signed-in user straight away
+  useEffect(() => {
+    window.addEventListener('auth:expired', clearAuth)
+    return () => window.removeEventListener('auth:expired', clearAuth)
+  }, [clearAuth])
+
   const login = useCallback(async (email, password) => {
     const res = await client.post('/auth/login', { email, password })
     const { access_token: newToken, user: newUser } = res.data.data
@@ -69,7 +75,8 @@ export function AuthProvider({ children }) {
       // Ignore logout errors
     }
     clearAuth()
-    toast.success('Logged out successfully')
+    // Shown on the page the user lands on after signing out
+    notify.success('You have signed out.', { keepOnNavigate: true })
   }, [clearAuth])
 
   const isAuthenticated = Boolean(user && token)

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Plus, Trash2, Info, ArrowRight, CheckCircle, HelpCircle, FileText, History } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getSelfCheckInstitutions, runSelfCheck } from '../../api/student'
 import Button from '../../components/ui/Button'
 
@@ -40,13 +40,13 @@ export default function SelfCheck() {
       credit_system: r.credit_system,
       grade: r.grade.trim() || null
     }))
-    if (!institution || !courses.length) { toast.error('Choose your college and enter at least one course code'); return }
+    if (!institution || !courses.length) { notify.error('Choose your college and enter at least one course code'); return }
     setLoading(true)
     try {
       const res = await runSelfCheck({ institution, courses })
       setResult(res.data)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The self-check could not run. Please try again.')
+      notify.error(err.response?.data?.message || 'The self-check could not run. Please try again.')
     } finally {
       setLoading(false)
     }

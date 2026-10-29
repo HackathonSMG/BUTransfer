@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { createApplication, uploadDocument } from '../../api/applications'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -67,13 +67,13 @@ export default function NewApplication() {
         }
       }
       if (failed.length > 0) {
-        toast.error(`Some documents could not be uploaded (${failed.join(', ')}). You can add them on the evaluation page.`)
+        notify.error(`Some documents could not be uploaded (${failed.join(', ')}). You can add them on the evaluation page.`)
       }
 
-      toast.success(`Application ${application.reference_number} created`)
+      notify.success(`Application ${application.reference_number} created`)
       navigate(`/evaluator/applications/${application.id}`)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create the evaluation')
+      notify.error(err.response?.data?.message || 'Failed to create the evaluation')
       setSubmitting(false)
     }
   }

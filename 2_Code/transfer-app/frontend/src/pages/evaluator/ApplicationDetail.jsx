@@ -4,7 +4,7 @@ import {
   ArrowLeft, Globe, Mail, UserCheck, RefreshCw, ClipboardCheck,
   MessageSquare, Gavel, FileText, Clock, User, StickyNote, Link2
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import {
   getApplication, triggerEvaluation, uploadDocument, getAuditLog, addEvaluatorNote
 } from '../../api/applications'
@@ -22,6 +22,8 @@ import Spinner from '../../components/ui/Spinner'
 import Textarea from '../../components/ui/Textarea'
 import { activityLabel } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
+import AssignDialog from '../../components/staff/AssignDialog'
+import { useAuth } from '../../hooks/useAuth'
 
 const SOURCE_CONFIG = {
   website: { Icon: Globe, label: 'Web Portal' },
@@ -70,6 +72,10 @@ function AuditEntry({ entry }) {
 export default function ApplicationDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // The Credit Evaluation Office and administrators can move an open course to another evaluator from here
+  const canReassign = ['admin', 'credit_office'].includes(user?.role)
+  const [assigning, setAssigning] = useState(null)
   const [state, setState] = useState({ loading: true, data: null, error: null })
   const [auditLog, setAuditLog] = useState([])
   const [triggering, setTriggering] = useState(false)
@@ -97,10 +103,10 @@ export default function ApplicationDetail() {
     setTriggering(true)
     try {
       await triggerEvaluation(id)
-      toast.success('Evaluation started. This may take a minute...')
+      notify.success('Evaluation started. This may take a minute...')
       setTimeout(load, 3000)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to trigger evaluation')
+      notify.error(err.response?.data?.message || 'Failed to trigger evaluation')
     } finally {
       setTriggering(false)
     }
@@ -121,11 +127,11 @@ export default function ApplicationDetail() {
     setSavingNote(true)
     try {
       await addEvaluatorNote(id, note)
-      toast.success('Note saved')
+      notify.success('Note saved')
       setNote('')
       await load()
     } catch {
-      toast.error('Failed to save note')
+      notify.error('Failed to save note')
     } finally {
       setSavingNote(false)
     }
@@ -161,9 +167,9 @@ export default function ApplicationDetail() {
   const copyStatusLink = async () => {
     try {
       await navigator.clipboard.writeText(statusLink)
-      toast.success('Tracking link copied')
+      notify.success('Tracking link copied')
     } catch {
-      toast.error('Could not copy; select the link and copy it manually')
+      notify.error('Could not copy; select the link and copy it manually')
     }
   }
 
@@ -211,7 +217,8 @@ export default function ApplicationDetail() {
       </div>
 
       {/* Where the application is and who holds each course */}
-      <ReviewAssignment ownership={app.ownership} />
+      <ReviewAssignment ownership={app.ownership} onReassign={canReassign ? setAssigning : null} />
+      {canReassign && <AssignDialog course={assigning} onClose={() => setAssigning(null)} onDone={() => { setAssigning(null); load() }} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Main content */}

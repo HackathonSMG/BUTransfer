@@ -39,6 +39,8 @@ const ACTIVITY_LABELS = {
   info_request_responded: 'Student replied',
   established_outcomes_applied: 'Established equivalencies applied',
   review_reassigned: 'Course reassigned',
+  reassignment_requested: 'Handed back for reassignment',
+  queued_reviews_opened: 'Courses opened for parallel review',
   credit_posted: 'Transfer credit posted',
   duplicate_suspected: 'Possible duplicate evaluation flagged',
   duplicate_resolved: 'Duplicate check resolved',

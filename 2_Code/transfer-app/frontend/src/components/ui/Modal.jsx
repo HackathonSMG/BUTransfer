@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { StatusRegion, useDialogRegion } from './StatusMessage'
 
 const sizeClasses = {
   sm: 'max-w-md',
@@ -9,6 +10,9 @@ const sizeClasses = {
 }
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }) {
+  // Errors raised while the dialog is open appear inside it, next to the form that caused them
+  const region = useDialogRegion(isOpen)
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -60,6 +64,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
+          <StatusRegion region={region} className="mb-4" />
           {children}
         </div>
       </div>
