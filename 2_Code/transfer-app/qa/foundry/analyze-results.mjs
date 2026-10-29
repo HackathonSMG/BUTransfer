@@ -9,8 +9,7 @@
  */
 import 'dotenv/config';
 import fs from 'node:fs';
-import { DefaultAzureCredential } from '@azure/identity';
-import { AIProjectClient } from '@azure/ai-projects';
+import { askAI } from './llm.mjs';
 
 const [resultsPath = 'test-results/results.json', outPath = 'qa-report.md'] = process.argv.slice(2);
 const env = process.env;
@@ -29,7 +28,8 @@ function collect(suite, file, out) {
         project: t.projectName,
         status,
         duration_ms: last.duration ?? 0,
-        requirements: [...new Set(title.match(/R\d+/g) || [])],
+        // problem-statement tags: [STEP-n], [RULE-x], [GOAL-x], [DEMO]
+        requirements: [...new Set((title.match(/\[(?:STEP|RULE|GOAL)-[^\]]+\]|\[DEMO\]/g) || []).map((t) => t.slice(1, -1)))],
         known_bug: bug ? Number(bug[1]) : null,
         ai_generated: t.projectName === 'ai-generated' || title.includes('[AI]'),
         skip_reason: status === 'skipped' ? (t.annotations || []).map((a) => a.description).filter(Boolean).join('; ') || undefined : undefined,
@@ -79,26 +79,34 @@ const payload = {
   tests,
 };
 
-// ---------- 2. Ask the Foundry agent ----------
-async function askAgent() {
-  if (!env.FOUNDRY_PROJECT_ENDPOINT) throw new Error('FOUNDRY_PROJECT_ENDPOINT not set');
-  if (env.CI && env.HAS_AZURE !== 'true') throw new Error('Azure login not configured');
-  const project = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, new DefaultAzureCredential());
-  const client = project.getOpenAIClient();
-  const agentRef = { body: { agent_reference: { type: 'agent_reference', name: env.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst' } } };
-  const conversation = await client.conversations.create();
-  try {
-    const response = await client.responses.create({ conversation: conversation.id, input: JSON.stringify(payload) }, agentRef);
-    const text = response.output_text
-      || (response.output || []).filter((i) => i.type === 'message').flatMap((m) => m.content || []).map((c) => c.text || '').join('\n');
-    if (!text.trim()) throw new Error('Agent returned an empty report');
-    return text.trim();
-  } finally {
-    await client.conversations.delete(conversation.id).catch(() => {});
-  }
-}
+// ---------- 2. Ask the AI (API key or Foundry agent, see llm.mjs) ----------
+const askAgent = () => askAI({
+  role: 'qa-analyst',
+  instructionsFile: 'qa-agent-instructions.md',
+  agentName: env.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst',
+  input: JSON.stringify(payload),
+});
 
 // ---------- 3. Plain fallback report (no AI) ----------
+// The Problem 1 statement, as tagged in the test titles
+const COVERAGE = [
+  ['STEP-1', 'Self-check: preview likely equivalencies'], ['STEP-2', 'Submit official transcripts'],
+  ['STEP-3/4', 'Processed against the equivalency database; existing match applied'], ['STEP-5', 'No match: syllabus requested'],
+  ['STEP-6', 'Department review: BU course, elective or no credit'], ['STEP-7', 'Posted with grade T; pending shows 0 units'],
+  ['RULE-QUARTER', 'Quarter credits × 2/3'], ['RULE-GRADE', 'C or higher; grades not in BU GPA'], ['RULE-HUB', 'No BU Hub units'],
+  ['RULE-DEADLINE', 'Within one year of starting at BU'], ['RULE-ZERO', 'Pending credit = 0 units'],
+  ['GOAL-FASTER', 'Faster'], ['GOAL-TRANSPARENT', 'More transparent'], ['GOAL-LESS-STRESS', 'Less stressful'],
+  ['GOAL-DEPT-DECIDES', 'Departments make the final decision'], ['GOAL-PRIVACY', 'Student records stay private'], ['DEMO', 'Demo scenario'],
+];
+function coverageRows() {
+  return COVERAGE.map(([id, label]) => {
+    const ts = tests.filter((t) => t.requirements.includes(id));
+    const run = ts.filter((t) => t.status !== 'skipped');
+    const bad = run.filter((t) => t.status === 'failed' && !t.known_bug && !t.ai_generated);
+    const icon = !run.length ? '⏭' : bad.length ? '❌' : run.some((t) => t.status === 'failed') ? '⚠️' : '✅';
+    return `| ${id} | ${label} | ${icon} | ${run.filter((t) => t.status === 'passed' || t.status === 'flaky').length}/${ts.length}${ts.length > run.length ? ` (${ts.length - run.length} skipped)` : ''} |`;
+  });
+}
 function fallbackReport(reason) {
   const cell = (s) => String(s || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
   const verdict = regressions.length ? '❌ Blocked: new regressions' : failed.length ? '⚠️ Ready with known issues' : '✅ Ready';
@@ -106,6 +114,9 @@ function fallbackReport(reason) {
     `## QA report · ${payload.build.commit} · ${payload.build.branch}`,
     `**Verdict:** ${verdict}`,
     `**Results:** ${summary.passed} passed · ${summary.failed} failed (${summary.regressions} new regressions, ${summary.known_bug_failures} known bugs) · ${summary.skipped} skipped · target ${payload.build.target_url}`,
+    '',
+    '### Problem statement coverage',
+    ['| Tag | Problem statement | Status | Passed |', '|---|---|---|---|', ...coverageRows()].join('\n'),
     '',
     '### New regressions',
     regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n')[0]).slice(0, 160)} |`)].join('\n') : 'None',
@@ -119,7 +130,7 @@ function fallbackReport(reason) {
 let report;
 try {
   report = await askAgent();
-  console.log('[QA] Report written by the Foundry agent.');
+  console.log('[QA] Report written by the AI.');
 } catch (err) {
   console.log(`[QA] Using the plain report (AI report not available: ${err.message.split('\n')[0]})`);
   report = fallbackReport(err.message);

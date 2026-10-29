@@ -1,41 +1,59 @@
-// Shared steps for the 4-step application at /apply (pages/applicant/EligibilityApplication.jsx).
-// IMPORTANT: clicking "Continue" on step 1 with valid details saves a DRAFT APPLICATION on the server.
-// Tests that go past step 1 must call requireWriteSafeSite() so they never run against production.
+// Shared helpers for the transcript-first submission at /apply (pages/applicant/TransferCreditApplication.jsx)
+// and for the team's test-case transcripts in 5_Test_Cases/transcripts.
+//
+// Step 1 "Upload Transcripts" reads each file with POST /api/student/transcripts/read, which stores NOTHING.
+// Step 2 "Review & Confirm" only shows what was read. Data is saved ONLY when "Submit for Credit Evaluation"
+// is clicked, so tests that stop before that are safe on production. blockSaving() enforces it.
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 const path = require('path');
 
 const fixture = (name) => path.join(__dirname, '..', 'fixtures', name);
+// qa/tests/helpers → repo root (BUTransfer) → 5_Test_Cases/transcripts. TRANSCRIPT_DIR overrides it.
+const TRANSCRIPT_DIR = process.env.TRANSCRIPT_DIR || path.resolve(__dirname, '../../../../../5_Test_Cases/transcripts');
+const CASES_FILE = path.join(TRANSCRIPT_DIR, 'transcripts.json');
 
-const VALID = {
-  firstName: 'Test', lastName: 'Student', email: 'test.student@example.com',
-  institution: 'Test Community College',
-};
+// "CS2000", "cs-1800" and "CS 2000" count as the same code
+const norm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-// The footer shows "Step N of 4" (hidden on phone widths, so this is for desktop tests).
-const atStep = (page, n) => expect(page.getByText(`Step ${n} of 4`)).toBeVisible();
-const cont = (page) => page.getByRole('button', { name: /^Continue/ }).click();
+/** Test cases from transcripts.json, grouped by TC id (TC16 and TC26 have one transcript per college). */
+function loadCases() {
+  if (!fs.existsSync(CASES_FILE)) return [];
+  const byCase = new Map();
+  for (const t of JSON.parse(fs.readFileSync(CASES_FILE, 'utf8'))) {
+    const id = t.file.match(/^(TC\d+)/)[1];
+    if (!byCase.has(id)) byCase.set(id, { id, name: t.file.replace(/^TC\d+_/, '').replace(/_[^_]+\.pdf$/, '').replace(/_/g, ' '), transcripts: [] });
+    byCase.get(id).transcripts.push({ ...t, path: path.join(TRANSCRIPT_DIR, t.file) });
+  }
+  return [...byCase.values()];
+}
+
+/** Fails the test if the page tries to create or submit an application (keeps production clean). */
+async function blockSaving(page) {
+  await page.route(/\/api\/student\/applications/, (route) => {
+    if (route.request().method() === 'GET') return route.continue();
+    return route.fulfill({ status: 418, contentType: 'application/json', body: '{"error":{"message":"Blocked by QA: tests never submit on this site"}}' });
+  });
+}
 
 async function openApplication(page) {
-  // The form keeps a draft in sessionStorage; start each test clean.
-  await page.addInitScript(() => { try { sessionStorage.removeItem('bu.transfer.application'); } catch {} });
   await page.goto('/apply');
-  await expect(page.getByRole('heading', { name: 'Applicant Information' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Upload your official transcript(s)' })).toBeVisible();
 }
 
-async function fillStep1(page, data = {}) {
-  const d = { ...VALID, ...data };
-  await page.getByLabel('First name').fill(d.firstName);
-  await page.getByLabel('Last name').fill(d.lastName);
-  await page.getByLabel('Email address', { exact: false }).first().fill(d.email);
-  await page.getByLabel('Confirm email address').fill(d.confirmEmail ?? d.email);
-  await page.getByLabel('Previous college or university').fill(d.institution);
-  // program/term: '' = leave empty, a label = choose that option, undefined = first option
-  if (d.program !== '') await page.getByLabel('Intended program at BU').selectOption(d.program ? { label: d.program } : { index: 1 });
-  if (d.term !== '') await page.getByLabel('Intended start term').selectOption(d.term ? { label: d.term } : { index: 1 });
+/** Adds files in step 1 and waits until each one has been read. */
+async function uploadTranscripts(page, files) {
+  await page.locator('input[type="file"]').first().setInputFiles(files);
+  await expect(page.getByRole('button', { name: /Review details/ })).toBeEnabled({ timeout: 60_000 });
 }
+
+const reviewDetails = async (page) => {
+  await page.getByRole('button', { name: /Review details/ }).click();
+  await expect(page.getByRole('heading', { name: 'Review and confirm' })).toBeVisible();
+};
 
 function requireWriteSafeSite() {
-  test.skip(process.env.ALLOW_SUBMIT !== 'true', 'Saves a draft application. Runs only on local/staging with ALLOW_SUBMIT=true.');
+  test.skip(process.env.ALLOW_SUBMIT !== 'true', 'Submits a real application. Runs only on local/staging with ALLOW_SUBMIT=true.');
 }
 
-module.exports = { VALID, fixture, atStep, cont, openApplication, fillStep1, requireWriteSafeSite };
+module.exports = { fixture, norm, loadCases, blockSaving, openApplication, uploadTranscripts, reviewDetails, requireWriteSafeSite, TRANSCRIPT_DIR };

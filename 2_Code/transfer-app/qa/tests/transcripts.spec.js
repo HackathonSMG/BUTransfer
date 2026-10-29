@@ -1,99 +1,80 @@
-// [R1][R3][R5] End-to-end runs with the team's test-case transcripts (5_Test_Cases/transcripts/*.pdf).
-// For each test case: apply through /apply as the student in transcripts.json, upload that case's transcript(s),
-// submit, then open Track Application and check that every course on the transcript appears.
+// Process steps 3–7 end to end with the team's test-case transcripts: submit as the student, then follow the
+// application on the Transfer Credit Status page the way the student would.
 //
 // These SUBMIT REAL APPLICATIONS, so they run only on local/staging with ALLOW_SUBMIT=true (never on production).
-// Expected decisions per case (accept / elective / no credit / information required ...) are checked by
-// 5_Test_Cases/transcripts/run_scenarios.mjs against the database; these tests cover the screens a student uses.
+// The staff decisions (department review, final posting) are covered by 5_Test_Cases/transcripts/run_scenarios.mjs.
 const { test, expect } = require('@playwright/test');
-const fs = require('fs');
-const path = require('path');
 const A = require('./helpers/apply');
 
-const DIR = path.resolve(__dirname, '../../../../5_Test_Cases/transcripts');
-const CASES_FILE = path.join(DIR, 'transcripts.json');
+// What the problem statement says each case must show the student (from scenario_results.json)
+const EXPECT = {
+  TC01: { tags: '[STEP-3/4][GOAL-FASTER]', text: [/CAS CS 111/] },                              // established equivalencies applied
+  TC02: { tags: '[STEP-3/4][STEP-6]', text: [/Elective/i] },                                       // established elective credit
+  TC04: { tags: '[RULE-GRADE]', text: [/not accepted|no credit/i] },                              // D and C- earn no credit
+  TC05: { tags: '[STEP-5][GOAL-LESS-STRESS]', text: [/syllabus/i] },                              // "maybe" → syllabus requested
+  TC14: { tags: '[STEP-5]', text: [/syllabus/i] },                                                 // unknown course → syllabus
+  TC16: { tags: '[RULE-QUARTER]', text: [/3\.33/] },                                               // 5 quarter credits → 3.33 BU
+  TC17: { tags: '[STEP-6][GOAL-TRANSPARENT]', text: [/Department Review/i] },                      // courses with department evaluators
+};
 
-// The form's program list (lib/application.js); other majors go to the closest program.
-const PROGRAMS = ['Computer Science', 'Business Administration', 'Engineering', 'Liberal Arts', 'Sciences', 'Education', 'Communication'];
-const programFor = (major) => PROGRAMS.includes(major) ? major
-  : ['Mathematics', 'Biology', 'Psychology', 'Chemistry', 'Physics'].includes(major) ? 'Sciences' : 'Liberal Arts';
+const cases = A.loadCases();
 
-// "CS2000", "cs-1800" and "CS 2000" count as the same course code
-const norm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-// Group the transcripts by test case: TC16 and TC26 have one transcript per institution
-const cases = [];
-if (fs.existsSync(CASES_FILE)) {
-  const byCase = new Map();
-  for (const t of JSON.parse(fs.readFileSync(CASES_FILE, 'utf8'))) {
-    const id = t.file.match(/^(TC\d+)/)[1];
-    if (!byCase.has(id)) byCase.set(id, { id, name: t.file.replace(/^TC\d+_/, '').replace(/_[^_]+\.pdf$/, '').replace(/_/g, ' '), transcripts: [] });
-    byCase.get(id).transcripts.push(t);
-  }
-  cases.push(...byCase.values());
-}
-
-test.describe('[R1][R3] Test-case transcripts through the student screens (local/staging only)', () => {
-  test.skip(cases.length === 0, `No transcripts found at ${CASES_FILE}`);
-  test.describe.configure({ mode: 'serial' }); // one application at a time, like a real student
-  test.setTimeout(240_000);
+test.describe('[STEP-3/4][STEP-5][STEP-6][STEP-7] Test-case transcripts from upload to status (local/staging only)', () => {
+  test.skip(cases.length === 0, 'No transcripts found in 5_Test_Cases/transcripts');
+  test.describe.configure({ mode: 'serial' });
+  test.setTimeout(300_000);
 
   for (const c of cases) {
-    test(`[R1][R3] ${c.id} ${c.name}: apply with transcript${c.transcripts.length > 1 ? 's' : ''} and track it`, async ({ page }) => {
+    const exp = EXPECT[c.id] || { tags: '', text: [] };
+    test(`[STEP-2][STEP-7][RULE-ZERO][GOAL-DEPT-DECIDES]${exp.tags} ${c.id} ${c.name}: submit and follow the status`, async ({ page }) => {
       A.requireWriteSafeSite();
-      const t = c.transcripts[0];
-      const [first, ...rest] = t.student.split(' ');
       const email = `qa.${c.id.toLowerCase()}.${Date.now()}@example.com`;
 
-      // Step 1: applicant details from transcripts.json
       await A.openApplication(page);
-      await A.fillStep1(page, {
-        firstName: first, lastName: rest.join(' ') || 'Test', email,
-        institution: t.institution, program: programFor(t.major), term: t.start,
-      });
-      await A.cont(page);
-      await expect(page.getByRole('heading', { name: 'Academic Documents' })).toBeVisible({ timeout: 20_000 });
+      await A.uploadTranscripts(page, c.transcripts.map((t) => t.path));
+      await A.reviewDetails(page);
+      await page.getByLabel('Email address', { exact: false }).first().fill(email);
+      await page.getByLabel('Confirm email address').fill(email);
+      await page.getByRole('checkbox').last().check();
+      await page.getByRole('button', { name: /Submit for Credit Evaluation/ }).click();
 
-      // Step 2: upload this case's transcript PDF(s) into the "Academic Transcript" box
-      const files = c.transcripts.map((x) => path.join(DIR, x.file));
-      // Found by its visible title: the box's aria-label is a React element, so it reads "[object Object]"
-      // (DocumentDropzone.jsx, <section aria-label={title}>)
-      const transcriptBox = page.locator('section').filter({ hasText: 'Academic Transcript' }).first();
-      await transcriptBox.locator('input[type="file"]').setInputFiles(files);
-      for (const x of c.transcripts) {
-        await expect(transcriptBox.getByText(x.file)).toBeVisible();
+      // A previous run with the same student may be found; continue with a new evaluation
+      const another = page.getByRole('button', { name: /Continue with a new evaluation/ });
+      if (await another.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await another.click();
+        await page.getByRole('button', { name: /Submit for Credit Evaluation/ }).click();
       }
-      await expect(transcriptBox.getByText('Uploaded')).toHaveCount(files.length, { timeout: 90_000 });
 
-      // Steps 3–4: continue, confirm and submit
-      await A.cont(page);
-      await expect(page.getByRole('heading', { name: 'Additional Information' })).toBeVisible();
-      await A.cont(page);
-      await expect(page.getByRole('heading', { name: 'Review & Submit' })).toBeVisible();
-      for (const x of c.transcripts) await expect(page.getByText(x.file).first()).toBeVisible();
-      await page.getByRole('checkbox').check();
-      await page.getByRole('button', { name: /Submit Application/ }).click();
+      await expect(page.getByRole('heading', { name: 'Credit Evaluation Submitted' })).toBeVisible({ timeout: 60_000 });
+      const id = (await page.locator('span.font-mono').first().textContent()).trim();
+      test.info().annotations.push({ type: 'Transfer Credit ID', description: `${c.id} → ${id} (${email})` });
 
-      // Confirmation page shows the application number
-      await expect(page.getByRole('heading', { name: 'Application Submitted' })).toBeVisible({ timeout: 30_000 });
-      const number = (await page.locator('span.font-mono').first().textContent()).trim();
-      expect(number).toMatch(/\w+-\d+/);
-      test.info().annotations.push({ type: 'application', description: `${c.id} → ${number} (${email})` });
-
-      // Track it and wait until every transcript course is listed
-      await page.goto(`/track?application=${encodeURIComponent(number)}`);
-      await page.getByLabel('Application number').fill(number);
+      // Transfer Credit Status, as the student sees it
+      await page.goto(`/track?id=${encodeURIComponent(id)}`);
+      await page.getByLabel('Transfer Credit ID').fill(id);
       await page.getByLabel('Email address').first().fill(email);
-      await page.getByRole('button', { name: /^Track Application/ }).click();
-      await expect(page.getByText(number).first()).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('button', { name: /^Check Status/ }).click();
+      await expect(page.getByText(id).first()).toBeVisible({ timeout: 20_000 });
 
-      const expected = [...new Set(c.transcripts.flatMap((x) => x.courses.map((k) => norm(k.code))))];
+      // [GOAL-TRANSPARENT] every course on the transcript is listed, with BU units
+      const codes = [...new Set(c.transcripts.flatMap((t) => t.courses.map((k) => A.norm(k.code))))];
       await expect.poll(async () => {
-        const text = norm(await page.locator('main').innerText());
-        return expected.filter((code) => !text.includes(code));
-      }, { message: `courses not shown on the tracking page for ${c.id}`, timeout: 120_000, intervals: [5_000] }).toEqual([]);
+        await page.reload().catch(() => {});
+        const text = A.norm(await page.locator('main').innerText());
+        return codes.filter((k) => !text.includes(k));
+      }, { message: `courses missing on the status page for ${c.id}`, timeout: 180_000, intervals: [10_000] }).toEqual([]);
 
-      await expect(page.getByRole('heading', { name: /Transfer Credit Summary/ })).toBeVisible();
+      // [RULE-ZERO] pending courses show 0 units until decided; [GOAL-DEPT-DECIDES] the student is told who decides
+      await expect(page.getByText(/0 units until decided|0 BU units until they are reviewed/).first()).toBeVisible();
+      await expect(page.getByText('Academic departments make the final decision on every course.')).toBeVisible();
+      // [RULE-DEADLINE] the one-year deadline is shown once credit is being evaluated
+      await expect.soft(page.getByText(/one year/i).first()).toBeVisible();
+
+      // Case-specific outcome from the problem statement
+      for (const re of exp.text) {
+        await expect.poll(async () => { await page.reload().catch(() => {}); return re.test(await page.locator('main').innerText()); },
+          { message: `${c.id}: expected ${re} on the status page`, timeout: 120_000, intervals: [10_000] }).toBe(true);
+      }
     });
   }
 });

@@ -12,8 +12,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { DefaultAzureCredential } from '@azure/identity';
-import { AIProjectClient } from '@azure/ai-projects';
+import { askAI, aiMode } from './llm.mjs';
 
 const env = process.env;
 const OUT = 'tests/generated/ai-tests.spec.js';
@@ -30,7 +29,7 @@ fs.rmSync(OUT, { force: true });
 
 const changed = (env.CHANGED_FILES || '').split('\n').map((s) => s.trim()).filter(Boolean);
 const appFiles = changed.filter((f) => f.startsWith('2_Code/transfer-app/frontend/') || f.startsWith('2_Code/transfer-app/backend/'));
-if (!env.FOUNDRY_PROJECT_ENDPOINT) done(false, 'FOUNDRY_PROJECT_ENDPOINT not set');
+if (!aiMode()) done(false, 'AI not configured (QA_AGENT_SECRET, FOUNDRY_API_KEY or Azure login)');
 
 const request = {
   commit: (env.GITHUB_SHA || 'local').slice(0, 7),
@@ -39,22 +38,17 @@ const request = {
   note: appFiles.length ? 'Write tests for the areas these files affect.' : 'No app files changed: write smoke tests for the main public pages.',
 };
 
-// ---------- Ask the agent ----------
+// ---------- Ask the AI (API key or Foundry agent, see llm.mjs) ----------
 let text;
 try {
-  const project = new AIProjectClient(env.FOUNDRY_PROJECT_ENDPOINT, new DefaultAzureCredential());
-  const client = project.getOpenAIClient();
-  const agentRef = { body: { agent_reference: { type: 'agent_reference', name: env.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer' } } };
-  const conversation = await client.conversations.create();
-  try {
-    const response = await client.responses.create({ conversation: conversation.id, input: JSON.stringify(request) }, agentRef);
-    text = response.output_text
-      || (response.output || []).filter((i) => i.type === 'message').flatMap((m) => m.content || []).map((c) => c.text || '').join('\n');
-  } finally {
-    await client.conversations.delete(conversation.id).catch(() => {});
-  }
+  text = await askAI({
+    role: 'test-writer',
+    instructionsFile: 'test-writer-instructions.md',
+    agentName: env.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer',
+    input: JSON.stringify(request),
+  });
 } catch (err) {
-  done(false, `agent call failed: ${err.message}`);
+  done(false, `AI call failed: ${err.message}`);
 }
 
 // ---------- Extract and check the code ----------
