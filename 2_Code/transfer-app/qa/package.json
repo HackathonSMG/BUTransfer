@@ -7,7 +7,8 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "qa:report": "node foundry/analyze-results.mjs test-results/results.json qa-report.md"
+    "qa:report": "node foundry/analyze-results.mjs test-results/results.json qa-report.md",
+    "test:transcripts": "playwright test transcripts.spec.js --project=desktop"
   },
   "dependencies": {
     "@azure/ai-projects": "^2.9.0",

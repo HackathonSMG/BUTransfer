@@ -20,32 +20,30 @@ R5 evaluator speed · R6 department makes final decision, roles enforced · R7 s
 R8 audit trail · R9 phone and keyboard · R10 no console errors or failed requests
 
 ## App map
-Public routes: / · /apply (5 steps) · /apply/confirm · /status/:token · /eligibility · /self-check · /login · unknown → 404
-Staff routes (signed out → redirect to /login): /evaluator, /evaluator/my-evaluations, /evaluator/reviews/:id,
+Public routes: / · /apply (4 steps) · /apply/submitted · /track · /eligibility · /self-check · /login · unknown → 404.
+/status/:token and /apply/confirm redirect to /track.
+Signed-out → redirect to /login: /student, /evaluator, /evaluator/my-evaluations, /evaluator/lookup, /evaluator/reviews/:id,
 /evaluator/equivalencies, /evaluator/applications/:id, /office, /office/applications/:id, /admin, /admin/applications,
 /admin/conflicts, /admin/reports, /admin/criteria, /admin/audit, /admin/users
 APIs (GET without login → 401 or 403): /api/applications, /api/admin/overview, /api/admin/audit-logs, /api/admin/conflicts,
 /api/evaluators, /api/my/dashboard, /api/my/reviews, /api/office/applications, /api/auth/me. /api/health → 200 {"status":"ok"}.
-/api/student/status/<unknown-token> → 400/401/403/404.
 
-/apply form (footer always shows "Step N of 5"; buttons "Next", "Previous", final "Submit Application"):
-- Step 1 Personal Information: textboxes named "First Name", "Last Name"; placeholders "you@example.com" (email),
-  "+1 (555) 000-0000" (phone), input[type=date] (date of birth), "Street, City, State, ZIP".
-  Errors: "First name is required", "Last name is required", "Valid email address is required".
-- Step 2 Academic Background: placeholders "e.g., University of Massachusetts Boston", "e.g., Computer Science",
-  "e.g., 3.50" (GPA), "e.g., 60" (credits). Errors: "Institution is required", "Valid GPA (0.0–4.0) is required",
-  "Total credits is required".
-- Step 3 Transfer Request: two <select>s (program, start term). Errors: "Program is required", "Expected start term is required".
-- Step 4 Documents: 4 file inputs (transcript, ID, syllabi, other); text "Click or drag & drop to upload";
-  error "Official transcript is required".
-- Step 5 Review: checkbox; error "You must confirm the information is accurate" (clicking Submit Application
-  without ticking is safe: it's blocked on the client).
-Login page: placeholders "your@bu.edu", "••••••••"; button "Sign In"; errors "Enter a valid email address",
-"Password is required"; link "Submit a Transfer Application".
-Status page with a bad token shows heading "Application Not Found".
+/apply (pages/applicant/EligibilityApplication.jsx). Heading per step; footer "Step N of 4"; buttons "Continue", "Back", "Submit Application".
+WARNING: "Continue" on step 1 with all fields valid SAVES A DRAFT on the server. Only test step 1 with at least one invalid field.
+- Step 1 "Applicant Information": labels "First name", "Last name", "Email address", "Confirm email address",
+  "Previous college or university", selects "Intended program at BU", "Intended start term".
+  Errors: "Enter your first name", "Enter your last name", "Enter a valid email address", "The email addresses do not match",
+  "Enter the college or university you attended" (needs ≥ 2 characters), "Select your intended program", "Select your intended start term".
+- Steps list: role list named "Application steps" with "Applicant Information", "Academic Documents", "Additional Information", "Review & Submit".
+/track (pages/applicant/TrackApplication.jsx): heading "Track Transfer Credit Application"; labels "Application number"
+(placeholder "APP-2026-0001", auto upper-case), "Email address"; button "Track Application".
+Errors (red text under the field, p.text-red-600): "Enter your application number", "Enter the email address you applied with".
+Login (/login): heading "Welcome back"; labels "Email address" (placeholder "you@bu.edu"), "Password"; button "Sign in";
+errors "Enter a valid email address", "Password is required"; links "Track your application" (/track), "start one" (/apply).
+Home (/): links "Start Transfer Credit Eligibility" (/apply), "Track Application" (/track), "Check eligibility" (/eligibility).
 
 ## File → screen map (for changed files)
-frontend/src/pages/student/* → /apply, /status, /eligibility, /self-check · frontend/src/pages/auth/* → /login
+frontend/src/pages/applicant/* → /apply, /track · frontend/src/pages/student/* → /eligibility, /self-check, /student · frontend/src/pages/auth/* → /login
 frontend/src/pages/evaluator/*, admin/*, office/* → staff routes (test redirects and that APIs stay protected)
 frontend/src/components/ui/*, layout/* → all pages (smoke + mobile layout) · backend/src/routes/* → the matching /api/* endpoints
 backend/src/middleware/* → API protection (401/403)

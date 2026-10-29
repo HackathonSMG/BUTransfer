@@ -18,9 +18,9 @@ for (const [role, [emailVar, passVar]] of Object.entries(ROLES)) {
       setup.skip(true, `${emailVar} / ${passVar} not set`);
     }
     await page.goto('/login');
-    await page.getByPlaceholder('your@bu.edu').fill(process.env[emailVar]);
-    await page.getByPlaceholder('••••••••').fill(process.env[passVar]);
-    await page.getByRole('button', { name: 'Sign In' }).click();
+    await page.getByLabel('Email address').fill(process.env[emailVar]);
+    await page.getByLabel(/^Password/).fill(process.env[passVar]);
+    await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
     await page.context().storageState({ path: file });
   });
