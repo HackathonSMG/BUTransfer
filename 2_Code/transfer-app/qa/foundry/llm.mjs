@@ -29,22 +29,37 @@ function openAiEndpoint() {
 
 async function viaApiKey(instructionsFile, input) {
   const deployment = env.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-4.1-mini';
-  const url = `${openAiEndpoint()}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=2024-10-21`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api-key': env.FOUNDRY_API_KEY },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: fs.readFileSync(path.join(here, instructionsFile), 'utf8') },
-        { role: 'user', content: input },
-      ],
-      temperature: 0.2,
-      max_tokens: 4000,
-    }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`model call failed (${res.status}): ${body.error?.message || body.message || 'no details'}`);
-  return body.choices?.[0]?.message?.content || '';
+  const apiVersion = env.FOUNDRY_API_VERSION || '2024-10-21';
+  const url = `${openAiEndpoint()}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${apiVersion}`;
+  const body = {
+    messages: [
+      { role: 'system', content: fs.readFileSync(path.join(here, instructionsFile), 'utf8') },
+      { role: 'user', content: input },
+    ],
+    // Newer models (GPT-5, o-series) need max_completion_tokens (it also covers their reasoning tokens)
+    // and only allow the default temperature; older ones (GPT-4.x) accept both forms below.
+    max_completion_tokens: 16000,
+    temperature: 0.2,
+  };
+  // If the model rejects a setting, drop or rename it and try again (at most 3 times)
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': env.FOUNDRY_API_KEY },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return data.choices?.[0]?.message?.content || '';
+    const msg = data.error?.message || data.message || 'no details';
+    const param = data.error?.param || (msg.match(/'([a-z_]+)'/) || [])[1];
+    if (res.status === 400 && attempt < 3 && param && param in body && param !== 'messages') {
+      if (param === 'max_completion_tokens') body.max_tokens = 4000; // older API version or model
+      delete body[param];
+      console.log(`[AI] model does not accept '${param}', retrying without it`);
+      continue;
+    }
+    throw new Error(`model call failed (${res.status}): ${msg}`);
+  }
 }
 
 async function viaBackend(role, input) {
