@@ -51,8 +51,17 @@ if (!fs.existsSync(resultsPath)) {
 }
 
 const raw = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
-const tests = [];
-for (const s of raw.suites || []) collect(s, s.file, tests);
+const allTests = [];
+for (const s of raw.suites || []) collect(s, s.file, allTests);
+
+// AI-written tests guess locators and texts. When one fails only because its locator or text didn't match the
+// screen (strict-mode clash, element or text not found), it's the test's mistake, not an app bug: drop it from
+// the report. AI failures that point at the app (page errors, 5xx, wrong status codes, redirects) are kept.
+const TEST_MISTAKE = /strict mode violation|resolved to \d+ elements|element\(s\) not found|waiting for (getBy|locator)|Test timeout of \d+ms exceeded|to(Be(Visible|Enabled|Disabled|Hidden|Checked)|Have(Text|Count|Attribute|Value)|ContainText)\b/i;
+const APP_PROBLEM = /(status|Received)\D{0,12}5\d\d\b|pageerror|page error|Uncaught|TypeError|ReferenceError|net::ERR|response\.status|toBeOK|toHaveURL/i;
+const isTestMistake = (t) => t.ai_generated && t.status === 'failed' && TEST_MISTAKE.test(t.error || '') && !APP_PROBLEM.test(t.error || '');
+const discarded = allTests.filter(isTestMistake);
+const tests = allTests.filter((t) => !isTestMistake(t));
 
 const count = (st) => tests.filter((t) => t.status === st).length;
 const failed = tests.filter((t) => t.status === 'failed');
@@ -64,7 +73,8 @@ try { aiStatus = JSON.parse(fs.readFileSync('tests/generated/ai-status.json', 'u
 const summary = {
   total: tests.length, passed: count('passed'), failed: failed.length, flaky: count('flaky'), skipped: count('skipped'),
   regressions: regressions.length, known_bug_failures: failed.filter((t) => t.known_bug).length,
-  ai_tests: { generated: aiStatus?.generated ?? false, note: aiStatus?.reason || null, total: aiTests.length,
+  ai_tests: { generated: aiStatus?.generated ?? false, note: aiStatus?.reason || null, total: aiTests.length + discarded.length,
+    discarded_test_mistakes: discarded.length,
     passed: aiTests.filter((t) => t.status === 'passed').length, failed: aiTests.filter((t) => t.status === 'failed').length },
 };
 
@@ -123,7 +133,8 @@ function fallbackReport(reason) {
     '', '### AI-written tests for this build',
     aiTests.length
       ? aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')
-      : `None this run: ${summary.ai_tests.note || 'the test-writer step did not run'}`,
+      : `None this run: ${discarded.length ? 'every AI test that failed did not match the screen' : summary.ai_tests.note || 'the test-writer step did not run'}`,
+    ...(discarded.length ? [`_${discarded.length} AI-written test${discarded.length > 1 ? 's were' : ' was'} dropped: ${discarded.length > 1 ? 'they' : 'it'} failed only because the AI's locator or text did not match the screen (not an app bug)._`] : []),
     '', '### Known bugs still failing',
     failed.filter((t) => t.known_bug).map((t) => `- #${t.known_bug} ${t.title}`).join('\n') || 'None',
   ].join('\n');

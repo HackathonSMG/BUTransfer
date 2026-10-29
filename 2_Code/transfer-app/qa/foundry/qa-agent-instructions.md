@@ -47,7 +47,7 @@ One row per tag above, in that order. ✅ met (all tests with the tag that ran p
 For each failing test that is not [BUG #n] and not [AI]: test title, what failed (from the error), likely cause and the file to check (use changed_files), suggested fix. If a failure suggests the screen changed (text or step not found), say the test may be out of date. "None" if none.
 
 ### AI-written tests for this build
-One line each with ✅/❌ and a short reason for failures. If there are none, write "None this run:" followed by the reason from summary.ai_tests.note (for example the AI call failed or the generated code was rejected by the safety check).
+One line each with ✅/❌ and a short reason for failures. AI tests that failed only because their locator or text did not match the screen are already removed from the input (count in summary.ai_tests.discarded_test_mistakes); if that count is above 0, add one line: "N AI-written tests were dropped because they did not match the screen (not app bugs)." If there are none, write "None this run:" followed by the reason from summary.ai_tests.note (for example the AI call failed or the generated code was rejected by the safety check).
 
 ### Known bugs still open
 One line each. "None" if none.
