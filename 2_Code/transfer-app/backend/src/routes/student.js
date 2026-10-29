@@ -5,7 +5,7 @@ import { validateSecureToken } from '../middleware/secure-token.js';
 import { requireAuth, optionalAuth } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/require-role.js';
 import {
-  eligibilityCheck, submitApplication, submitDraft, updateDraft, removeDraftDocument, myApplications, uploadDocument, getApplicationStatus,
+  eligibilityCheck, readTranscript, submitApplication, submitDraft, updateDraft, removeDraftDocument, myApplications, uploadDocument, getApplicationStatus,
   getStudentNotifications, respondToInfoRequest, selfCheck, selfCheckInstitutions, checkExistingApplications, emailApplicationNumbers, trackApplication,
 } from '../controllers/student.controller.js';
 import { env } from '../config/env.js';
@@ -37,7 +37,18 @@ router.post('/eligibility-check', eligibilityCheck);
 router.get('/self-check/institutions', selfCheckInstitutions);
 router.post('/self-check', selfCheck);
 
-// Applicant intake (no account needed): draft -> documents -> submit
+// Reading a transcript before submission (nothing stored); CPU-bound, so limited per IP
+const readLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.TRACK_RATE_LIMIT_MAX * 2,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many files read. Please wait a few minutes and try again.' } },
+  keyGenerator: (req) => (req.ip || req.socket.remoteAddress || 'unknown').replace(/:\d+$/, ''),
+});
+router.post('/transcripts/read', readLimiter, upload.single('file'), readTranscript);
+
+// Student intake (no account needed): draft -> documents -> submit
 router.post('/applications/check-email', lookupLimiter, checkExistingApplications);
 router.post('/applications/email-numbers', lookupLimiter, emailApplicationNumbers);
 router.post('/applications', optionalAuth, submitApplication);

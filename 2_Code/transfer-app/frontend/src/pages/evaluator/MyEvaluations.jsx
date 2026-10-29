@@ -99,12 +99,12 @@ export default function MyEvaluations() {
           <EmptyState
             icon={ClipboardCheck}
             title={search ? 'Nothing matches your search' : 'Nothing here'}
-            description={search ? 'Try another student, reference or course code.' : 'Courses assigned to you appear here as applications are evaluated.'}
+            description={search ? 'Try another student, reference or course code.' : 'Courses assigned to you appear here as transcripts are evaluated.'}
           />
         ) : (
           <ul className="divide-y divide-staff-line2">
             <li className="hidden lg:grid grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1.5fr)_9.5rem_7rem_5.5rem_1rem] gap-4 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
-              <span>Application</span><span>Applicant</span><span>Course</span><span>Status</span><span>Assigned</span><span className="text-right">Waiting</span><span />
+              <span>Transfer Credit ID</span><span>Student</span><span>Course</span><span>Status</span><span>Assigned</span><span className="text-right">Waiting</span><span />
             </li>
             {state.rows.map(r => {
               const status = REVIEW_STATUS[r.status] || { label: r.status, tone: 'neutral' }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { impactMetrics } from '../services/workflow/impact.service.js';
 import { query } from '../config/db.js';
 import * as auditService from '../services/audit.service.js';
 import { badRequest, notFound } from '../utils/errors.js';
@@ -99,6 +100,8 @@ export async function getOverview(req, res, next) {
         evaluator_workload: workload.rows,
         recent_activity: activity.rows,
         attention: { ...attention.rows[0], conflicts: conflicts.length },
+        // The measured outcome (impact.service): automation rate and how courses were decided
+        impact: await impactMetrics(),
       },
     });
   } catch (err) { return next(err); }

@@ -184,6 +184,7 @@ export function summarizeCourses(courses) {
   const s = {
     courses: courses.length, decided: 0, posted: 0, pending: 0, needs_student_action: 0, credits_posted: 0, credits_approved: 0, credits_pending_source: 0,
     courses_accepted: 0, courses_equivalent: 0, courses_elective: 0, courses_not_accepted: 0, credits_accepted: 0, credits_pending: 0, pending_without_credits: 0,
+    courses_awaiting_syllabus: 0, courses_in_department_review: 0,
   };
   for (const c of courses) {
     if (c.state === 'withdrawn') continue;
@@ -196,6 +197,8 @@ export function summarizeCourses(courses) {
     } else {
       s.pending += 1;
       if (c.state === 'information_requested') s.needs_student_action += 1;
+      if (c.state === 'information_requested' && c.info_kind === 'syllabus') s.courses_awaiting_syllabus += 1;
+      if (['department_review', 'information_received', 'waiting_for_review', 'credit_office_review'].includes(c.state)) s.courses_in_department_review += 1;
       if (c.bu_credits == null) s.pending_without_credits += 1; else s.credits_pending += c.bu_credits;
     }
   }

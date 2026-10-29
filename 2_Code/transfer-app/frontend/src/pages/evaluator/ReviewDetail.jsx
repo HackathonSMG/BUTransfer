@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getReview, startReview, decideReview, requestReviewInfo, escalateReview, searchBuCourses, getDocumentLink } from '../../api/my'
+import { getReview, startReview, decideReview, checkReviewDecision, requestReviewInfo, escalateReview, searchBuCourses, getDocumentLink } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
 import TranscriptDrawer from '../../components/evaluator/TranscriptDrawer'
 import Button from '../../components/ui/Button'
@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { REVIEW_STATUS, DECISION_LABELS, matchLabelClass, formatDate } from '../../lib/reviews'
 import { activityLabel } from '../../lib/staffFormat'
+import CourseComparison from '../../components/evaluator/CourseComparison'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
 const INFO_SUGGESTIONS = ['Detailed course description', 'Learning outcomes', 'Contact hours', 'Lab component']
@@ -24,6 +25,18 @@ const OUTCOMES = [
   { key: 'no_credit', label: 'No credit', hint: '0 units. A reason is required.' },
   { key: 'request_info', label: 'Request more information', hint: 'Ask the student for the syllabus or other details before deciding.' }
 ]
+
+// The decision as the API takes it (also sent to the consistency check before it is recorded)
+function decisionPayload(form, text) {
+  return {
+    decision: form.outcome,
+    reason: text || null,
+    bu_course: form.outcome === 'different_course' ? form.courses.join(' + ') : null,
+    elective_label: form.outcome === 'elective' ? form.elective || null : null,
+    units: form.units !== '' ? Number(form.units) : null,
+    conflict_action: form.conflictAction
+  }
+}
 
 // One sentence on where the proposed BU course came from
 function basisSentence(review) {
@@ -83,7 +96,13 @@ export default function ReviewDetail() {
     setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, infoKind: 'syllabus', ...preset })
     setDialog('decide')
   }
-  const openDialog = (kind) => { setText(''); setInfoKind('syllabus'); setDialog(kind) }
+  // A request starts from the one drafted from the comparison's gaps; the evaluator edits it before sending
+  const openDialog = (kind) => {
+    const suggested = kind === 'info' ? state.data?.suggested_request : null
+    setText(suggested?.message || '')
+    setInfoKind(suggested?.kind || 'syllabus')
+    setDialog(kind)
+  }
 
   const submit = async () => {
     setSubmitting(true)
@@ -98,17 +117,9 @@ export default function ReviewDetail() {
         await requestReviewInfo(id, text, form.infoKind)
         toast.success(form.infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else {
-        const payload = {
-          decision: form.outcome,
-          reason: text || null,
-          bu_course: form.outcome === 'different_course' ? form.courses.join(' + ') : null,
-          elective_label: form.outcome === 'elective' ? form.elective || null : null,
-          units: form.units !== '' ? Number(form.units) : null,
-          conflict_action: form.conflictAction
-        }
-        const res = await decideReview(id, payload)
+        const res = await decideReview(id, decisionPayload(form, text))
         toast.success(form.outcome === 'no_credit' ? 'Recorded: no credit' : 'Decision recorded')
-        if (res.data.transfer) toast(`Application handed to the next evaluator (${res.data.transfer.request_number})`)
+        if (res.data.transfer) toast(`Evaluation handed to the next evaluator (${res.data.transfer.request_number})`)
         if (res.data.application_status === 'ready_for_posting') toast('Every course on this application is decided. It is ready for posting.')
       }
       setDialog(null)
@@ -212,7 +223,10 @@ export default function ReviewDetail() {
         <div className="mt-6 pt-6 border-t border-staff-line2 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4 items-center">
           <MatchSummary r={r} />
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-staff-ink2">Recommendation</p>
+            <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-staff-ink2">
+              System recommendation
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-staff-muted border border-staff-line rounded px-1.5 py-px">Advisory</span>
+            </p>
             <p className="text-[18px] font-semibold text-staff-ink mt-1">{proposed?.label || 'Evaluator to decide'}</p>
             <p className="text-[14px] text-staff-ink2 mt-1">{basisSentence(r)}</p>
             <KnowledgeCues k={k} onConflicts={() => openSection('conflicts')} onPrevious={() => openSection('previous')} />
@@ -221,11 +235,23 @@ export default function ReviewDetail() {
               onClick={() => { setEvidenceOpen(true); document.getElementById('matching-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
               className="mt-2 text-[13px] font-semibold text-primary-700 hover:text-primary-800"
             >
-              View matching evidence
+              View supporting evidence
             </button>
+            <p className="mt-3 text-[12.5px] text-staff-muted">The recommendation explains the evidence; the department evaluator makes the final academic decision.</p>
           </div>
         </div>
       </section>
+
+      {/* The evidence below in one place: what supports the proposal, where it differs, what needs attention */}
+      <EvaluationContext
+        brief={d.brief}
+        onRequestSyllabus={isOpen ? () => openDialog('info') : null}
+        onConflicts={() => openSection('conflicts')}
+        onPrevious={() => openSection('previous')}
+      />
+
+      {/* Why the recommendation fits: BU outcomes and topics against the transfer course's description and syllabus */}
+      <CourseComparison comparison={d.comparison} src={src} buCourses={buCourses} />
 
       {/* Details on demand */}
       <section className="staff-card mt-6 divide-y divide-staff-line2">
@@ -237,12 +263,12 @@ export default function ReviewDetail() {
             <div className="space-y-6">{buCourses.map(c => <CourseDetails key={c.course_code} c={c} institution="Boston University" heading={buCourses.length > 1 ? c.course_code : null} />)}</div>
           ) : <p className="text-[14px] text-staff-muted">No BU course has been proposed for this course.</p>}
         </Disclosure>
-        <Disclosure id="matching-details" title="Matching evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
+        <Disclosure id="matching-details" title="Supporting evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
           <Evidence evidence={evidence} src={src} buCourses={buCourses} syllabus={d.syllabus} />
         </Disclosure>
         {previous && (
-          <Disclosure {...sectionProps('previous')} title={`Previous decisions (${previous.total + (k.similar?.length || 0)})`}>
-            <PreviousDecisions k={k} src={src} target={r.target_bu_course} />
+          <Disclosure {...sectionProps('previous')} title={`Similar past decisions (${previous.total + (k.similar?.length || 0) + (d.similar_elsewhere?.courses.length || 0)})`}>
+            <PreviousDecisions k={k} src={src} target={r.target_bu_course} elsewhere={d.similar_elsewhere} />
           </Disclosure>
         )}
         {conflicts.length > 0 && (
@@ -275,7 +301,7 @@ export default function ReviewDetail() {
           {isOpen ? (
             <>
               <div className="hidden sm:block min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-staff-muted">Recommendation</p>
+                <p className="text-[13px] font-medium text-staff-muted">System recommendation · the decision is yours</p>
                 <p className="text-[15px] font-semibold text-staff-ink truncate font-mono">{mapping}</p>
               </div>
               <span className="sm:hidden flex-1" />
@@ -284,14 +310,14 @@ export default function ReviewDetail() {
                 <span className="hidden sm:inline">Request information</span><span className="sm:hidden">Request info</span>
               </Button>
               <Button variant="success" onClick={() => openDecision()}>
-                <Check className="w-4 h-4" />Record decision
+                <Check className="w-4 h-4" />Record department decision
               </Button>
             </>
           ) : (
             <>
               <p className="flex-1 text-[15px] text-staff-ink2">
                 {r.status === 'queued'
-                  ? 'This course opens for your decision once the earlier review of this application is finished.'
+                  ? 'This course opens for your decision once the earlier review of this evaluation is finished.'
                   : r.status === 'withdrawn' ? 'This course no longer needs a decision.' : 'This course has been decided.'}
               </p>
               {d.next_review_id ? (
@@ -317,13 +343,14 @@ export default function ReviewDetail() {
       <Modal
         isOpen={dialog !== null}
         onClose={() => !submitting && setDialog(null)}
-        title={dialog === 'decide' ? 'Evaluation decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
+        title={dialog === 'decide' ? 'Department decision' : dialog === 'escalate' ? 'Request additional review' : 'Request information from the student'}
         size={dialog === 'decide' ? 'md' : 'sm'}
       >
         <div className="space-y-4">
           {dialog === 'decide' && (
             <DecisionForm d={d} form={form} setForm={setForm} text={text} setText={setText} />
           )}
+          {dialog === 'decide' && form.outcome !== 'request_info' && <ConsistencyCheck reviewId={id} form={form} />}
           {dialog === 'escalate' && (
             <label className="block">
               <span className="block text-sm font-medium text-gray-700 mb-1.5">Note for the Credit Evaluation Office</span>
@@ -359,6 +386,7 @@ export default function ReviewDetail() {
                   ))}
                 </div>
               )}
+              {d.suggested_request && <p className="text-[12.5px] text-staff-muted">Drafted from what the course comparison could not find. Edit it before sending.</p>}
               <p className="text-[12.5px] text-staff-muted">The student is notified and answers from their status page. The course returns to you when they do.</p>
             </>
           )}
@@ -448,7 +476,11 @@ function DecisionForm({ d, form, setForm, text, setText }) {
           const active = form.outcome === o.key
           return (
             <label key={o.key} className={`flex gap-3 rounded-lg border px-3.5 py-3 cursor-pointer ${active ? 'border-primary-500 bg-primary-50/50' : 'border-staff-line hover:bg-staff-bg'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <input type="radio" name="outcome" className="mt-1 accent-current text-primary-600" checked={active} disabled={disabled} onChange={() => set({ outcome: o.key })} />
+              <input type="radio" name="outcome" className="mt-1 accent-current text-primary-600" checked={active} disabled={disabled} onChange={() => {
+                const suggested = o.key === 'request_info' ? d.suggested_request : null
+                set({ outcome: o.key, ...(suggested ? { infoKind: suggested.kind } : {}) })
+                if (suggested && !text.trim()) setText(suggested.message)
+              }} />
               <span className="min-w-0 flex-1">
                 <span className="block text-[14.5px] font-semibold text-staff-ink">{o.label}</span>
                 <span className="block text-[12.5px] text-staff-muted">
@@ -477,6 +509,7 @@ function DecisionForm({ d, form, setForm, text, setText }) {
             <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
               placeholder={form.infoKind === 'syllabus' ? 'e.g. Please include the weekly topics and lab hours.' : 'e.g. Please confirm the number of contact hours.'} />
           </label>
+          {d.suggested_request && <p className="text-[12.5px] text-staff-muted">Drafted from what the course comparison could not find. Edit it before sending.</p>}
           <p className="text-[12.5px] text-staff-muted">The student sees the request on this course in their portal. The course returns to you when they answer.</p>
         </>
       ) : (
@@ -593,7 +626,7 @@ function StatusBanner({ d }) {
             {decision.bu_award ? `: ${decision.bu_award}` : ''}
             {decision.bu_units != null && approved ? ` · ${Number(decision.bu_units)} BU units` : ''}
           </p>
-          <p className="text-staff-ink2">{[decision.decided_by, formatDate(decision.decided_at)].filter(Boolean).join(' · ')}</p>
+          <p className="text-staff-ink2">Department decision · {[decision.decided_by, formatDate(decision.decided_at)].filter(Boolean).join(' · ')}</p>
           {decision.reason && <p className="text-staff-ink2 mt-1">{decision.reason}</p>}
         </div>
       </div>
@@ -608,11 +641,11 @@ function StatusBanner({ d }) {
           <p className="font-semibold text-staff-ink">
             {replied
               ? `${info.kind === 'syllabus' ? 'Syllabus received' : 'The student replied'} ${formatDate(info.responded_at)}`
-              : `Waiting on the applicant for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
+              : `Waiting on the student for the ${info.kind === 'syllabus' ? 'syllabus' : 'requested information'}`}
           </p>
           <p className="text-staff-ink2">Requested {formatDate(info.created_at)}{info.message ? `: ${info.message}` : ''}</p>
           {info.student_response && <p className="text-staff-ink mt-1"><span className="font-medium">Reply:</span> {info.student_response}</p>}
-          {replied && syllabus?.compared && <p className="text-staff-ink2 mt-1">The syllabus was compared with the BU catalog; the matching evidence below reflects it.</p>}
+          {replied && syllabus?.compared && <p className="text-staff-ink2 mt-1">The syllabus was compared with the BU catalog; the course comparison below reflects it.</p>}
         </div>
       </div>
     )
@@ -731,6 +764,20 @@ function Evidence({ evidence: e, src, buCourses, syllabus }) {
           <span className="font-medium">Missing information:</span> {e.missing_information}
         </div>
       )}
+      {e.rule_sources?.length > 0 && (
+        <div>
+          <p className="text-staff-muted mb-1.5">Rules applied</p>
+          <ul className="space-y-1">
+            {e.rule_sources.map(rule => (
+              <li key={rule.code} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-[12.5px] text-staff-ink">{rule.code}</span>
+                <span className="text-staff-ink">{rule.name}</span>
+                <span className={`text-[11.5px] font-medium px-1.5 rounded border ${rule.source === 'Problem statement' ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-staff-line bg-staff-sunk text-staff-ink2'}`}>{rule.source}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {e.reasons.length > 0 && (
         <div>
           <p className="text-staff-muted mb-1.5">Evaluation notes</p>
@@ -781,7 +828,123 @@ function KnowledgeCues({ k, onConflicts, onPrevious }) {
   return cues.length ? <div className="flex flex-wrap gap-2 mt-3 text-[12.5px] font-medium">{cues}</div> : null
 }
 
-function PreviousDecisions({ k, src, target }) {
+const CONTEXT_COLUMNS = { 1: '', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' }
+
+// The evidence on this page in one place, so the evaluator starts from a summary rather than from zero.
+// Every line is a fact the API derived from the records; the next step is a suggestion, never a decision.
+function EvaluationContext({ brief, onRequestSyllabus, onConflicts, onPrevious }) {
+  if (!brief) return null
+  const groups = [
+    { key: 'supporting', title: 'Supporting evidence', items: brief.supporting, icon: Check, tone: 'text-emerald-600' },
+    { key: 'differences', title: 'Differences', items: brief.differences, icon: Minus, tone: 'text-amber-600' },
+    { key: 'attention', title: 'Needs attention', items: brief.attention, icon: AlertTriangle, tone: 'text-red-600' }
+  ].filter(g => g.items.length)
+  const p = brief.precedent
+  const precedent = [
+    p.established && `Established equivalency ${p.established.bu_course || ''}`.trim(),
+    p.same_course.total > 0
+      ? `This course: ${p.same_course.total} earlier decision${p.same_course.total === 1 ? '' : 's'} (${p.same_course.outcomes.map(o => `${o.award} ×${o.count}`).join(', ')})`
+      : 'This course: not evaluated before',
+    p.similar_elsewhere.courses > 0 &&
+      `Similar courses elsewhere: ${p.similar_elsewhere.courses} (${p.similar_elsewhere.tally.map(t => `${t.award} ×${t.count}`).join(', ')})`
+  ].filter(Boolean)
+  const step = brief.next_step
+  return (
+    <section className="staff-card p-6 sm:p-8 mt-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-5">
+        <h2 className="text-[17px] font-semibold text-staff-ink">Evaluation context</h2>
+        <p className="text-[12.5px] text-staff-muted">From the course records, the comparison below and earlier decisions</p>
+      </div>
+      {groups.length === 0 ? (
+        <p className="text-[14px] text-staff-muted">No evidence on file for this course yet.</p>
+      ) : (
+        <div className={`grid grid-cols-1 gap-6 ${CONTEXT_COLUMNS[groups.length]}`}>
+          {groups.map(g => (
+            <div key={g.key} className="min-w-0">
+              <p className="text-[13px] font-semibold text-staff-ink2 mb-2">{g.title}</p>
+              <ul className="space-y-2">
+                {g.items.map((t, i) => (
+                  <li key={i} className="flex gap-2 text-[14px] text-staff-ink leading-snug">
+                    <g.icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${g.tone}`} />{t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+      <button type="button" onClick={onPrevious} className="mt-5 flex flex-wrap gap-x-3 gap-y-1 text-left text-[13px] text-staff-ink2 hover:text-staff-ink">
+        <HistoryIcon className="w-4 h-4 text-staff-muted flex-shrink-0 mt-px" />
+        {precedent.map((t, i) => <span key={i}>{i > 0 && <span className="text-staff-muted mr-3">·</span>}{t}</span>)}
+      </button>
+      {step && (
+        <div className="mt-5 pt-5 border-t border-staff-line2 flex flex-wrap items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-primary-600 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[12.5px] text-staff-muted">Suggested next step · the decision is yours</p>
+            <p className="text-[14.5px] font-medium text-staff-ink">{step.text}</p>
+          </div>
+          {step.action === 'request_syllabus' && onRequestSyllabus && (
+            <Button size="sm" variant="secondary" onClick={onRequestSyllabus}><MessageSquare className="w-3.5 h-3.5" />Request syllabus</Button>
+          )}
+          {step.action === 'review_conflict' && (
+            <Button size="sm" variant="secondary" onClick={onConflicts}><AlertTriangle className="w-3.5 h-3.5" />Review the conflict</Button>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const CHECK_TONES = {
+  ok: { icon: Check, cls: 'text-emerald-600' },
+  warn: { icon: AlertTriangle, cls: 'text-amber-600' },
+  info: { icon: Info, cls: 'text-staff-muted' }
+}
+
+// The decision being prepared, checked against the institution's record before it is saved. A guardrail only:
+// the evaluator can always confirm.
+function ConsistencyCheck({ reviewId, form }) {
+  const [state, setState] = useState({ loading: true, data: null })
+  const payload = JSON.stringify(decisionPayload(form, ''))
+  useEffect(() => {
+    let live = true
+    setState(s => ({ ...s, loading: true }))
+    const t = setTimeout(() => {
+      checkReviewDecision(reviewId, JSON.parse(payload))
+        .then(res => live && setState({ loading: false, data: res.data }))
+        .catch(() => live && setState({ loading: false, data: null }))
+    }, 300)
+    return () => { live = false; clearTimeout(t) }
+  }, [reviewId, payload])
+
+  if (!state.data) return state.loading ? <p className="text-[12.5px] text-staff-muted">Checking against earlier decisions…</p> : null
+  const { status, headline, checks } = state.data
+  const box = status === 'review' ? 'border-amber-200 bg-amber-50/60' : status === 'incomplete' ? 'border-staff-line bg-staff-bg' : 'border-emerald-200 bg-emerald-50/50'
+  return (
+    <div className={`rounded-lg border px-3.5 py-3 ${box} ${state.loading ? 'opacity-70' : ''}`} aria-live="polite">
+      <p className="flex items-center gap-2 text-[13.5px] font-semibold text-staff-ink">
+        <ShieldCheck className="w-4 h-4 text-staff-ink2" />Consistency check<span className="font-normal text-staff-ink2">· {headline}</span>
+      </p>
+      {checks.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {checks.map((c, i) => {
+            const tone = CHECK_TONES[c.tone] || CHECK_TONES.info
+            return (
+              <li key={i} className="flex gap-2 text-[13px] text-staff-ink">
+                <tone.icon className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${tone.cls}`} />
+                <span>{c.title}{c.detail && <span className="block text-staff-ink2">{c.detail}</span>}</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {status === 'review' && <p className="text-[12px] text-staff-muted mt-2">A guardrail, not a rule: you can still confirm this decision.</p>}
+    </div>
+  )
+}
+
+function PreviousDecisions({ k, src, target, elsewhere }) {
   const p = k.previous
   return (
     <div className="space-y-5 text-[14px]">
@@ -820,6 +983,24 @@ function PreviousDecisions({ k, src, target }) {
                 <span className="font-mono text-staff-ink">{s.course_code}</span>
                 <span className="text-staff-muted">{s.institution}</span>
                 <span className="text-staff-ink2">→ {s.bu_awarded}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {elsewhere?.courses?.length > 0 && (
+        <div>
+          <p className="text-staff-muted mb-2">Courses with similar content at other institutions, already decided</p>
+          <ul className="divide-y divide-staff-line2 border-y border-staff-line2">
+            {elsewhere.courses.map(c => (
+              <li key={`${c.institution}|${c.course_code}`} className="py-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                <span className="min-w-0">
+                  <span className="font-mono text-staff-ink">{c.course_code}</span> <span className="text-staff-ink2">{c.title}</span>
+                  <span className="block text-[13px] text-staff-muted">
+                    {c.institution} · {c.outcomes.map(o => `${o.award}${o.count > 1 ? ` ×${o.count}` : ''}`).join(', ')}
+                  </span>
+                </span>
+                <span className="text-[12.5px] text-staff-muted tabular-nums whitespace-nowrap">{Math.round(c.similarity * 100)}% content similarity</span>
               </li>
             ))}
           </ul>
@@ -894,7 +1075,7 @@ function InfoRequests({ requests }) {
           <span className="text-staff-muted tabular-nums">{formatDate(q.created_at)}</span>
           <span>
             <span className="text-staff-ink">{q.kind === 'syllabus' ? 'Syllabus requested' : 'Information requested'}</span>
-            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the applicant' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
+            <span className="text-staff-muted"> · {q.status === 'pending' ? 'waiting on the student' : q.status === 'responded' ? `answered ${formatDate(q.responded_at)}` : 'closed'}</span>
             {q.message && <span className="block text-[13px] text-staff-ink2">{q.message}</span>}
             {q.student_response && <span className="block text-[13px] text-staff-ink"><span className="font-medium">Reply:</span> {q.student_response}</span>}
             {q.document_id && <span className="inline-block mt-1"><DocumentButton id={q.document_id} label={q.document_name || 'Open file'} icon={Paperclip} /></span>}

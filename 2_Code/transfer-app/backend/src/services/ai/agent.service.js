@@ -195,6 +195,28 @@ async function loadAccuracyByInstitution() {
 
 const describe = (c) => [c.title, c.title, c.description, c.learning_outcomes, c.syllabus].filter(Boolean).join(' ');
 
+// The BU catalog index and the evidence map depend only on the reference data loaded for a run, so they are built
+// once per reference set instead of on every tool call (an agent run makes 5-15 calls)
+const derived = new WeakMap();
+function derivedOf(ref) {
+  if (!derived.has(ref)) {
+    const bu = ref.catalog.filter((c) => c.institution === TARGET_INSTITUTION);
+    const evidence = new Map();
+    for (const d of ref.decisions) {
+      const k = keyOf(d.institution, d.course_code);
+      if (!evidence.has(k)) evidence.set(k, []);
+      evidence.get(k).push(`${d.decision_id}: ${d.decision} → ${d.bu_awarded || '—'}`);
+    }
+    for (const e of ref.equivalencies) {
+      const k = keyOf(e.institution, e.course_code);
+      if (!evidence.has(k)) evidence.set(k, []);
+      evidence.get(k).push(`${e.eq_id}: approved equivalency → ${e.bu_course || 'elective credit'}`);
+    }
+    derived.set(ref, { bu, buIndex: new TfIdf(bu.map(describe)), evidence });
+  }
+  return derived.get(ref);
+}
+
 // Tool: check whether courses exist in the catalog for the given institution
 function verifyCourses(ref, { institution, course_codes }) {
   const results = course_codes.map((code) => {
@@ -222,17 +244,7 @@ function searchPrecedents(ref, { institution, course_code, title }) {
   const decisionView = ({ decision_id, institution: i, course_code: c, proposed_bu, decision, bu_awarded, reason, decided_on, source }) =>
     ({ decision_id, institution: i, course_code: c, proposed_bu, decision, bu_awarded, reason, decided_on, source });
 
-  const evidence = new Map();
-  for (const d of ref.decisions) {
-    const k = keyOf(d.institution, d.course_code);
-    if (!evidence.has(k)) evidence.set(k, []);
-    evidence.get(k).push(`${d.decision_id}: ${d.decision} → ${d.bu_awarded || '—'}`);
-  }
-  for (const e of ref.equivalencies) {
-    const k = keyOf(e.institution, e.course_code);
-    if (!evidence.has(k)) evidence.set(k, []);
-    evidence.get(k).push(`${e.eq_id}: approved equivalency → ${e.bu_course || 'elective credit'}`);
-  }
+  const { evidence } = derivedOf(ref);
 
   const self = ref.catalog.find((c) => keyOf(c.institution, c.course_code) === keyOf(institution, course_code));
   const others = ref.catalog.filter((c) => c.institution !== TARGET_INSTITUTION && evidence.has(keyOf(c.institution, c.course_code))
@@ -256,8 +268,8 @@ function searchPrecedents(ref, { institution, course_code, title }) {
 
 // Tool: BU catalog search by content
 function searchBuCatalog(ref, { query: text, program }) {
-  const bu = ref.catalog.filter((c) => c.institution === TARGET_INSTITUTION);
-  const sims = new TfIdf(bu.map(describe)).similarities(text);
+  const { bu, buIndex } = derivedOf(ref);
+  const sims = buIndex.similarities(text);
   return {
     courses: bu
       .map((c, i) => ({ c, score: sims[i] + (program && c.program === program ? 0.05 : 0) }))

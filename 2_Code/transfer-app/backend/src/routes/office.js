@@ -9,6 +9,8 @@ import * as lifecycle from '../services/workflow/lifecycle.service.js';
 import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, assignApplication } from '../services/workflow/assignment.service.js';
 import { POLICY } from '../services/credit/policy.js';
 import { ownershipView, unassignedReason } from '../services/workflow/ownership.service.js';
+import { impactMetrics } from '../services/workflow/impact.service.js';
+import { applicationQuality } from '../services/workflow/pipeline-trace.service.js';
 
 // The Credit Evaluation Office (Problem 1, steps 3, 4 and 7): monitors every application, places courses that
 // have no subject specialist, resolves duplicates and deadline exceptions, and posts decided transfer credit.
@@ -94,6 +96,7 @@ router.get('/overview', async (_req, res, next) => {
         deadlines: deadlines.map((a) => ({ id: a.id, reference_number: a.reference_number, student_name: a.student_name, start_term: a.expected_start_term,
           status: a.deadline.status, deadline: a.deadline.deadline, days_left: a.deadline.days_left, exception: a.deadline_exception })),
         recent_activity: recent.rows,
+        impact: await impactMetrics(),
       },
     });
   } catch (err) { return next(err); }
@@ -153,6 +156,14 @@ router.get('/applications/:id', async (req, res, next) => {
         history: history.rows,
         applicant_updates: applicantUpdates.rows,
         ownership: await ownershipView(app.id),
+        impact: await impactMetrics({ applicationId: app.id }),
+        // Transcript check (staff wording) and what each automated stage did on the latest evaluation
+        quality: (await applicationQuality(app.id)).map(({ institution, credit_system: creditSystem, courses: n, findings, needs_review: needsReview }) => ({
+          institution, credit_system: creditSystem, courses: n, needs_review: needsReview,
+          findings: findings.map(({ type, severity, courses: codes, staff }) => ({ type, severity, courses: codes, text: staff })),
+        })),
+        trace: (await query(`SELECT pipeline_trace FROM ai_evaluations WHERE application_id = $1 AND pipeline_trace IS NOT NULL
+                             ORDER BY created_at DESC LIMIT 1`, [app.id])).rows[0]?.pipeline_trace || null,
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });

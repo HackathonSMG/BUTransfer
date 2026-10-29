@@ -84,7 +84,7 @@ export default function ApplicationDetail() {
       const data = await getApplication(id)
       setState({ loading: false, data, error: null })
     } catch (err) {
-      setState({ loading: false, data: null, error: err.response?.data?.message || 'Application not found' })
+      setState({ loading: false, data: null, error: err.response?.data?.message || 'Evaluation not found' })
     }
   }, [id])
 
@@ -217,7 +217,7 @@ export default function ApplicationDetail() {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-5">
           {/* Student Info */}
-          <Card title="Applicant Information">
+          <Card title="Student Information">
             <dl className="grid grid-cols-2 gap-4">
               <InfoField label="Full Name" value={app.student_name} />
               <InfoField label="Email" value={app.student_email} />
@@ -247,7 +247,7 @@ export default function ApplicationDetail() {
             </dl>
             {app.applicant_comments && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Additional Information from the Applicant</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Additional Information from the Student</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{app.applicant_comments}</p>
               </div>
             )}
@@ -366,17 +366,17 @@ export default function ApplicationDetail() {
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
                 <Link2 className="w-4 h-4" />
-                Applicant Tracking
+                Student Tracking
               </h3>
               <p className="text-xs text-gray-500 mb-2">
-                The applicant tracks this application at Track Application with <span className="font-mono">{app.reference_number}</span> and {app.student_email}. The link fills in the number; the email is always required.
+                The student tracks this application at Track Application with <span className="font-mono">{app.reference_number}</span> and {app.student_email}. The link fills in the number; the email is always required.
               </p>
               <div className="flex items-center gap-2">
                 <input
                   readOnly
                   value={statusLink}
                   onFocus={e => e.target.select()}
-                  aria-label="Applicant tracking link"
+                  aria-label="Student tracking link"
                   className="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700"
                 />
                 <Button size="sm" variant="secondary" onClick={copyStatusLink}>Copy</Button>

@@ -2,6 +2,9 @@ import { query } from '../../config/db.js';
 import { createEngine, ENGINE_VERSION } from './engine.js';
 import { parseTranscript } from './transcript-parser.js';
 import { isAgentConfigured, getProjectClient } from '../ai/agent.service.js';
+import { invalidatePrecedentIndex } from './precedent-index.js';
+import { checkTranscript } from './transcript-quality.js';
+import { courseKey } from './policy.js';
 
 let enginePromise = null;
 
@@ -36,6 +39,30 @@ async function getEngine() {
 /** Forces the next evaluation to reload reference data (after equivalencies or decisions change). */
 export function invalidateEngine() {
   enginePromise = null;
+  invalidatePrecedentIndex();
+}
+
+/**
+ * Reads a transcript PDF without storing anything, the same way an upload does, so the student can confirm
+ * what was found before submitting: institution, calendar, courses and the header (name, student ID, BU major,
+ * BU start term). Catalog titles replace truncated ones, as on import.
+ */
+export async function readTranscript(buffer) {
+  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
+  const parsed = await parseTranscript(buffer, aiClient);
+  let courses = parsed.courses;
+  let knownCodes;
+  if (parsed.institution && courses.length) {
+    const titles = await query(`SELECT UPPER(course_code) AS code, title FROM catalog_courses WHERE institution = $1`, [parsed.institution]);
+    const titleOf = new Map(titles.rows.map((r) => [r.code, r.title]));
+    courses = courses.map((c) => ({ ...c, title: titleOf.get(c.course_code.toUpperCase()) || c.title }));
+    const { rows: eq } = await query(`SELECT course_code FROM equivalencies WHERE institution = $1`, [parsed.institution]);
+    const codes = [...titles.rows.map((r) => r.code), ...eq.map((r) => r.course_code)];
+    knownCodes = codes.length ? new Set(codes.map(courseKey)) : null;
+  }
+  // What may need more review (missing credits, unreadable or Pass grades, repeats, courses not evaluated before)
+  const quality = checkTranscript({ institution: parsed.institution, credit_system: parsed.credit_system, courses }, { knownCodes });
+  return { institution: parsed.institution, credit_system: parsed.credit_system, courses, student: parsed.student || {}, quality };
 }
 
 /**

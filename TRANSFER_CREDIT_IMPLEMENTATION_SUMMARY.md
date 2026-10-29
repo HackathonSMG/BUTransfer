@@ -580,3 +580,88 @@ There are no external resources, and the event rules are unchanged.
 **Test kit:**
 - `5_Test_Cases/transcripts/`: 17 PDFs plus their generator, `run_scenarios.mjs` and `scenario_results.json`.
 - `TRANSFER_CREDIT_TEST_SCENARIOS.md`: the scenario catalog and test matrix. The automated run passes 24/24 checks.
+
+## 14. Sixth round: alignment with the problem statement
+
+This round followed the read-only review of Problem 1. Only misaligned parts were changed.
+
+**Post-admission framing**
+- The process now reads as **transfer credit evaluation for admitted students** (problem step 2: "After admission…"). Changes:
+  - landing CTA **Submit Transcripts for Evaluation**;
+  - the `/apply` page titled **Transfer Credit Evaluation**;
+  - navbar, confirmation and tracking wording;
+  - "Student" instead of "Applicant".
+- The admission eligibility pre-check page was removed; `/eligibility` redirects to the self-check.
+- The staff report no longer shows the admission eligibility score or criteria, and the report text no longer has an ELIGIBILITY line.
+- The admin "Eligibility Criteria" menu item was removed. The backend criteria and the page remain.
+
+**No student accounts**
+- The dormant public `POST /api/auth/register` endpoint and the frontend `register` were removed.
+- Students submit and track with application number + email; status in production belongs to MyBU Student.
+- Existing student accounts still sign in, and staff authentication is unchanged.
+
+**Evaluator decision ownership**
+- "System recommendation" is marked **Advisory**, and the page states that the department evaluator makes the final decision.
+- Sections were renamed **Supporting evidence** and **Similar past decisions**.
+- The decision action is now **Record department decision**, and decided courses show "Department decision · name · date".
+- **Rules applied** shows each rule with its source: Problem statement / Supplied program data / Transcript data / Implementation assumption (`RULE_SOURCES` in `policy.js`).
+
+**Course comparison** (`credit/comparison.js`, shown by `CourseComparison.jsx`)
+- Transfer and BU courses side by side: code, title, credits, description, learning outcomes.
+- Each BU learning outcome and topic is marked covered / partly / not evident against the transfer course's description, outcomes and syllabus, with the matched terms.
+- Shared and missing terms, and a credit-hour comparison.
+- Deterministic and explanatory; the engine is unchanged, and syllabus text is not sent to the browser.
+
+**Measured outcome** (`workflow/impact.service.js`, shown by `ImpactPanel.jsx`)
+- Headline: **automation rate** = courses settled by established equivalency or deterministic policy rule / all courses evaluated.
+- Also shown, all counted from stored data:
+  - automatic vs department decisions, pending and quarter courses;
+  - outcomes;
+  - syllabi requested, and department decisions made without a request;
+  - evaluator agreement with the recommendation;
+  - median times.
+- Shown on Reports and the Credit Office dashboard, and per application on the Credit Office application page. For the 6-course STU-001 demo: 6 courses, 3 resolved automatically, 3 with departments, 1 quarter course, 50%.
+
+**Student transparency**
+- The tracking summary adds With Department Review and Waiting for Your Syllabus. How a course was decided (established equivalency, policy rule or evaluator) stays internal: the student summary has no "matched automatically" count.
+- A plain next-step line says what, if anything, the student needs to do.
+
+## 15. Seventh round: transcript-first submission and Transfer Credit ID
+
+**Terminology.** The system is transfer credit evaluation, not an application or admission. Student-facing wording:
+
+| Before | Now |
+|---|---|
+| Application number | Transfer Credit ID |
+| Submit Application | Submit for Credit Evaluation |
+| Application Submitted | Credit Evaluation Submitted |
+| Track Application | Track Transfer Credit / Transfer Credit Status |
+| Application Information | Credit Transfer Details |
+
+Staff now see "Credit Evaluations" and "Evaluation Lookup", and emails use the same terms. Internal tables, fields and routes (`applications`, `reference_number`, `/apply`, `/track`) are unchanged.
+
+**Transfer Credit ID:**
+- Format `TC-YYYY-NNNN`, generated when a submission is created.
+- Earlier `APP-…` IDs remain valid for tracking.
+- Email links use `/track?id=…`; `?application=` from older emails still works.
+
+**Submission flow (`/apply`)**
+1. **Upload transcripts** (one per college). Each is read immediately by the existing parser through `POST /api/student/transcripts/read`, which stores nothing. The parser's structured layout now also reads the header block: student name, student ID, BU major and BU start term.
+2. **Review & confirm:**
+   - Detected values are shown as "Detected from transcript".
+   - Only missing or conflicting values are asked for.
+   - The email is always entered by hand, because transcripts don't carry it.
+   - Supporting documents and comments are optional.
+   - The submit button stays disabled until at least one transcript is read, the required details are complete and the confirmation box is ticked.
+3. **Submit:** the existing draft → upload → submit APIs create **one** evaluation for all transcripts.
+
+**Field decisions:**
+
+| Field | Decision |
+|---|---|
+| Name | From the transcript; asked for only if not detected or if transcripts disagree |
+| Student ID | From the transcript; optional; kept in `academic_history` |
+| Previous institution | Always from the transcripts |
+| BU program | Needed (R8, evaluator order, reporting); from the transcript, else selected |
+| BU start term | Needed (one-year deadline); from the transcript, else selected |
+| Email | Entered by hand |

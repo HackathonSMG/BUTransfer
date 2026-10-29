@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2, Undo2, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOfficeApplication, postCredit, recordDeadlineException, resolveDuplicate, getEligibleEvaluators, assignReview, returnToEvaluator } from '../../api/office'
 import StatusPill from '../../components/staff/StatusPill'
@@ -11,6 +11,8 @@ import EmptyState from '../../components/ui/EmptyState'
 import { DECISION_LABELS, formatDate } from '../../lib/reviews'
 import { activityLabel, timeAgo } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
+import ImpactPanel from '../../components/staff/ImpactPanel'
+import PreparationTrace from '../../components/staff/PreparationTrace'
 
 // Delivery state of an applicant email (notifications.email_status)
 const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry', sent: 'sent', logged: 'logged (email not configured)', failed: 'failed', suppressed: 'not sent (test address)' }
@@ -19,8 +21,8 @@ const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry
 const STATE = {
   posted: { label: 'Posted', tone: 'ok' },
   decided: { label: 'Awaiting final review', tone: 'info' },
-  information_requested: { label: 'Waiting for applicant', tone: 'warn' },
-  information_received: { label: 'Applicant answered', tone: 'info' },
+  information_requested: { label: 'Waiting for student', tone: 'warn' },
+  information_received: { label: 'Student answered', tone: 'info' },
   department_review: { label: 'Department review', tone: 'neutral' },
   waiting_for_review: { label: 'Queued for hand-off', tone: 'neutral' },
   credit_office_review: { label: 'Needs an evaluator', tone: 'warn' },
@@ -62,7 +64,7 @@ export default function OfficeApplication() {
   }
 
   if (state.loading) return <div className="flex justify-center py-24"><Spinner size="lg" className="text-primary-600" /></div>
-  if (state.error) return <div className="max-w-3xl mx-auto space-y-4"><BackLink /><div className="staff-card"><EmptyState title="Application unavailable" description={state.error} /></div></div>
+  if (state.error) return <div className="max-w-3xl mx-auto space-y-4"><BackLink /><div className="staff-card"><EmptyState title="Evaluation unavailable" description={state.error} /></div></div>
 
   const d = state.data
   const app = d.application
@@ -104,7 +106,7 @@ export default function OfficeApplication() {
 
       {app.applicant_comments && (
         <section className="staff-card px-6 py-4">
-          <p className="text-[13px] font-medium text-staff-muted">Additional information from the applicant</p>
+          <p className="text-[13px] font-medium text-staff-muted">Additional information from the student</p>
           <p className="text-[15px] text-staff-ink mt-1 whitespace-pre-wrap">{app.applicant_comments}</p>
         </section>
       )}
@@ -112,7 +114,7 @@ export default function OfficeApplication() {
       {/* Duplicate */}
       {d.duplicate?.status === 'suspected' && (
         <section className="rounded-xl border border-amber-300 bg-amber-50/70 px-5 py-4">
-          <p className="flex items-center gap-2 font-semibold text-staff-ink"><Copy className="w-4 h-4 text-amber-700" />Potential duplicate application</p>
+          <p className="flex items-center gap-2 font-semibold text-staff-ink"><Copy className="w-4 h-4 text-amber-700" />Potential duplicate evaluation</p>
           <p className="text-[14px] text-staff-ink2 mt-1">{d.duplicate.reason}</p>
           <div className="grid sm:grid-cols-2 gap-3 mt-3 text-[13.5px]">
             <Compare title="This application" rows={[[app.reference_number, app.transfer_from_institution], ['Start term', app.expected_start_term], ['Courses', d.courses.length]]} />
@@ -155,10 +157,14 @@ export default function OfficeApplication() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Tile label="Courses" value={s.courses} />
         <Tile label="Decided" value={s.decided} />
-        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the applicant` : null} />
+        <Tile label="Pending" value={s.pending} detail={s.needs_student_action ? `${s.needs_student_action} waiting on the student` : null} />
         <Tile label="Posted" value={s.posted} />
         <Tile label="Credits posted" value={s.credits_posted} detail={s.credits_approved ? `${s.credits_approved} credits decided, not yet posted` : null} />
       </div>
+
+      <ImpactPanel impact={d.impact} compact />
+
+      <PreparationTrace trace={d.trace} />
 
       {/* Courses */}
       <section className="staff-card">
@@ -177,6 +183,9 @@ export default function OfficeApplication() {
       </section>
 
       <section className="staff-card divide-y divide-staff-line2">
+        <Fold title={`Transcript check (${(d.quality || []).reduce((n, q) => n + q.findings.filter(f => f.severity === 'attention').length, 0)} flagged)`}>
+          <TranscriptCheck quality={d.quality || []} />
+        </Fold>
         <Fold title={`Requests to the student (${d.information_requests.length})`}>
           {d.information_requests.length === 0 ? <p className="text-[14px] text-staff-muted">None.</p> : (
             <ul className="space-y-2 text-[14px]">
@@ -198,7 +207,7 @@ export default function OfficeApplication() {
             {!d.documents.length && <li className="text-staff-muted">No documents.</li>}
           </ul>
         </Fold>
-        <Fold title={`Applicant updates (${(d.applicant_updates || []).length})`}>
+        <Fold title={`Student updates (${(d.applicant_updates || []).length})`}>
           {!(d.applicant_updates || []).length ? <p className="text-[14px] text-staff-muted">No updates sent yet.</p> : (
             <ul className="space-y-2 text-[14px]">
               {d.applicant_updates.map((u, i) => (
@@ -248,6 +257,35 @@ function Compare({ title, rows, to }) {
     <div className="rounded-lg bg-white border border-amber-200 px-3 py-2">
       <p className="text-[12px] font-medium text-staff-muted">{title}{to && <Link to={to} className="ml-2 text-primary-700 font-semibold">Open</Link>}</p>
       {rows.map(([k, v]) => <p key={k} className="text-staff-ink"><span className="text-staff-muted">{k}:</span> {v ?? '—'}</p>)}
+    </div>
+  )
+}
+
+// What the transcript check found on each transcript (advisory; nothing was blocked or changed)
+function TranscriptCheck({ quality }) {
+  if (!quality.length) return <p className="text-[14px] text-staff-muted">No transcript courses have been read.</p>
+  return (
+    <div className="space-y-4 text-[14px]">
+      {quality.map((q, i) => (
+        <div key={i}>
+          <p className="font-medium text-staff-ink">
+            {q.institution || 'Institution not shown'}
+            <span className="font-normal text-staff-muted"> · {q.courses} course{q.courses === 1 ? '' : 's'} · {q.credit_system || 'calendar not shown'}</span>
+          </p>
+          {q.findings.length === 0 ? (
+            <p className="flex items-center gap-2 text-staff-ink2 mt-1"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Every course has a code, credits and a readable grade.</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {q.findings.map((f, j) => (
+                <li key={j} className="flex gap-2 text-staff-ink2">
+                  {f.severity === 'attention' ? <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-staff-muted flex-shrink-0 mt-0.5" />}
+                  {f.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

@@ -35,11 +35,11 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <NavLink to="/apply" className={navClass}><FileText className="w-4 h-4" /><span className="hidden md:inline">Start Application</span></NavLink>
-            <NavLink to="/track" className={navClass}><Search className="w-4 h-4" /><span className="hidden sm:inline">Track Application</span></NavLink>
+            <NavLink to="/apply" className={navClass}><FileText className="w-4 h-4" /><span className="hidden md:inline">Submit Transcripts</span></NavLink>
+            <NavLink to="/track" className={navClass}><Search className="w-4 h-4" /><span className="hidden sm:inline">Track Transfer Credit</span></NavLink>
             {student ? (
               <>
-                <NavLink to="/student" className={navClass}><FolderOpen className="w-4 h-4" /><span className="hidden lg:inline">My Applications</span></NavLink>
+                <NavLink to="/student" className={navClass}><FolderOpen className="w-4 h-4" /><span className="hidden lg:inline">My Transfer Credit</span></NavLink>
                 <button onClick={signOut} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100">
                   <LogOut className="w-4 h-4" /><span className="hidden sm:inline">Sign out</span>
                 </button>

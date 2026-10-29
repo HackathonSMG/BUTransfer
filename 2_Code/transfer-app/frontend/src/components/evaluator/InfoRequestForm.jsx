@@ -68,7 +68,7 @@ export default function InfoRequestForm({ applicationId, onSuccess, onClose, isO
     <Modal isOpen={isOpen} onClose={handleClose} title="Request Additional Information" size="md">
       <form onSubmit={handleSubmit} className="space-y-5">
         <p className="text-sm text-gray-600">
-          The student will be notified via email and can respond through their application portal.
+          The student will be notified via email and can respond from their transfer credit status page.
         </p>
 
         {/* Requested Items */}

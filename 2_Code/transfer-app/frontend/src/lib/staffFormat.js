@@ -17,10 +17,10 @@ export function timeAgo(d) {
 }
 
 const ACTIVITY_LABELS = {
-  application_created: 'Application received',
+  application_created: 'Transcripts received',
   evaluation_triggered: 'Evaluation started',
   evaluation_failed: 'Evaluation could not complete',
-  validation_failed: 'Application failed validation',
+  validation_failed: 'Evaluation failed validation',
   reviews_assigned: 'Courses assigned to evaluators',
   staff_roster_imported: 'Staff roster imported',
   status_changed: 'Status updated',
@@ -30,7 +30,7 @@ const ACTIVITY_LABELS = {
   review_decided: 'Course decision recorded',
   course_decision: 'Course decision recorded',
   review_info_requested: 'Information requested for a course',
-  transfer_request_created: 'Application handed to the next evaluator',
+  transfer_request_created: 'Evaluation handed to the next evaluator',
   evaluation_assigned: 'New evaluation assigned',
   transfer_request: 'Transfer request received',
   note_added: 'Note added',
@@ -40,7 +40,7 @@ const ACTIVITY_LABELS = {
   established_outcomes_applied: 'Established equivalencies applied',
   review_reassigned: 'Course reassigned',
   credit_posted: 'Transfer credit posted',
-  duplicate_suspected: 'Possible duplicate application flagged',
+  duplicate_suspected: 'Possible duplicate evaluation flagged',
   duplicate_resolved: 'Duplicate check resolved',
   deadline_exception_recorded: 'Deadline exception recorded',
   conflict_escalated: 'Additional review requested',

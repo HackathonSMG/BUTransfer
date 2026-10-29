@@ -57,7 +57,7 @@ export default function ApplicationFilters({ filters, onChange }) {
           <input
             type="text"
             placeholder="Search name, email, reference or institution..."
-            aria-label="Search applications"
+            aria-label="Search evaluations"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"

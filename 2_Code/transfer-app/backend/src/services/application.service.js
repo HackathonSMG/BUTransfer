@@ -12,6 +12,7 @@ import * as assignmentService from './workflow/assignment.service.js';
 import * as lifecycle from './workflow/lifecycle.service.js';
 import { OWNERSHIP_FROM, ATTENTION_STAGES, ownershipView } from './workflow/ownership.service.js';
 import { isAgentConfigured, reviewWithAgent } from './ai/agent.service.js';
+import { createTrace, saveTrace, applicationQuality, precedentScan } from './workflow/pipeline-trace.service.js';
 import { env } from '../config/env.js';
 import { notFound, badRequest, forbidden } from '../utils/errors.js';
 
@@ -339,8 +340,6 @@ function buildEvaluationResult(application, documents, eligibility, credit, cred
     `From: ${application.transfer_from_institution}`,
     `To: ${application.transfer_to_program}`,
     '',
-    `ELIGIBILITY: ${eligibility.score}/100 (${eligibility.eligible ? 'meets the initial requirements' : 'does not meet all required criteria'})`,
-    '',
     ...(lines.length ? ['COURSES:', ...lines, ''] : []),
     `SUMMARY: ${recommendations}`,
     '',
@@ -355,6 +354,8 @@ export async function runEvaluation(evaluationId) {
   console.log(`[Eval] runEvaluation START — eval_id=${evaluationId}`);
   await query(`UPDATE ai_evaluations SET status = 'running', started_at = NOW() WHERE id = $1`, [evaluationId]);
   let applicationId;
+  // What each automated stage did, saved with the evaluation for the Credit Evaluation Office
+  const trace = createTrace();
 
   try {
     const evalRow = await query(`SELECT * FROM ai_evaluations WHERE id = $1 LIMIT 1`, [evaluationId]);
@@ -373,6 +374,29 @@ export async function runEvaluation(evaluationId) {
     console.log(`[Eval]   Institution : ${application.transfer_from_institution}`);
     console.log(`[Eval]   Program     : ${application.transfer_to_program}`);
     console.log(`[Eval]   Documents   : ${documents.length} (types: ${documents.map(d => d.document_type).join(', ') || 'none'})`);
+
+    // ── Transcript reading and quality check (recorded only) ─────────────────
+    let tq = trace.start();
+    try {
+      const quality = await applicationQuality(applicationId);
+      const courses = quality.reduce((n, q) => n + q.courses, 0);
+      const transcripts = documents.filter((d) => d.document_type === 'transcript').length;
+      trace.record('documents', 'Transcripts read', {
+        summary: `${courses} course${courses === 1 ? '' : 's'} read from ${transcripts} transcript${transcripts === 1 ? '' : 's'} (${quality.map((q) => q.institution || 'institution not shown').join(', ') || 'none'}).`,
+        metrics: { transcripts, courses, institutions: quality.length, quarter_system: quality.filter((q) => /quarter/i.test(q.credit_system || '')).length },
+        status: courses ? 'done' : 'failed',
+      }, tq);
+      tq = trace.start();
+      const attention = quality.flatMap((q) => q.findings.filter((f) => f.severity === 'attention'));
+      trace.record('quality', 'Transcript quality check', {
+        summary: attention.length
+          ? `${attention.length} item${attention.length === 1 ? '' : 's'} flagged for review: ${[...new Set(attention.map((f) => f.type.replace(/_/g, ' ')))].join(', ')}.`
+          : 'No issues found: every course has a code, credits and a readable grade.',
+        metrics: { flagged: attention.length, notes: quality.reduce((n, q) => n + q.findings.length, 0) - attention.length },
+      }, tq);
+    } catch (err) {
+      console.error('[Trace] Transcript check failed:', err.message);
+    }
 
     // ── Step 1: Eligibility ──────────────────────────────────────────────────
     console.log(`[Eval] STEP 1: Eligibility check`);
@@ -393,6 +417,7 @@ export async function runEvaluation(evaluationId) {
     console.log(`[Eval] STEP 2: Credit engine evaluation`);
     let credit = null;
     let creditError = null;
+    const tm = trace.start();
     try {
       credit = await creditService.evaluateApplicationCredits(application, evaluationId);
       if (credit) {
@@ -411,12 +436,36 @@ export async function runEvaluation(evaluationId) {
       console.error(`[Eval] STEP 2 FAILED: Credit engine error — ${err.message}`, err.stack);
       creditError = err.message;
     }
+    if (credit) {
+      const p = credit.summary.by_path;
+      const n = (k) => p[k] || 0;
+      trace.record('matching', 'Course matching', {
+        summary: `${credit.courses.length} courses checked against BU policy, approved equivalencies, past decisions and the BU catalog: `
+          + `${n('equivalency')} approved equivalenc${n('equivalency') === 1 ? 'y' : 'ies'}, ${n('rule')} policy rule${n('rule') === 1 ? '' : 's'}, ${n('precedent')} past decision${n('precedent') === 1 ? '' : 's'}, `
+          + `${n('review') + n('needs_information')} left for department review.`,
+        metrics: { courses: credit.courses.length, ...p },
+      }, tm);
+      const tk = trace.start();
+      try {
+        const k = await precedentScan(applicationId);
+        trace.record('precedents', 'Precedent search', {
+          summary: `${k.established} with an established equivalency, ${k.with_previous} evaluated before (${k.previous_decisions} earlier decision${k.previous_decisions === 1 ? '' : 's'}), `
+            + `${k.first_time} never seen before${k.first_time ? ` (${k.first_time_with_similar} with similar decided courses elsewhere)` : ''}; ${k.conflicts} potential conflict${k.conflicts === 1 ? '' : 's'}.`,
+          metrics: k,
+        }, tk);
+      } catch (err) {
+        console.error('[Trace] Precedent search failed:', err.message);
+      }
+    } else {
+      trace.record('matching', 'Course matching', { summary: creditError ? `Could not run: ${creditError}` : 'No transcript courses to match.', status: creditError ? 'failed' : 'skipped' }, tm);
+    }
 
     // ── Step 3: Agent ────────────────────────────────────────────────────────
     console.log(`[Eval] STEP 3: Agent evaluation`);
     console.log(`[Eval]   isAgentConfigured() = ${isAgentConfigured()}`);
     console.log(`[Eval]   credit available    = ${Boolean(credit)}`);
     let agent = { status: 'off' };
+    const ta = trace.start();
 
     if (!credit) {
       console.log(`[Eval]   Skipping agent — no credit data`);
@@ -438,6 +487,8 @@ export async function runEvaluation(evaluationId) {
           await updateApplicationStatus(applicationId, 'validation_failed', null,
             `Agent validation failed: ${agent.reason} — ${agent.details}`);
           await auditLog({ applicationId, action: 'validation_failed', details: { evaluation_id: evaluationId, reason: agent.reason, details: agent.details } });
+          trace.record('agent', 'Additional course review', { summary: `Stopped: the transcript needs attention (${agent.reason.replace(/_/g, ' ')}).`, status: 'failed' }, ta);
+          await saveTrace(evaluationId, trace);
           console.log(`[AI] Evaluation ${evaluationId} halted — validation failed: ${agent.reason}`);
           return;
         }
@@ -449,6 +500,16 @@ export async function runEvaluation(evaluationId) {
         console.error(`[Eval]   Stack       :`, err.stack?.split('\n').slice(0, 5).join('\n'));
         agent = { status: 'failed', error: err.message };
       }
+    }
+    if (credit) {
+      trace.record('agent', 'Additional course review', {
+        summary: agent.status === 'completed' ? `${agent.reviewed} of ${agent.sent} open course${agent.sent === 1 ? '' : 's'} reviewed against past decisions and the BU catalog (recommendations only).`
+          : agent.status === 'failed' ? 'Did not complete; the course-match suggestions are used.'
+            : agent.status === 'skipped' ? 'Transcript validated; no open courses needed an additional review.'
+              : 'Not configured in this environment; the course-match suggestions are used.',
+        metrics: { reviewed: agent.reviewed ?? 0 },
+        status: agent.status === 'completed' || agent.status === 'skipped' ? 'done' : agent.status === 'failed' ? 'failed' : 'skipped',
+      }, ta);
     }
 
     // ── Step 4: Build result ─────────────────────────────────────────────────
@@ -486,13 +547,40 @@ export async function runEvaluation(evaluationId) {
     if (credit) {
       console.log(`[Eval] STEP 6: Assigning application to evaluators`);
       try {
-        const { held } = await lifecycle.applyEstablished(applicationId);
-        await assignmentService.assignApplication(applicationId, { held });
+        const te = trace.start();
+        const { applied, held } = await lifecycle.applyEstablished(applicationId);
+        // Counted on the application, so a re-evaluation still reports courses an earlier run settled
+        const { rows: [settled] } = await query(
+          `SELECT COUNT(*)::int AS n FROM course_decisions WHERE application_id = $1 AND decided_via IN ('established_equivalency', 'policy_rule')`, [applicationId]);
+        trace.record('established', 'Established outcomes', {
+          summary: `${settled.n} course${settled.n === 1 ? '' : 's'} settled by an established equivalency or a BU policy rule, without department work`
+            + `${settled.n !== applied ? ` (${applied} in this run)` : ''}`
+            + `${held.size ? `; ${held.size} held for an evaluator because earlier decisions conflict` : ''}.`,
+          metrics: { settled: settled.n, applied, held: held.size },
+        }, te);
+        const tr = trace.start();
+        const assigned = await assignmentService.assignApplication(applicationId, { held });
+        const { rows: [routing] } = await query(
+          `SELECT COUNT(DISTINCT evaluator_id)::int AS evaluators, COUNT(*)::int AS open FROM course_reviews
+           WHERE application_id = $1 AND status NOT IN ('approved', 'rejected', 'withdrawn')`,
+          [applicationId]);
+        trace.record('routing', 'Evaluator routing', {
+          summary: assigned.created
+            ? (assigned.created > assigned.office
+              ? `${assigned.created - assigned.office} course${assigned.created - assigned.office === 1 ? '' : 's'} routed to ${routing.evaluators} evaluator${routing.evaluators === 1 ? '' : 's'} by expertise and workload`
+              : 'No subject specialist was available')
+              + `${assigned.office ? `; ${assigned.office} to the Credit Evaluation Office for manual assignment` : ''}`
+              + `${assigned.syllabus_requests ? `; ${assigned.syllabus_requests} syllabus request${assigned.syllabus_requests === 1 ? '' : 's'} sent to the student` : ''}.`
+            : routing.open ? `No new routing needed: ${routing.open} course${routing.open === 1 ? ' is' : 's are'} already with department evaluators or the Credit Evaluation Office.`
+              : 'No course needed a department evaluator.',
+          metrics: { reviews: assigned.created || routing.open, evaluators: routing.evaluators, office_queue: assigned.office, syllabus_requests: assigned.syllabus_requests },
+        }, tr);
         console.log(`[Eval]   Assignment complete`);
       } catch (err) {
         console.error(`[Eval] STEP 6 FAILED: Assignment error — ${err.message}`);
       }
     }
+    await saveTrace(evaluationId, trace);
 
     console.log(`[AI] Evaluation ${evaluationId} completed successfully`);
     console.log(`[Eval] ══════════════════════════════════════════`);

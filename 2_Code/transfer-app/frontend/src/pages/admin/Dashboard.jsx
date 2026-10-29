@@ -32,7 +32,7 @@ export default function AdminDashboard() {
     setAssigning(true)
     try {
       const res = await assignPendingApplications()
-      toast.success(`${res.data.courses} course${res.data.courses === 1 ? '' : 's'} assigned across ${res.data.applications} application${res.data.applications === 1 ? '' : 's'}`)
+      toast.success(`${res.data.courses} course${res.data.courses === 1 ? '' : 's'} assigned across ${res.data.applications} evaluation${res.data.applications === 1 ? '' : 's'}`)
       load()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Courses could not be assigned')
@@ -56,19 +56,19 @@ export default function AdminDashboard() {
   const items = [
     a.ready_for_posting > 0 && {
       icon: Stamp, tone: 'neutral',
-      title: `${a.ready_for_posting} application${a.ready_for_posting === 1 ? ' is' : 's are'} fully decided and ready to post`,
+      title: `${a.ready_for_posting} evaluation${a.ready_for_posting === 1 ? ' is' : 's are'} fully decided and ready to post`,
       detail: 'Post the transfer credit to the student record.',
       to: '/office', cta: 'Credit Office'
     },
     a.suspected_duplicates > 0 && {
       icon: Copy, tone: 'warn',
-      title: `${a.suspected_duplicates} possible duplicate application${a.suspected_duplicates === 1 ? '' : 's'}`,
+      title: `${a.suspected_duplicates} possible duplicate evaluation${a.suspected_duplicates === 1 ? '' : 's'}`,
       detail: 'Keep them separate or close the duplicate.',
       to: '/office', cta: 'Credit Office'
     },
     a.syllabi_pending > 0 && {
       icon: FileText, tone: 'neutral',
-      title: `${a.syllabi_pending} syllabus request${a.syllabi_pending === 1 ? '' : 's'} waiting on applicants`,
+      title: `${a.syllabi_pending} syllabus request${a.syllabi_pending === 1 ? '' : 's'} waiting on students`,
       detail: 'The courses return to their evaluators when the syllabus arrives.'
     },
     a.conflicts > 0 && {
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
     },
     a.unassigned_applications > 0 && {
       icon: Inbox, tone: 'warn',
-      title: `${a.unassigned_applications} application${a.unassigned_applications === 1 ? ' has' : 's have'} courses not yet assigned`,
+      title: `${a.unassigned_applications} evaluation${a.unassigned_applications === 1 ? ' has' : 's have'} courses not yet assigned`,
       detail: 'Route them to evaluators by subject and workload.',
       action: <Button size="sm" onClick={assignNow} loading={assigning}>Assign now</Button>
     },
@@ -97,13 +97,13 @@ export default function AdminDashboard() {
     },
     n('information_required') > 0 && {
       icon: MessageSquare, tone: 'neutral',
-      title: `${n('information_required')} application${n('information_required') === 1 ? ' is' : 's are'} waiting on the applicant`,
+      title: `${n('information_required')} evaluation${n('information_required') === 1 ? ' is' : 's are'} waiting on the student`,
       detail: 'Information has been requested.',
       to: '/admin/applications?status=information_required', cta: 'View'
     },
     n('validation_failed') > 0 && {
       icon: AlertTriangle, tone: 'bad',
-      title: `${n('validation_failed')} application${n('validation_failed') === 1 ? '' : 's'} failed validation`,
+      title: `${n('validation_failed')} evaluation${n('validation_failed') === 1 ? '' : 's'} failed validation`,
       detail: 'Check the institution or transcript details.',
       to: '/admin/applications?status=validation_failed', cta: 'View'
     },
@@ -114,7 +114,7 @@ export default function AdminDashboard() {
     },
     n('submitted') > 0 && {
       icon: Clock, tone: 'neutral',
-      title: `${n('submitted')} application${n('submitted') === 1 ? ' is' : 's are'} awaiting evaluation`,
+      title: `${n('submitted')} submission${n('submitted') === 1 ? ' is' : 's are'} awaiting evaluation`,
       detail: 'Received, transcript not yet evaluated.',
       to: '/admin/applications?status=submitted', cta: 'View'
     }
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Applications" value={d.applications} detail={`${d.students} applicants`} to="/admin/applications" />
+        <Metric label="Credit evaluations" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
         <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
         <Metric label="Completed" value={d.completed_applications} detail={`${d.credits_posted ?? 0} credits posted · ${d.established_applied ?? 0} courses by established equivalency`} />
         <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />

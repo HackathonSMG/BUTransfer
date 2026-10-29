@@ -18,13 +18,13 @@ function crumbsFor(pathname, role) {
   if (pathname === '/evaluator/profile') return ['My Workspace', 'My Profile']
   if (pathname.startsWith('/evaluator/reviews/')) return ['My Workspace', 'My Evaluations', 'Course Review']
   if (pathname === '/office') return ['Credit Evaluation Office', 'Dashboard']
-  if (pathname.startsWith('/office/applications/')) return ['Credit Evaluation Office', 'Applications', 'Application']
+  if (pathname.startsWith('/office/applications/')) return ['Credit Evaluation Office', 'Credit Evaluations', 'Evaluation']
   if (pathname === '/admin/reports') return ['Administration', 'Reports']
   if (pathname === '/admin/conflicts') return ['Course Mapping', 'Equivalency Conflicts']
-  if (pathname === '/admin/applications') return role === 'credit_office' ? ['Credit Evaluation Office', 'Applications'] : ['Administration', 'Applications']
-  if (pathname === '/evaluator/applications/new') return ['Administration', 'Applications', 'New Application']
+  if (pathname === '/admin/applications') return role === 'credit_office' ? ['Credit Evaluation Office', 'Credit Evaluations'] : ['Administration', 'Credit Evaluations']
+  if (pathname === '/evaluator/applications/new') return ['Administration', 'Credit Evaluations', 'New Evaluation']
   if (pathname.startsWith('/evaluator/applications/')) {
-    return role === 'admin' ? ['Administration', 'Applications', 'Application Review'] : role === 'credit_office' ? ['Credit Evaluation Office', 'Applications', 'Evaluation Report'] : ['My Workspace', 'My Evaluations', 'Application Review']
+    return role === 'admin' ? ['Administration', 'Credit Evaluations', 'Evaluation Report'] : role === 'credit_office' ? ['Credit Evaluation Office', 'Credit Evaluations', 'Evaluation Report'] : ['My Workspace', 'My Evaluations', 'Application Review']
   }
   if (pathname === '/evaluator/equivalencies') return ['Course Mapping', 'Course Equivalencies']
   if (pathname === '/admin') return ['Administration', 'Dashboard']
@@ -121,13 +121,13 @@ export default function StaffTopbar({ onOpenNav }) {
 
       <form onSubmit={handleSearch} className="relative hidden md:block w-[min(340px,30vw)]" role="search">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
-        <label htmlFor="staff-search" className="sr-only">Search applications</label>
+        <label htmlFor="staff-search" className="sr-only">Search evaluations</label>
         <input
           id="staff-search"
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={['admin', 'credit_office'].includes(user?.role) ? 'Search applicants, application numbers, institutions' : 'Search my evaluations'}
+          placeholder={['admin', 'credit_office'].includes(user?.role) ? 'Search students, Transfer Credit IDs, institutions' : 'Search my evaluations'}
           className="w-full pl-9 pr-3 py-2 text-sm bg-staff-sunk border border-transparent rounded-lg placeholder:text-staff-muted focus:outline-none focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
         />
       </form>
