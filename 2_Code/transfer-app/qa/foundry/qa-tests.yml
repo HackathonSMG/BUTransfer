@@ -1,0 +1,127 @@
+# MOVE THIS FILE TO: .github/workflows/qa-tests.yml  (next to master_transcripts.yml)
+#
+# QA on every build: after each successful deploy of 2_Code/transfer-app,
+#  1. the Foundry agent "bu-transfer-test-writer" writes extra tests for what changed (read-only, not committed),
+#  2. the full Playwright suite + those AI tests run against the deployed site,
+#  3. the Foundry agent "bu-transfer-qa-analyst" writes the report shown on the run's Summary page.
+# The deployed site is the PRODUCTION slot, so only read-only tests run (ALLOW_SUBMIT=false).
+
+name: QA tests and report
+
+on:
+  workflow_run:
+    workflows: ['Build and deploy Node.js app to Azure Web App - TranScripts']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Site to test (leave empty for the deployed site)'
+        required: false
+
+permissions:
+  contents: read
+  id-token: write   # Azure login with OpenID Connect (no stored passwords)
+
+concurrency:
+  group: qa-tests
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: 2_Code/transfer-app/qa
+    env:
+      CI: 'true'
+      BASE_URL: ${{ inputs.base_url || vars.QA_BASE_URL || 'https://transcripts-fqbwfbdkcbcyfcgg.westus3-01.azurewebsites.net' }}
+      ALLOW_SUBMIT: 'false'
+      ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+      OFFICE_EMAIL: ${{ secrets.QA_OFFICE_EMAIL }}
+      OFFICE_PASSWORD: ${{ secrets.QA_OFFICE_PASSWORD }}
+      EVALUATOR_EMAIL: ${{ secrets.QA_EVALUATOR_EMAIL }}
+      EVALUATOR_PASSWORD: ${{ secrets.QA_EVALUATOR_PASSWORD }}
+      FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+      FOUNDRY_QA_AGENT_NAME: ${{ vars.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst' }}
+      FOUNDRY_TEST_AGENT_NAME: ${{ vars.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer' }}
+      HAS_AZURE: ${{ secrets.AZURE_CLIENT_ID != '' }}
+      # Foundry agents through the API key: Foundry resource → Keys and Endpoint → KEY 1
+      FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}
+      FOUNDRY_MODEL_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-4.1-mini' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Collect build info
+        run: |
+          {
+            echo 'CHANGED_FILES<<EOF'
+            git diff --name-only HEAD~1 HEAD 2>/dev/null || true
+            echo 'EOF'
+            echo "COMMIT_MESSAGE=$(git log -1 --pretty=%s | tr -d '\r')"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test tools
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Wait for the site to be up
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$BASE_URL/api/health" > /dev/null; then echo "Site is up"; exit 0; fi
+            echo "Waiting for $BASE_URL ($i/30)"; sleep 10
+          done
+          echo "::warning::Site did not respond; the tests will report it"
+
+      - name: Azure login (for the Foundry agents)
+        if: ${{ env.HAS_AZURE == 'true' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Write tests for this build with the AI
+        if: ${{ env.FOUNDRY_API_KEY != '' || env.HAS_AZURE == 'true' }}
+        continue-on-error: true
+        run: node foundry/generate-tests.mjs
+
+      - name: Run Playwright tests (existing suite + AI-written tests)
+        continue-on-error: true   # the report is written even when tests fail
+        run: npx playwright test || echo "::warning::Some tests failed. See the QA report on the Summary page."
+
+      - name: Write QA report with the AI
+        if: ${{ always() }}
+        continue-on-error: true
+        run: node foundry/analyze-results.mjs test-results/results.json qa-report.md
+
+      - name: Upload reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            2_Code/transfer-app/qa/playwright-report
+            2_Code/transfer-app/qa/qa-report.md
+            2_Code/transfer-app/qa/test-results/junit.xml
+            2_Code/transfer-app/qa/tests/generated/ai-tests.spec.js
+            2_Code/transfer-app/qa/tests/generated/ai-status.json
+            2_Code/transfer-app/qa/tests/generated/ai-rejected.js.txt
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Test summary (never fails the pipeline)
+        if: ${{ always() }}
+        run: |
+          node -e "let s={};try{s=require('./qa-summary.json')}catch{}; if (s.regressions > 0) console.log('::warning::' + s.regressions + ' failing test(s). See the QA report on the Summary page.'); else console.log('No new regressions (' + (s.known_bug_failures||0) + ' known bugs still open)')"

@@ -14,6 +14,9 @@ You write tests that CI runs once, immediately, against the deployed site. The s
 - Use getByRole, getByLabel, getByPlaceholder, getByText with the exact texts listed below. Don't guess texts
   that are not listed; prefer structural checks (page loads, URL, heading visible, no page errors, status codes).
 - Each test must be independent and finish in under 20 seconds. Use relative URLs (baseURL is set).
+- Playwright is strict: a locator that matches 2+ elements fails. Many links and texts appear twice (header menu
+  + page body, e.g. "Submit Transcripts", "Track Transfer Credit"). So scope to the page body with
+  page.getByRole('main').getByRole('link', { name: '...', exact: true }), or add .first(). Same for repeated texts.
 
 ## Problem-statement tags
 STEP-1 self-check preview · STEP-2 submit transcripts without an account · STEP-3/4 existing equivalency applied ·
