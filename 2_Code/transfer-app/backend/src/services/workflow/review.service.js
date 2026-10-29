@@ -15,6 +15,8 @@ import { requestCourseInformation } from './information.service.js';
 import { refreshApplicationStatus, notifyCreditOffice } from './lifecycle.service.js';
 import { POLICY, RULE_SOURCES } from '../credit/policy.js';
 import { compareCourses } from '../credit/comparison.js';
+import { getPrecedentIndex } from '../credit/precedent-index.js';
+import { buildBrief, suggestRequest, checkDecision } from './evaluation-context.js';
 
 const OPEN = ['new', 'in_progress', 'info_requested'];
 const BU_CODE = /\bCAS [A-Z]{2} \d{3}\b/g;
@@ -108,6 +110,13 @@ export async function getReview(reviewId, userId) {
   const knowledge = hasSource
     ? await courseKnowledge({ institution: sourceCourse.institution, courseCode: code, targetBuCourse: r.target_bu_course })
     : null;
+  const sourceText = [syllabusText, catalogSyllabus].filter(Boolean).join(' ') || null;
+  // How courses like this one were decided at other institutions; evidence only, so a failure never blocks the review
+  const similarElsewhere = hasSource
+    ? await getPrecedentIndex().then((index) => index.similar({ institution: sourceCourse.institution, course_code: code, title: sourceCourse.title,
+      description: sourceCourse.description, learning_outcomes: sourceCourse.learning_outcomes, syllabus: sourceText }))
+      .catch((err) => { console.error('[Review] Similar-course search failed:', err.message); return null; })
+    : null;
 
   const precedents = ev?.precedent_ids?.length
     ? (await query(`SELECT decision_id, decision, bu_awarded, reason, TO_CHAR(decided_on, 'YYYY-MM-DD') AS decided_on FROM past_decisions
@@ -125,7 +134,7 @@ export async function getReview(reviewId, userId) {
   const currentRequest = infoRequests.rows.find((i) => i.id === r.info_request_id) || infoRequests.rows[0] || null;
   const presentation = matchPresentation(r);
 
-  return {
+  const pkg = {
     review: {
       id: r.id, status: r.status, priority: r.priority, match_score: r.match_score, match_label: presentation.label, match_kind: presentation.kind,
       match_percent: presentation.percent, match_basis: r.match_basis,
@@ -140,7 +149,7 @@ export async function getReview(reviewId, userId) {
     },
     source_course: hasSource ? { ...sourceCourse, bu_credits: ev?.bu_credits != null ? Number(ev.bu_credits) : null } : null,
     // Why the recommendation fits (or not): BU outcomes and topics checked against the transfer course's text
-    comparison: hasSource ? compareCourses({ ...sourceCourse, syllabus_text: [syllabusText, catalogSyllabus].filter(Boolean).join(' ') || null,
+    comparison: hasSource ? compareCourses({ ...sourceCourse, syllabus_text: sourceText,
       bu_credits: ev?.bu_credits != null ? Number(ev.bu_credits) : null }, target.rows) : null,
     target_course: target.rows[0] || null,
     target_courses: target.rows,
@@ -169,6 +178,7 @@ export async function getReview(reviewId, userId) {
       missing_information: ev?.agent_missing || null,
     },
     knowledge,
+    similar_elsewhere: similarElsewhere,
     decision: decision.rows[0] || null,
     info_request: currentRequest,
     info_requests: infoRequests.rows,
@@ -178,6 +188,46 @@ export async function getReview(reviewId, userId) {
     next_review_id: next.rows[0]?.id || null,
     policy: { transfer_grade: POLICY.transferGrade, minimum_grade: POLICY.minimumGrade },
   };
+  // The evaluation context: the evidence above summarised, and a specific request drawn from its gaps
+  pkg.brief = buildBrief(pkg);
+  pkg.suggested_request = suggestRequest(pkg);
+  return pkg;
+}
+
+/**
+ * Checks a decision the evaluator is about to record against the institution's record (established equivalency,
+ * earlier and similar decisions, conflicts, content coverage of the awarded BU course, units, grade holds).
+ * Takes the same body as decideReview; records nothing and never blocks the decision.
+ */
+export async function checkReviewDecision(reviewId, { decision, bu_course: buCourse, elective_label: electiveLabel, units, conflict_action: conflictAction }, user) {
+  const pkg = await getReview(reviewId, user.id);
+  let outcome;
+  let award = null;
+  let comparison = pkg.comparison;
+  if (decision === 'accept' || decision === 'equivalent') {
+    if (!pkg.proposed) throw badRequest('There is no proposed BU course to accept.');
+    ({ outcome, award } = pkg.proposed);
+  } else if (decision === 'different_course') {
+    const codes = [...new Set(String(buCourse || '').toUpperCase().match(BU_CODE) || [])];
+    if (!codes.length) return { status: 'incomplete', headline: 'Choose the BU course to check this decision.', checks: [] };
+    const { rows } = await query(`SELECT course_code, title, credits, description, learning_outcomes FROM catalog_courses
+                                  WHERE institution = 'Boston University' AND course_code = ANY($1) ORDER BY course_code`, [codes]);
+    const { rows: [texts] } = await query(
+      `SELECT tc.syllabus_text, c.syllabus FROM transcript_courses tc
+       LEFT JOIN catalog_courses c ON c.institution = tc.institution AND c.course_code = COALESCE(tc.catalog_code, tc.course_code) WHERE tc.id = $1`,
+      [pkg.source_course?.id]);
+    outcome = 'transfer';
+    award = codes.join(' + ');
+    comparison = pkg.source_course ? compareCourses({ ...pkg.source_course, syllabus_text: [texts?.syllabus_text, texts?.syllabus].filter(Boolean).join(' ') || null }, rows) : null;
+  } else if (decision === 'elective') {
+    outcome = 'elective';
+    award = String(electiveLabel || '').trim() || 'Elective credit';
+  } else if (decision === 'no_credit' || decision === 'reject') {
+    outcome = 'no_credit';
+  } else {
+    throw badRequest(`Decision must be one of: ${DECISIONS.join(', ')}.`);
+  }
+  return checkDecision(pkg, { outcome, award, units, conflict_action: conflictAction || null, comparison });
 }
 
 /** Opening a new review moves it to In Progress. */
@@ -366,4 +416,4 @@ export async function escalate(reviewId, { note }, user) {
   return { escalated: true, notified: recipients.rows.length };
 }
 
-export default { getReview, startReview, decideReview, requestInformation, escalate, DECISIONS };
+export default { getReview, checkReviewDecision, startReview, decideReview, requestInformation, escalate, DECISIONS };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Stamp, Copy, CalendarClock, ChevronDown, UserCog, FileSearch, AlertTriangle, CheckCircle2, Undo2, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOfficeApplication, postCredit, recordDeadlineException, resolveDuplicate, getEligibleEvaluators, assignReview, returnToEvaluator } from '../../api/office'
 import StatusPill from '../../components/staff/StatusPill'
@@ -12,6 +12,7 @@ import { DECISION_LABELS, formatDate } from '../../lib/reviews'
 import { activityLabel, timeAgo } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
 import ImpactPanel from '../../components/staff/ImpactPanel'
+import PreparationTrace from '../../components/staff/PreparationTrace'
 
 // Delivery state of an applicant email (notifications.email_status)
 const EMAIL_STATUS = { pending: 'queued', sending: 'sending', retry: 'will retry', sent: 'sent', logged: 'logged (email not configured)', failed: 'failed', suppressed: 'not sent (test address)' }
@@ -163,6 +164,8 @@ export default function OfficeApplication() {
 
       <ImpactPanel impact={d.impact} compact />
 
+      <PreparationTrace trace={d.trace} />
+
       {/* Courses */}
       <section className="staff-card">
         <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Courses</h2>
@@ -180,6 +183,9 @@ export default function OfficeApplication() {
       </section>
 
       <section className="staff-card divide-y divide-staff-line2">
+        <Fold title={`Transcript check (${(d.quality || []).reduce((n, q) => n + q.findings.filter(f => f.severity === 'attention').length, 0)} flagged)`}>
+          <TranscriptCheck quality={d.quality || []} />
+        </Fold>
         <Fold title={`Requests to the student (${d.information_requests.length})`}>
           {d.information_requests.length === 0 ? <p className="text-[14px] text-staff-muted">None.</p> : (
             <ul className="space-y-2 text-[14px]">
@@ -251,6 +257,35 @@ function Compare({ title, rows, to }) {
     <div className="rounded-lg bg-white border border-amber-200 px-3 py-2">
       <p className="text-[12px] font-medium text-staff-muted">{title}{to && <Link to={to} className="ml-2 text-primary-700 font-semibold">Open</Link>}</p>
       {rows.map(([k, v]) => <p key={k} className="text-staff-ink"><span className="text-staff-muted">{k}:</span> {v ?? '—'}</p>)}
+    </div>
+  )
+}
+
+// What the transcript check found on each transcript (advisory; nothing was blocked or changed)
+function TranscriptCheck({ quality }) {
+  if (!quality.length) return <p className="text-[14px] text-staff-muted">No transcript courses have been read.</p>
+  return (
+    <div className="space-y-4 text-[14px]">
+      {quality.map((q, i) => (
+        <div key={i}>
+          <p className="font-medium text-staff-ink">
+            {q.institution || 'Institution not shown'}
+            <span className="font-normal text-staff-muted"> · {q.courses} course{q.courses === 1 ? '' : 's'} · {q.credit_system || 'calendar not shown'}</span>
+          </p>
+          {q.findings.length === 0 ? (
+            <p className="flex items-center gap-2 text-staff-ink2 mt-1"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Every course has a code, credits and a readable grade.</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {q.findings.map((f, j) => (
+                <li key={j} className="flex gap-2 text-staff-ink2">
+                  {f.severity === 'attention' ? <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-staff-muted flex-shrink-0 mt-0.5" />}
+                  {f.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

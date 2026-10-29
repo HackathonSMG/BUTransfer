@@ -169,6 +169,16 @@ router.post('/reviews/:id/decision', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
+// Consistency check before a decision is recorded: same body as /decision, records nothing
+router.post('/reviews/:id/check', async (req, res, next) => {
+  try {
+    if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));
+    const parsed = decisionSchema.safeParse(req.body);
+    if (!parsed.success) return next(badRequest(`Decision must be one of: ${reviewService.DECISIONS.join(', ')}`));
+    return res.status(200).json({ data: await reviewService.checkReviewDecision(req.params.id, parsed.data, req.user) });
+  } catch (err) { return next(err); }
+});
+
 router.post('/reviews/:id/request-info', async (req, res, next) => {
   try {
     if (!UUID.test(req.params.id)) return next(badRequest('Invalid evaluation id'));

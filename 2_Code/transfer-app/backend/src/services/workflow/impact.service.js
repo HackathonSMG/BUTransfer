@@ -48,7 +48,17 @@ export async function impactMetrics({ applicationId = null } = {}) {
               FILTER (WHERE decided_via = 'evaluator' AND started_at IS NOT NULL AND completed_at IS NOT NULL) AS hours_evaluator_review
      FROM c`, params);
 
+  // Institutional knowledge (whole institution only): what the equivalency memory holds, how much of it was
+  // learned from department decisions, and how often established equivalencies have settled a course since
+  const knowledge = applicationId ? null : (await query(
+    `SELECT (SELECT COUNT(*)::int FROM equivalencies WHERE status = 'active') AS equivalencies,
+            (SELECT COUNT(*)::int FROM equivalencies WHERE status = 'active' AND source = 'promoted') AS learned_equivalencies,
+            (SELECT COUNT(*)::int FROM past_decisions WHERE status = 'active') AS precedents,
+            (SELECT COUNT(*)::int FROM past_decisions WHERE status = 'active' AND source = 'evaluator') AS learned_precedents,
+            (SELECT COUNT(*)::int FROM course_decisions WHERE decided_via = 'established_equivalency') AS reused`)).rows[0];
+
   return {
+    knowledge,
     courses: m.courses,
     decided: m.decided,
     pending: m.pending,

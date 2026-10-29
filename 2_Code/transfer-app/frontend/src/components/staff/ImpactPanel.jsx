@@ -48,6 +48,14 @@ export default function ImpactPanel({ impact: m, compact = false }) {
           <Stat label="Median time to decision" value={`${fmtHours(m.median_hours.to_decision_automatic)} automatic · ${fmtHours(m.median_hours.to_decision_department)} department`} hint={`Evaluator review: ${fmtHours(m.median_hours.evaluator_review)} median`} />
         </dl>
       )}
+      {!compact && m.knowledge && (
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 px-6 py-4 border-t border-staff-line2 text-[13px]">
+          <Stat label="Institutional knowledge" value={`${m.knowledge.equivalencies} established equivalencies`} hint={`${m.knowledge.learned_equivalencies} learned from department decisions or office standards`} />
+          <Stat label="Precedents on record" value={`${m.knowledge.precedents} past decisions`} hint={`${m.knowledge.learned_precedents} recorded by department evaluators in this system`} />
+          <Stat label="Courses settled by reuse" value={`${m.knowledge.reused} course${m.knowledge.reused === 1 ? '' : 's'}`} hint="settled by an established equivalency instead of a new review" />
+          <Stat label="How it grows" value="Each department decision becomes a precedent" hint="Agreeing decisions by different evaluators become an equivalency" />
+        </dl>
+      )}
     </section>
   )
 }
