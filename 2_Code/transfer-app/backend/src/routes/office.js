@@ -10,6 +10,7 @@ import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue,
 import { POLICY } from '../services/credit/policy.js';
 import { ownershipView, unassignedReason } from '../services/workflow/ownership.service.js';
 import { impactMetrics } from '../services/workflow/impact.service.js';
+import { applicationQuality } from '../services/workflow/pipeline-trace.service.js';
 
 // The Credit Evaluation Office (Problem 1, steps 3, 4 and 7): monitors every application, places courses that
 // have no subject specialist, resolves duplicates and deadline exceptions, and posts decided transfer credit.
@@ -156,6 +157,13 @@ router.get('/applications/:id', async (req, res, next) => {
         applicant_updates: applicantUpdates.rows,
         ownership: await ownershipView(app.id),
         impact: await impactMetrics({ applicationId: app.id }),
+        // Transcript check (staff wording) and what each automated stage did on the latest evaluation
+        quality: (await applicationQuality(app.id)).map(({ institution, credit_system: creditSystem, courses: n, findings, needs_review: needsReview }) => ({
+          institution, credit_system: creditSystem, courses: n, needs_review: needsReview,
+          findings: findings.map(({ type, severity, courses: codes, staff }) => ({ type, severity, courses: codes, text: staff })),
+        })),
+        trace: (await query(`SELECT pipeline_trace FROM ai_evaluations WHERE application_id = $1 AND pipeline_trace IS NOT NULL
+                             ORDER BY created_at DESC LIMIT 1`, [app.id])).rows[0]?.pipeline_trace || null,
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });

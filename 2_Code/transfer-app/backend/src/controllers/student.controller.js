@@ -124,6 +124,11 @@ export async function readTranscript(req, res, next) {
       reason: readable ? null : 'No courses could be read from this file. Upload the official transcript PDF issued by the college.',
       institution: r.institution, credit_system: r.credit_system, student: r.student,
       courses: r.courses.map((c) => ({ course_code: c.course_code, title: c.title, term: c.term, credits: c.source_credits, grade: c.grade })),
+      // Plain-language notes only; the staff wording and finding types stay internal
+      review_notes: readable && r.quality ? {
+        summary: r.quality.student_summary,
+        notes: r.quality.findings.filter((f) => f.student).map((f) => ({ severity: f.severity, text: f.student })),
+      } : null,
     } });
   } catch (err) { return next(err); }
 }

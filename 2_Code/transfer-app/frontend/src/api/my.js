@@ -17,6 +17,10 @@ export const startReview = (id) =>
 export const decideReview = (id, payload) =>
   client.post(`/my/reviews/${id}/decision`, payload).then(r => r.data)
 
+// The same payload as decideReview, checked against the institution's record; records nothing
+export const checkReviewDecision = (id, payload) =>
+  client.post(`/my/reviews/${id}/check`, payload).then(r => r.data)
+
 // kind: 'syllabus' asks the student for the course syllabus; 'information' for anything else
 export const requestReviewInfo = (id, message, kind = 'information') =>
   client.post(`/my/reviews/${id}/request-info`, { message, kind }).then(r => r.data)

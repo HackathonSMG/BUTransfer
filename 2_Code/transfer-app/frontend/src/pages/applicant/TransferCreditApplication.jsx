@@ -310,7 +310,24 @@ function TranscriptItem({ t, onRemove, onRetry }) {
         {t.status !== 'reading' && <button type="button" onClick={onRemove} className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50" aria-label={`Remove ${t.name}`}><X className="w-4 h-4" /></button>}
       </div>
       {t.error && <p className="mt-1.5 text-xs text-amber-800">{t.error}{t.status === 'unreadable' && ' You can keep it with your submission; the Credit Evaluation Office will review it.'}</p>}
+      {t.status === 'read' && <ReviewNotes notes={r.review_notes} />}
     </li>
+  )
+}
+
+// What the transcript check found that may need more review, in plain language. Nothing is blocked: the student
+// can still submit, and the notes say what to expect.
+function ReviewNotes({ notes }) {
+  if (!notes?.notes?.length) return null
+  const attention = Boolean(notes.summary)
+  return (
+    <div className={`mt-2.5 rounded-md px-3 py-2 text-xs ${attention ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-600'}`}>
+      {attention && <p className="font-semibold">{notes.summary}</p>}
+      <ul className={`${attention ? 'mt-1' : ''} space-y-0.5 list-disc pl-4`}>
+        {notes.notes.map((n, i) => <li key={i}>{n.text}</li>)}
+      </ul>
+      {attention && <p className="mt-1 text-amber-800/90">You can still submit. We will contact you if anything else is needed.</p>}
+    </div>
   )
 }
 
@@ -331,7 +348,8 @@ function TranscriptSummary({ t }) {
       </button>
       {open && (
         <div className="px-4 pb-3 overflow-x-auto">
-          <table className="w-full text-sm">
+          <ReviewNotes notes={r.review_notes} />
+          <table className="w-full text-sm mt-2">
             <thead><tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500"><th className="py-1.5 pr-3">Course</th><th className="py-1.5 pr-3">Title</th><th className="py-1.5 pr-3">Term</th><th className="py-1.5 pr-3 text-right">Credits</th><th className="py-1.5 text-right">Grade</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {r.courses.map((c, i) => (
