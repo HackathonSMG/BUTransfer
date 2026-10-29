@@ -48,11 +48,9 @@ jobs:
       FOUNDRY_QA_AGENT_NAME: ${{ vars.FOUNDRY_QA_AGENT_NAME || 'bu-transfer-qa-analyst' }}
       FOUNDRY_TEST_AGENT_NAME: ${{ vars.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer' }}
       HAS_AZURE: ${{ secrets.AZURE_CLIENT_ID != '' }}
-      # Real Foundry agents through your backend (Managed Identity). Same value as QA_AGENT_SECRET in the Web App settings.
-      QA_AGENT_SECRET: ${{ secrets.QA_AGENT_SECRET }}
-      # Fallback, API-key mode: Foundry resource → Keys and Endpoint → KEY 1
+      # Foundry agents through the API key: Foundry resource → Keys and Endpoint → KEY 1
       FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}
-      FOUNDRY_MODEL_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-5-mini' }}
+      FOUNDRY_MODEL_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT || 'gpt-4.1-mini' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +93,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Write tests for this build with the AI
-        if: ${{ env.QA_AGENT_SECRET != '' || env.HAS_AZURE == 'true' || env.FOUNDRY_API_KEY != '' }}
+        if: ${{ env.FOUNDRY_API_KEY != '' || env.HAS_AZURE == 'true' }}
         run: node foundry/generate-tests.mjs
 
       - name: Run Playwright tests (existing suite + AI-written tests)
@@ -116,6 +114,8 @@ jobs:
             2_Code/transfer-app/qa/qa-report.md
             2_Code/transfer-app/qa/test-results/junit.xml
             2_Code/transfer-app/qa/tests/generated/ai-tests.spec.js
+            2_Code/transfer-app/qa/tests/generated/ai-status.json
+            2_Code/transfer-app/qa/tests/generated/ai-rejected.js.txt
             2_Code/transfer-app/qa/tests/generated/ai-status.json
           if-no-files-found: ignore
           retention-days: 30

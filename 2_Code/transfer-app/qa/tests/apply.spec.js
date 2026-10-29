@@ -32,7 +32,7 @@ const cases = A.loadCases();
 
 test.describe('[STEP-2] Each test-case transcript is read correctly (nothing submitted)', () => {
   test.skip(cases.length === 0, 'No transcripts found in 5_Test_Cases/transcripts');
-  test.describe.configure({ mode: 'serial' }); // the read endpoint is rate limited per visitor
+  // Not 'serial': one transcript failing must not skip the others. Tests in a file still run one after another.
   test.setTimeout(120_000);
 
   for (const c of cases) {
