@@ -27,3 +27,14 @@ npx playwright test --ui
 ## Notes
 - The Azure site is **Production**: CI runs read-only tests only. `ALLOW_SUBMIT=true` is refused on azurewebsites.net.
 - `[BUG #n]` tests are known bugs. They fail until fixed and don't fail the build; new regressions do.
+
+## Test-case transcripts (5_Test_Cases/transcripts)
+`tests/transcripts.spec.js` applies once per test case (TC01–TC26) through the student screens with that case's
+transcript PDF(s), submits, then tracks the application and checks every course on the transcript is listed.
+They submit real applications, so run them only against a local or staging copy:
+```
+set BASE_URL=http://localhost:5173
+set ALLOW_SUBMIT=true
+npm run test:transcripts
+```
+Each test notes the application number it created in the HTML report (Annotations).

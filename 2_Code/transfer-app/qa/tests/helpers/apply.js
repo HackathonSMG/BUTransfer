@@ -1,56 +1,41 @@
-// Shared steps for the 5-step application at /apply (pages/student/ApplicationForm.jsx).
-const { expect } = require('@playwright/test');
+// Shared steps for the 4-step application at /apply (pages/applicant/EligibilityApplication.jsx).
+// IMPORTANT: clicking "Continue" on step 1 with valid details saves a DRAFT APPLICATION on the server.
+// Tests that go past step 1 must call requireWriteSafeSite() so they never run against production.
+const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const fixture = (name) => path.join(__dirname, '..', 'fixtures', name);
 
 const VALID = {
-  firstName: 'Test', lastName: 'Student', email: 'test.student@example.com', phone: '+1 (617) 555-0142',
-  dob: '2004-05-14', address: '1 Test St, Boston, MA 02215', institution: 'Test Community College',
-  major: 'Computer Science', gpa: '3.5', credits: '60', program: 'computer_science', term: 'fall_2027',
+  firstName: 'Test', lastName: 'Student', email: 'test.student@example.com',
+  institution: 'Test Community College',
 };
 
-// The footer shows "Step N of 5" on every step.
-const atStep = (page, n) => expect(page.getByText(`Step ${n} of 5`)).toBeVisible();
-const next = (page) => page.getByRole('button', { name: 'Next' }).click();
+// The footer shows "Step N of 4" (hidden on phone widths, so this is for desktop tests).
+const atStep = (page, n) => expect(page.getByText(`Step ${n} of 4`)).toBeVisible();
+const cont = (page) => page.getByRole('button', { name: /^Continue/ }).click();
 
 async function openApplication(page) {
+  // The form keeps a draft in sessionStorage; start each test clean.
+  await page.addInitScript(() => { try { sessionStorage.removeItem('bu.transfer.application'); } catch {} });
   await page.goto('/apply');
-  await atStep(page, 1);
+  await expect(page.getByRole('heading', { name: 'Applicant Information' })).toBeVisible();
 }
 
 async function fillStep1(page, data = {}) {
   const d = { ...VALID, ...data };
-  await page.getByRole('textbox', { name: 'First Name' }).fill(d.firstName);
-  await page.getByRole('textbox', { name: 'Last Name' }).fill(d.lastName);
-  await page.getByPlaceholder('you@example.com').fill(d.email);
-  await page.getByPlaceholder('+1 (555) 000-0000').fill(d.phone);
-  await page.locator('input[type="date"]').fill(d.dob);
-  await page.getByPlaceholder('Street, City, State, ZIP').fill(d.address);
+  await page.getByLabel('First name').fill(d.firstName);
+  await page.getByLabel('Last name').fill(d.lastName);
+  await page.getByLabel('Email address', { exact: false }).first().fill(d.email);
+  await page.getByLabel('Confirm email address').fill(d.confirmEmail ?? d.email);
+  await page.getByLabel('Previous college or university').fill(d.institution);
+  // program/term: '' = leave empty, a label = choose that option, undefined = first option
+  if (d.program !== '') await page.getByLabel('Intended program at BU').selectOption(d.program ? { label: d.program } : { index: 1 });
+  if (d.term !== '') await page.getByLabel('Intended start term').selectOption(d.term ? { label: d.term } : { index: 1 });
 }
 
-async function fillStep2(page, data = {}) {
-  const d = { ...VALID, ...data };
-  await page.getByPlaceholder('e.g., University of Massachusetts Boston').fill(d.institution);
-  await page.getByPlaceholder('e.g., Computer Science').fill(d.major);
-  await page.getByPlaceholder('e.g., 3.50').fill(d.gpa);
-  await page.getByPlaceholder('e.g., 60').fill(d.credits);
+function requireWriteSafeSite() {
+  test.skip(process.env.ALLOW_SUBMIT !== 'true', 'Saves a draft application. Runs only on local/staging with ALLOW_SUBMIT=true.');
 }
 
-async function fillStep3(page, data = {}) {
-  const d = { ...VALID, ...data };
-  await page.locator('select').nth(0).selectOption(d.program);
-  await page.locator('select').nth(1).selectOption(d.term);
-}
-
-// Upload boxes in order: 0 transcript, 1 ID, 2 syllabi, 3 other documents.
-const uploadInput = (page, index) => page.locator('input[type="file"]').nth(index);
-
-async function goToDocuments(page) {
-  await openApplication(page);
-  await fillStep1(page); await next(page); await atStep(page, 2);
-  await fillStep2(page); await next(page); await atStep(page, 3);
-  await fillStep3(page); await next(page); await atStep(page, 4);
-}
-
-module.exports = { VALID, fixture, atStep, next, openApplication, fillStep1, fillStep2, fillStep3, uploadInput, goToDocuments };
+module.exports = { VALID, fixture, atStep, cont, openApplication, fillStep1, requireWriteSafeSite };
