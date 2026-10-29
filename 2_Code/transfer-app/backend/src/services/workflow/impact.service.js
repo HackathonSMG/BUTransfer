@@ -55,7 +55,9 @@ export async function impactMetrics({ applicationId = null } = {}) {
             (SELECT COUNT(*)::int FROM equivalencies WHERE status = 'active' AND source = 'promoted') AS learned_equivalencies,
             (SELECT COUNT(*)::int FROM past_decisions WHERE status = 'active') AS precedents,
             (SELECT COUNT(*)::int FROM past_decisions WHERE status = 'active' AND source = 'evaluator') AS learned_precedents,
-            (SELECT COUNT(*)::int FROM course_decisions WHERE decided_via = 'established_equivalency') AS reused`)).rows[0];
+            (SELECT COUNT(*)::int FROM course_decisions WHERE decided_via = 'established_equivalency') AS reused`)
+    // Supplementary figures: a failure here is logged and never fails the dashboards that show the impact panel
+    .catch((err) => { console.error('[Impact] Institutional knowledge figures unavailable:', err.message); return { rows: [null] }; })).rows[0];
 
   return {
     knowledge,

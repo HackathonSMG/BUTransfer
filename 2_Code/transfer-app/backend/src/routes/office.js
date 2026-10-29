@@ -162,8 +162,10 @@ router.get('/applications/:id', async (req, res, next) => {
           institution, credit_system: creditSystem, courses: n, needs_review: needsReview,
           findings: findings.map(({ type, severity, courses: codes, staff }) => ({ type, severity, courses: codes, text: staff })),
         })),
+        // Null until migration 012 adds the column, or for evaluations run before it
         trace: (await query(`SELECT pipeline_trace FROM ai_evaluations WHERE application_id = $1 AND pipeline_trace IS NOT NULL
-                             ORDER BY created_at DESC LIMIT 1`, [app.id])).rows[0]?.pipeline_trace || null,
+                             ORDER BY created_at DESC LIMIT 1`, [app.id])
+          .catch((err) => { console.error('[Office] Evaluation trace unavailable:', err.message); return { rows: [] }; })).rows[0]?.pipeline_trace || null,
         policy: { transfer_grade: POLICY.transferGrade, hub_units: POLICY.transferHubUnits, counts_in_gpa: POLICY.transferGradesCountInGpa },
       },
     });
