@@ -54,7 +54,7 @@ try {
 // ---------- Extract and check the code ----------
 const match = (text || '').match(/```(?:js|javascript)?\s*\n([\s\S]*?)```/);
 const code = (match ? match[1] : text || '').trim();
-if (!code) done(false, 'agent returned no code');
+if (!code) done(false, `the AI returned no code${text === '' ? ' (empty answer: the model may have used all its tokens on reasoning)' : ''}`);
 
 const problems = [];
 if (!/require\(\s*['"]\.\/guard['"]\s*\)/.test(code)) problems.push("doesn't import ./guard");
@@ -63,7 +63,8 @@ if (requires.some((r) => r !== './guard')) problems.push(`imports other modules:
 const banned = [
   [/\bimport\s+[\w{*]/, 'ES import'], [/child_process|\bprocess\.|\beval\s*\(|\bFunction\s*\(/, 'system access'],
   [/\bfs\.|require\(['"]fs['"]\)/, 'file system'], [/\.(post|put|patch|delete)\s*\(/, 'write request'],
-  [/password|fill\([^)]*['"]\S*@\S*['"][^)]*\)[\s\S]{0,80}Sign In/i, 'login attempt'],
+  // typing into the password field = a login attempt (checking the "Password is required" message is fine)
+  [/getByLabel\(\s*\/?['"^]*Password[^)]*\)\s*\.(fill|type|press)|type=\\?['"]password\\?['"]\]?['"]?\)\s*\.(fill|type)/i, 'login attempt'],
   [/getByRole\(\s*['"]button['"]\s*,\s*\{\s*name:\s*['"](Confirm|Approve|Reject|Delete|Save)/i, 'clicks a write button'],
 ];
 for (const [re, label] of banned) if (re.test(code)) problems.push(label);
@@ -72,7 +73,10 @@ const count = (code.match(/\btest\s*\(\s*['"`]/g) || []).length;
 if (count === 0) problems.push('no tests found');
 if (count > 12) problems.push(`too many tests (${count})`);
 
-if (problems.length) done(false, `generated code rejected: ${problems.join('; ')}`);
+if (problems.length) {
+  fs.writeFileSync('tests/generated/ai-rejected.js.txt', code); // kept for the run artifact, never run
+  done(false, `generated code rejected: ${problems.join('; ')}`);
+}
 
 fs.writeFileSync(OUT, `// AI-generated for commit ${request.commit} by ${env.FOUNDRY_TEST_AGENT_NAME || 'bu-transfer-test-writer'}. Not committed; runs once in CI.\n${code}\n`);
 done(true, `${count} tests written to ${OUT}`, { tests: count, changed_files: request.changed_files });

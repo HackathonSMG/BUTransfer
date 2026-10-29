@@ -39,6 +39,7 @@ async function viaApiKey(instructionsFile, input) {
     // Newer models (GPT-5, o-series) need max_completion_tokens (it also covers their reasoning tokens)
     // and only allow the default temperature; older ones (GPT-4.x) accept both forms below.
     max_completion_tokens: 16000,
+    reasoning_effort: 'low', // reasoning models: keep most tokens for the answer
     temperature: 0.2,
   };
   // If the model rejects a setting, drop or rename it and try again (at most 3 times)
@@ -49,10 +50,14 @@ async function viaApiKey(instructionsFile, input) {
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data.choices?.[0]?.message?.content || '';
+    if (res.ok) {
+      const choice = data.choices?.[0] || {};
+      if (!choice.message?.content) console.log(`[AI] empty answer (finish_reason: ${choice.finish_reason || 'unknown'})`);
+      return choice.message?.content || '';
+    }
     const msg = data.error?.message || data.message || 'no details';
-    const param = data.error?.param || (msg.match(/'([a-z_]+)'/) || [])[1];
-    if (res.status === 400 && attempt < 3 && param && param in body && param !== 'messages') {
+    const param = data.error?.param || (msg.match(/'([a-z_]+)'/) || msg.match(/argument supplied: ([a-z_]+)/i) || [])[1];
+    if (res.status === 400 && attempt < 4 && param && param in body && param !== 'messages') {
       if (param === 'max_completion_tokens') body.max_tokens = 4000; // older API version or model
       delete body[param];
       console.log(`[AI] model does not accept '${param}', retrying without it`);

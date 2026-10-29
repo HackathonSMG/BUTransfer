@@ -120,8 +120,10 @@ function fallbackReport(reason) {
     '',
     '### New regressions',
     regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n')[0]).slice(0, 160)} |`)].join('\n') : 'None',
-    ...(aiTests.length ? ['', '### AI-written tests for this build',
-      aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')] : []),
+    '', '### AI-written tests for this build',
+    aiTests.length
+      ? aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')
+      : `None this run: ${summary.ai_tests.note || 'the test-writer step did not run'}`,
     '', '### Known bugs still failing',
     failed.filter((t) => t.known_bug).map((t) => `- #${t.known_bug} ${t.title}`).join('\n') || 'None',
   ].join('\n');
