@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, Mail, ShieldCheck, ArrowRight, LogOut } from 'lucide-react'
+import { Mail, ShieldCheck, ArrowRight, LogOut } from 'lucide-react'
 import { trackApplication, emailApplicationNumbers } from '../../api/student'
 import Input from '../../components/ui/Input'
+import PublicHero from '../../components/layout/PublicHero'
 import Button from '../../components/ui/Button'
 import ApplicationTracker from '../../components/applicant/ApplicationTracker'
 
@@ -75,14 +76,10 @@ function TrackForm({ initialNumber, onOpen }) {
 
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
-      <div className="max-w-xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-        <div className="text-center">
-          <span className="w-12 h-12 rounded-xl bg-red-50 grid place-items-center mx-auto"><Search className="w-6 h-6 text-brand" /></span>
-          <h1 className="font-display text-3xl font-semibold text-gray-900 mt-4">Transfer Credit Status</h1>
-          <p className="text-gray-600 mt-2">Enter your Transfer Credit ID and the email address you submitted your transcripts with.</p>
-        </div>
-
-        <form onSubmit={submit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 mt-8 space-y-5" noValidate>
+      <PublicHero title="Transfer Credit Status" width="max-w-xl"
+        intro="Enter your Transfer Credit ID and the email address you submitted your transcripts with." />
+      <div className="max-w-xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
+        <form onSubmit={submit} className="relative bg-white rounded-2xl border border-gray-200 shadow-md p-6 sm:p-8 -mt-4 space-y-5" noValidate>
           {errors.general && <div className="rounded-lg bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-800" role="alert">{errors.general}</div>}
           <Input label="Transfer Credit ID" required value={number} onChange={e => { setNumber(e.target.value.toUpperCase()); setErrors({}) }}
             error={errors.number} placeholder="TC-2026-0001" autoComplete="off" className="[&_input]:font-mono [&_input]:tracking-wide" />

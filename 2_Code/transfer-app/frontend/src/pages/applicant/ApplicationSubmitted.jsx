@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
+import campus from '../../assets/campus-hero.jpg'
 import { CheckCircle2, Copy, Check, Mail, ArrowRight, FileSearch, Building2, Stamp } from 'lucide-react'
 
 const NEXT = [
@@ -22,8 +23,14 @@ export default function ApplicationSubmitted() {
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)] px-4 py-10 sm:py-14">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 sm:px-10 pt-10 pb-8 text-center">
-            <span className="w-14 h-14 rounded-full bg-green-50 grid place-items-center mx-auto"><CheckCircle2 className="w-8 h-8 text-green-600" /></span>
+          {/* Campus photo strip under a BU red gradient */}
+          <div className="relative h-24 sm:h-28 bg-[#7a0000]" aria-hidden="true">
+            <img src={campus} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#990000] via-[#990000]/80 to-[#cc0000]/40" />
+            <p className="relative px-6 sm:px-10 pt-5 text-[13px] font-semibold tracking-[0.12em] uppercase text-white/85">Boston University · Transfer Credit</p>
+          </div>
+          <div className="px-6 sm:px-10 pt-0 pb-8 text-center">
+            <span className="relative -mt-7 w-14 h-14 rounded-full bg-green-50 ring-4 ring-white grid place-items-center mx-auto"><CheckCircle2 className="w-8 h-8 text-green-600" /></span>
             <h1 className="font-display text-[28px] sm:text-3xl font-semibold text-gray-900 mt-4">Credit Evaluation Submitted</h1>
             <p className="text-gray-600 mt-2">
               {state.student ? `Thank you, ${state.student}. ` : ''}Your transcripts have been submitted for transfer credit evaluation.

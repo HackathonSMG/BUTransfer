@@ -79,3 +79,15 @@ export function formatDateTime(d) {
   if (!d) return '—'
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(d))
 }
+
+// What the student changed on the review step, against the transcript's reading (transcript_courses.extracted).
+// Returns e.g. ['grade B+ (transcript: C)'], or [] when nothing was corrected. A corrected institution applies to
+// every course of the transcript, so it is shown once by the page rather than on each course.
+const CORRECTED_LABELS = { course_code: 'course code', title: 'title', term: 'term', source_credits: 'credits', grade: 'grade' }
+export function correctionsOf(c) {
+  const fields = Array.isArray(c?.corrected_fields) ? c.corrected_fields : []
+  return fields.filter(k => k !== 'institution').map(k => {
+    const was = c.extracted?.[k]
+    return `${CORRECTED_LABELS[k] || k} ${c[k] ?? 'removed'} (transcript: ${was == null || was === '' ? 'not shown' : was})`
+  })
+}

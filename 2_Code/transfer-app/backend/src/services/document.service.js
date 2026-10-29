@@ -10,7 +10,13 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
-export async function uploadDocument({ buffer, originalName, fileSize, mimeType, applicationId, documentType = 'other', uploadedBy = null, uploadSource = 'student', notes = null }) {
+const TRANSCRIPT_READABLE = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']);
+
+/**
+ * Stores a document. A transcript (PDF, or an image of one) is read into transcript_courses; reviewed carries what the
+ * student confirmed or corrected on the review step (see importTranscript).
+ */
+export async function uploadDocument({ buffer, originalName, fileSize, mimeType, applicationId, documentType = 'other', uploadedBy = null, uploadSource = 'student', notes = null, reviewed = null }) {
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new Error(`File type ${mimeType} is not allowed. Supported types: PDF, JPG, PNG, DOC, DOCX.`);
   }
@@ -24,11 +30,12 @@ export async function uploadDocument({ buffer, originalName, fileSize, mimeType,
   );
   const document = result.rows[0];
 
-  // Read course rows from transcript PDFs so the credit evaluation can use them; a transcript
-  // in another layout is still stored, it just contributes no courses
-  if (documentType === 'transcript' && mimeType === 'application/pdf') {
+  // Read course rows from transcripts so the credit evaluation can use them. Any layout is tried (see
+  // transcript-parser); images and scans need the AI reader. A transcript that can't be read is still stored, and
+  // the Credit Evaluation Office follows up
+  if (documentType === 'transcript' && TRANSCRIPT_READABLE.has(mimeType)) {
     try {
-      document.transcript_import = await importTranscript(applicationId, document.id, buffer);
+      document.transcript_import = await importTranscript(applicationId, document.id, buffer, { mimeType, reviewed });
     } catch (err) {
       console.error(`[Transcript] Could not read courses from ${originalName}:`, err.message);
       document.transcript_import = { institution: null, courses: 0, error: err.message };

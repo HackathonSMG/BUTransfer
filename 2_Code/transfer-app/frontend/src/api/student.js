@@ -71,10 +71,13 @@ export const removeDraftDocument = (token, documentId) =>
   client.delete(`/student/applications/${token}/documents/${documentId}`)
 
 // Upload with progress (0-100) reported to onProgress
-export const uploadApplicationDocument = (token, file, documentType, onProgress) => {
+// reviewed (transcripts only): what the student confirmed on the review step, { institution, courses }; the original
+// reading is kept beside it on the server
+export const uploadApplicationDocument = (token, file, documentType, onProgress, reviewed) => {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('document_type', documentType)
+  if (reviewed) fd.append('reviewed', JSON.stringify(reviewed))
   return client.post(`/student/applications/${token}/documents`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100)) }

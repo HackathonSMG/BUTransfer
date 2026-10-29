@@ -49,6 +49,7 @@ export default function MyDashboard() {
   return (
     <div className="space-y-8">
       <PageHeader
+        banner
         eyebrow={today}
         title={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         subtitle={c.open > 0 ? `${plural(c.open, 'course')} ${c.open === 1 ? 'needs' : 'need'} your review.` : "You're all caught up."}
