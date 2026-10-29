@@ -47,3 +47,7 @@ export const getConflicts = () =>
 
 export const recordStandardEquivalency = (body) =>
   client.post('/admin/conflicts/standard', body).then(r => r.data)
+
+// Process counts for a period and a BU start term: { term?, from?, to? } (dates YYYY-MM-DD, inclusive)
+export const getAdminCounts = (params = {}) =>
+  client.get('/admin/counts', { params }).then(r => r.data)

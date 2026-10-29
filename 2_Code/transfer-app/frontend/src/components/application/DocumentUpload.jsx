@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import FileUpload from '../ui/FileUpload'
 import Select from '../ui/Select'
 import Button from '../ui/Button'
@@ -32,9 +32,9 @@ export default function DocumentUpload({ onUpload, uploading = false }) {
       await onUpload(file, docType)
       setFile(null)
       setDocType('')
-      toast.success('Document uploaded successfully')
+      notify.success('Document uploaded successfully')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to upload document')
+      notify.error(err.response?.data?.message || 'Failed to upload document')
     }
   }
 

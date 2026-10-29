@@ -4,12 +4,8 @@ import { Bell, LogOut, ChevronDown, ChevronRight, Menu, Search } from 'lucide-re
 import { useAuth } from '../../hooks/useAuth'
 import { getNotifications, markAllRead } from '../../api/notifications'
 import { initials } from '../../lib/reviews'
+import { ROLE_LABELS } from '../../lib/homeFor'
 
-const ROLE_LABELS = {
-  evaluator: 'Evaluator',
-  admin: 'Administrator',
-  credit_office: 'Credit Evaluation Office'
-}
 
 // Breadcrumb trail for each staff route
 function crumbsFor(pathname, role) {

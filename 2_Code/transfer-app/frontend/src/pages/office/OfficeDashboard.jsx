@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Stamp, Inbox, Copy, CalendarClock, ArrowRight, CheckCircle2, GitCompare, Flag } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getOfficeOverview, placeOfficeQueue, processExistingApplications } from '../../api/office'
 import { useAuth } from '../../hooks/useAuth'
 import PageHeader from '../../components/staff/PageHeader'
@@ -37,10 +37,10 @@ export default function OfficeDashboard() {
     setPlacing(true)
     try {
       const res = await placeOfficeQueue()
-      toast.success(res.data.placed ? `${res.data.placed} course${res.data.placed === 1 ? '' : 's'} assigned to evaluators` : 'No queued course has a qualified evaluator yet')
+      notify.success(res.data.placed ? `${res.data.placed} course${res.data.placed === 1 ? '' : 's'} assigned to evaluators` : 'No queued course has a qualified evaluator yet')
       load()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Courses could not be placed')
+      notify.error(err.response?.data?.message || 'Courses could not be placed')
     } finally {
       setPlacing(false)
     }
@@ -51,10 +51,10 @@ export default function OfficeDashboard() {
     try {
       const res = await processExistingApplications()
       const r = res.data
-      toast.success(`${r.applications} evaluations checked: ${r.established_applied} courses settled by established equivalencies, ${r.reviews_created} assigned, ${r.duplicates_flagged} possible duplicates`)
+      notify.success(`${r.applications} evaluations checked: ${r.established_applied} courses settled by established equivalencies, ${r.reviews_created} assigned, ${r.duplicates_flagged} possible duplicates`)
       load()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Existing evaluations could not be processed')
+      notify.error(err.response?.data?.message || 'Existing evaluations could not be processed')
     } finally {
       setProcessing(false)
     }

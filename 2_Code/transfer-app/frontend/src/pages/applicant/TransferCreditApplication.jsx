@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Check, Lock, Mail, FileSearch, Send, AlertCircle, AlertTriangle, CheckCircle2,
   UploadCloud, FileText, X, RotateCcw, Loader2, ChevronDown
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import {
   readTranscriptFile, startApplication, uploadApplicationDocument, submitApplicationForEvaluation,
   checkExistingApplications, emailApplicationNumbers
@@ -16,6 +16,7 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import { ACCEPTED, MAX_MB, formatSize } from '../../components/applicant/DocumentDropzone'
 import { PROGRAMS, TERMS, PROGRAM_DEPARTMENTS } from '../../lib/application'
+import { homeFor, ROLE_LABELS } from '../../lib/homeFor'
 
 // Transfer Credit Evaluation for an admitted student, transcript first:
 //   1. upload the official transcript(s); each is read straight away with the existing transcript reader
@@ -31,13 +32,19 @@ const uniq = (values) => [...new Set(values.map(v => (v || '').trim()).filter(Bo
 let seq = 0
 
 export default function TransferCreditApplication() {
-  const { user, isAuthenticated, loading } = useAuth()
+  const { user, isAuthenticated, loading, logout } = useAuth()
   if (loading) return <div className="flex justify-center py-24"><Spinner size="lg" className="text-brand" /></div>
+  // A staff session on the student form: say whose session it is and offer both ways forward, rather than a dead end
   if (isAuthenticated && user.role !== 'student') {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <h1 className="text-xl font-bold text-gray-900">You are signed in as staff</h1>
-        <p className="text-gray-500 mt-2">Students submit transcripts without an account. Staff create credit evaluations from the staff portal.</p>
+        <h1 className="text-xl font-bold text-gray-900">You are signed in as {user.full_name || user.email}</h1>
+        <p className="text-sm text-gray-500 mt-1">{ROLE_LABELS[user.role] || user.role} account</p>
+        <p className="text-gray-600 mt-4">Students submit transcripts without an account. To submit as a student, sign out first; staff create credit evaluations from the staff workspace.</p>
+        <div className="flex flex-wrap justify-center gap-2 mt-6">
+          <Link to={homeFor(user.role)}><Button variant="secondary">Go to my workspace</Button></Link>
+          <Button onClick={() => logout()}>Sign out and continue as a student</Button>
+        </div>
       </div>
     )
   }
@@ -79,8 +86,8 @@ function SubmissionFlow({ accountEmail }) {
   const addTranscripts = (files) => {
     const fresh = []
     for (const f of Array.from(files || [])) {
-      if (!ACCEPTED[extOf(f.name)]) { toast.error(`${f.name}: use a PDF, Word, JPG or PNG file.`); continue }
-      if (f.size > MAX_MB * 1024 * 1024) { toast.error(`${f.name} is larger than ${MAX_MB} MB.`); continue }
+      if (!ACCEPTED[extOf(f.name)]) { notify.error(`${f.name}: use a PDF, Word, JPG or PNG file.`); continue }
+      if (f.size > MAX_MB * 1024 * 1024) { notify.error(`${f.name} is larger than ${MAX_MB} MB.`); continue }
       fresh.push({ key: `t${++seq}`, file: f, name: f.name, size: f.size, status: 'reading', result: null, error: '' })
     }
     if (!fresh.length) return
@@ -193,7 +200,10 @@ function SubmissionFlow({ accountEmail }) {
             <Body title="Review and confirm" intro="Check the details read from your transcripts. Only what the transcripts did not show is asked for.">
               {/* Student details */}
               <section className="rounded-xl border border-gray-200">
-                <h3 className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-900">Student information</h3>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">Student information</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />Filled in from your transcript. Please check these are right.</p>
+                </div>
                 <dl className="divide-y divide-gray-100">
                   <DetectedField label="Name" value={detected.name} conflict={names.length > 1 ? names : null}
                     input={<Input aria-label="Your full name" value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} placeholder="Your full name" />} />
@@ -302,7 +312,7 @@ function TranscriptItem({ t, onRemove, onRetry }) {
           <span className="block text-sm font-medium text-gray-900 truncate">{t.status === 'read' ? r.institution : t.name}</span>
           <span className="block text-xs text-gray-500 truncate">
             {t.status === 'reading' && `Reading ${t.name}…`}
-            {t.status === 'read' && `${r.courses.length} course${r.courses.length === 1 ? '' : 's'} detected · ${r.credit_system || 'calendar not shown'} · ${t.name} (${formatSize(t.size)})`}
+            {t.status === 'read' && `${r.courses.length} course${r.courses.length === 1 ? '' : 's'} found · ${r.credit_system || 'calendar not shown'} · ${t.name} (${formatSize(t.size)})`}
             {['unreadable', 'error'].includes(t.status) && `${t.name} (${formatSize(t.size)})`}
           </span>
         </span>
@@ -342,7 +352,7 @@ function TranscriptSummary({ t }) {
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-gray-50">
         <span>
           <span className="block text-sm font-semibold text-gray-900">{r.institution}</span>
-          <span className="block text-xs text-gray-500">{r.courses.length} course{r.courses.length === 1 ? '' : 's'} detected · {r.credit_system || 'calendar not shown'}{r.student?.student_id ? ` · Student ID ${r.student.student_id}` : ''}</span>
+          <span className="block text-xs text-gray-500">{r.courses.length} course{r.courses.length === 1 ? '' : 's'} found · {r.credit_system || 'calendar not shown'}{r.student?.student_id ? ` · Student ID ${r.student.student_id}` : ''}</span>
         </span>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -369,7 +379,7 @@ function TranscriptSummary({ t }) {
   )
 }
 
-// A detected value is shown read-only; a missing one asks for input (only for fields that are needed)
+// A value read from the transcript is shown read-only with a green check; a missing one asks for input (only for fields that are needed)
 function DetectedField({ label, value, conflict, input, note, optional = false }) {
   return (
     <div className="px-4 py-3 grid sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 items-start">
@@ -377,15 +387,19 @@ function DetectedField({ label, value, conflict, input, note, optional = false }
       <dd className="min-w-0">
         {value ? (
           <>
-            <span className="text-sm font-medium text-gray-900">{value}</span>
-            <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-700"><Check className="w-3.5 h-3.5" />Detected from transcript</span>
+            {/* A green check marks a value taken from the transcript; the words are for screen readers and on hover */}
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-900">
+              <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" aria-hidden="true" />
+              <span title="From your transcript">{value}</span>
+              <span className="sr-only">(from your transcript)</span>
+            </span>
           </>
         ) : optional ? (
           <span className="text-sm text-gray-400">Not shown on the transcript</span>
         ) : (
           <>
             <span className="flex items-center gap-1 text-xs text-amber-700 mb-1.5"><AlertTriangle className="w-3.5 h-3.5" />
-              {conflict ? `Your transcripts show different values (${conflict.join(' / ')}). Please enter the correct one.` : 'Not detected. Please enter it.'}
+              {conflict ? `Your transcripts show different values (${conflict.join(' / ')}). Please enter the correct one.` : 'Not on your transcript. Please enter it.'}
             </span>
             {input}
           </>
@@ -400,8 +414,8 @@ function SupportingFiles({ files, onChange }) {
   const input = useRef(null)
   const add = (list) => {
     const ok = Array.from(list || []).filter(f => {
-      if (!ACCEPTED[extOf(f.name)]) { toast.error(`${f.name}: use a PDF, Word, JPG or PNG file.`); return false }
-      if (f.size > MAX_MB * 1024 * 1024) { toast.error(`${f.name} is larger than ${MAX_MB} MB.`); return false }
+      if (!ACCEPTED[extOf(f.name)]) { notify.error(`${f.name}: use a PDF, Word, JPG or PNG file.`); return false }
+      if (f.size > MAX_MB * 1024 * 1024) { notify.error(`${f.name} is larger than ${MAX_MB} MB.`); return false }
       return true
     }).map(f => ({ key: `s${++seq}`, file: f, name: f.name, size: f.size }))
     onChange([...files, ...ok])
@@ -439,7 +453,7 @@ function ExistingEvaluations({ email, result, busy, onAnother, onBack }) {
   const [sent, setSent] = useState(false)
   const send = async () => {
     setSending(true)
-    try { await emailApplicationNumbers(email); setSent(true) } catch { toast.error('We could not send the email. Please try again.') } finally { setSending(false) }
+    try { await emailApplicationNumbers(email); setSent(true) } catch { notify.error('We could not send the email. Please try again.') } finally { setSending(false) }
   }
   return (
     <div className="px-5 sm:px-8 py-7">

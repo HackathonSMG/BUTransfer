@@ -33,5 +33,13 @@ export const searchBuCourses = (search) =>
 export const getDocumentLink = (documentId) =>
   client.get(`/documents/${documentId}`).then(r => r.data)
 
+// reason: different_department | outside_expertise | additional_review | correction (note required for the last two)
+export const requestReassignment = (id, reason, note) =>
+  client.post(`/my/reviews/${id}/reassign`, { reason, note }).then(r => r.data)
+
 export const escalateReview = (id, note) =>
   client.post(`/my/reviews/${id}/escalate`, { note }).then(r => r.data)
+
+// Course counts for a period and a BU start term: { term?, from?, to? } (dates YYYY-MM-DD, inclusive)
+export const getMyCounts = (params = {}) =>
+  client.get('/my/counts', { params }).then(r => r.data)

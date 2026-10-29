@@ -4,6 +4,7 @@ import { requireRole } from '../middleware/require-role.js';
 import { z } from 'zod';
 import { listConflicts, recordStandard, recordResolution } from '../services/workflow/knowledge.service.js';
 import { badRequest } from '../utils/errors.js';
+import { filterSchema, adminCounts, startTerms } from '../services/workflow/period-counts.service.js';
 import { getReports, getOverview, getAuditLogs, listCriteria, createCriterion, updateCriterion, deleteCriterion } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -47,6 +48,15 @@ router.post('/conflicts/resolve', CONFLICT_ROLES, async (req, res, next) => {
 router.use(requireRole('admin'));
 router.get('/reports', getReports);
 router.get('/overview', getOverview);
+// Process counts for a period and a BU start term (admin dashboard filter bar)
+router.get('/counts', async (req, res, next) => {
+  try {
+    const parsed = filterSchema.safeParse(req.query);
+    if (!parsed.success) return next(badRequest('Use a term and dates as YYYY-MM-DD'));
+    const [counts, terms] = await Promise.all([adminCounts(parsed.data), startTerms()]);
+    return res.status(200).json({ data: { counts, terms, filters: parsed.data } });
+  } catch (err) { return next(err); }
+});
 router.get('/audit-logs', getAuditLogs);
 router.get('/criteria', listCriteria);
 router.post('/criteria', createCriterion);

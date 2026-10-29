@@ -66,7 +66,7 @@ Sign in as **Evaluator: Computer Science** (`evaluator.cs@bu-transfer.local`) �
     - Switch to **No credit**: it notes the course shows most of the BU outcomes, and asks that the reason explain what's missing.
     - Switch to **Different BU course** and pick an unrelated course (e.g. CAS MA 123): ⚠ "Only 0 of N BU learning outcomes are evident in the transfer course".
     - **Say:** "This is a guardrail, not a gate. It checks the decision against the established equivalency, every earlier decision on this course, similar courses, conflicts, content, units and grade rules, *before* it becomes precedent for future students."
-13. Choose **Equivalent BU course** → **Confirm decision**. The next evaluator receives the hand-off automatically.
+13. Choose **Equivalent BU course** → **Confirm decision**. "Decision recorded." appears in place at the top of the page. The other departments have been reviewing their courses in parallel since assignment.
 
 *(Optional, 30 s, conflict story: open any review whose cues show **Potential equivalency conflict**. The seeded synthetic scenarios include one. Show "Earlier decisions on … differ" under *Needs attention*, the next step "Review the conflict", and in the decision dialog "This decision differs from 2 of 3 earlier decisions".)*
 

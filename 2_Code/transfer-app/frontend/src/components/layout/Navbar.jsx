@@ -1,11 +1,13 @@
 import React from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { LogOut, FolderOpen, Search, FileText, LogIn } from 'lucide-react'
+import { LogOut, FolderOpen, Search, FileText, LogIn, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { homeFor, ROLE_LABELS } from '../../lib/homeFor'
 
 // Top bar for the public applicant pages. Applicants need no account: they start an application or track one.
-// Staff sign in from here; signed-in staff get StaffTopbar inside StaffShell instead. A student account
-// (created before applicant-first intake) still sees its applications.
+// Staff sign in from here; a signed-in staff member visiting a student page sees who is signed in, the way back
+// to their workspace and Sign out. A student account (created before applicant-first intake) still sees its
+// applications.
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -40,6 +42,20 @@ export default function Navbar() {
             {student ? (
               <>
                 <NavLink to="/student" className={navClass}><FolderOpen className="w-4 h-4" /><span className="hidden lg:inline">My Transfer Credit</span></NavLink>
+                <button onClick={signOut} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100">
+                  <LogOut className="w-4 h-4" /><span className="hidden sm:inline">Sign out</span>
+                </button>
+              </>
+            ) : user ? (
+              // Signed-in staff on a student page: say who is signed in, and offer the way back and a sign-out
+              <>
+                <span className="hidden lg:block text-right leading-tight ml-1 pl-3 border-l border-gray-200">
+                  <span className="block text-xs font-medium text-gray-900">{user.full_name || user.email}</span>
+                  <span className="block text-[11px] text-gray-500">{ROLE_LABELS[user.role] || user.role}</span>
+                </span>
+                <Link to={homeFor(user.role)} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <LayoutDashboard className="w-4 h-4" /><span className="hidden sm:inline">My workspace</span>
+                </Link>
                 <button onClick={signOut} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100">
                   <LogOut className="w-4 h-4" /><span className="hidden sm:inline">Sign out</span>
                 </button>

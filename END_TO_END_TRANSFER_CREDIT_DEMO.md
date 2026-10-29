@@ -120,7 +120,7 @@ Unchanged:
 
 Unchanged:
 - The remaining courses are assigned by subject expertise, the student's major and workload.
-- Several evaluators on one application review in sequence (hand-offs).
+- Several evaluators on one application review their courses in parallel; each opens at assignment.
 
 ## 10. Evaluator review
 
@@ -367,7 +367,7 @@ Files: `4_Sample_Transcripts/Transcript_STU-001_*.pdf` (two files) and `5_Demo_D
 
 11. Sign in as `evaluator.cs@bu-transfer.local`. Open **CSC 220**. **Record decision → Request more information → Course syllabus → Send request**.
 12. Applicant: you receive **Additional Information Required**. On the tracking page, CSC 220 shows **Action needed**. Upload `CSC_220_Syllabus_Riverside.pdf` there and click **Send syllabus**.
-13. Evaluator: CSC 220 shows **Syllabus received**. Decide **Equivalent BU course** (CAS CS 112). The next evaluator receives the hand-off.
+13. Evaluator: CSC 220 shows **Syllabus received**. Decide **Equivalent BU course** (CAS CS 112). The Mathematics and Psychology evaluators have had their courses since assignment (parallel review).
 14. Sign in as `evaluator.math@bu-transfer.local`. **MATH 22** (4 quarter credits = 2.66 BU units) → **Equivalent BU course**.
 15. Sign in as `evaluator.psych@bu-transfer.local`. **PSY 210** → **Elective credit**, or **No credit** with a reason to show a not-accepted course.
 16. Every course is decided. The application enters **Final Review** and you receive **Your Transfer Credit Is in Final Review**.

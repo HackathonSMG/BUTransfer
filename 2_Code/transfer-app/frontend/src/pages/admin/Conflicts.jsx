@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, CheckCircle2, BadgeCheck } from 'lucide-react'
-import toast from 'react-hot-toast'
+import notify from '../../lib/notify'
 import { getConflicts, recordStandardEquivalency } from '../../api/admin'
 import { resolveConflict } from '../../api/office'
 import PageHeader from '../../components/staff/PageHeader'
@@ -135,10 +135,10 @@ function StandardModal({ conflict, onClose, onDone }) {
     setSaving(true)
     try {
       await recordStandardEquivalency(body)
-      toast.success('Standard equivalency recorded')
+      notify.success('Standard equivalency recorded')
       onDone()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The standard could not be recorded')
+      notify.error(err.response?.data?.message || 'The standard could not be recorded')
     } finally {
       setSaving(false)
     }
@@ -188,10 +188,10 @@ function ResolveModal({ conflict, onClose, onDone }) {
     setSaving(true)
     try {
       await resolveConflict({ institution: conflict.institution, course_code: conflict.course_code, note: note.trim() })
-      toast.success('Conflict marked as resolved')
+      notify.success('Conflict marked as resolved')
       onDone()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'The conflict could not be resolved')
+      notify.error(err.response?.data?.message || 'The conflict could not be resolved')
     } finally {
       setSaving(false)
     }

@@ -6,7 +6,7 @@ import { query } from '../config/db.js';
 import { badRequest, notFound } from '../utils/errors.js';
 import { log as auditLog } from '../services/audit.service.js';
 import * as lifecycle from '../services/workflow/lifecycle.service.js';
-import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, assignApplication } from '../services/workflow/assignment.service.js';
+import { eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, assignApplication, openQueuedReviews } from '../services/workflow/assignment.service.js';
 import { POLICY } from '../services/credit/policy.js';
 import { ownershipView, unassignedReason } from '../services/workflow/ownership.service.js';
 import { impactMetrics } from '../services/workflow/impact.service.js';
@@ -245,6 +245,8 @@ router.post('/process-existing', async (req, res, next) => {
       totals.reviews_created += (await assignApplication(id, { held })).created;
       await lifecycle.refreshApplicationStatus(id, req.user.id);
     }
+    // Departments review in parallel: courses still waiting for a hand-off open now
+    totals.queued_opened = (await openQueuedReviews(req.user)).opened;
     await auditLog({ action: 'existing_applications_processed', actorId: req.user.id, actorEmail: req.user.email, details: totals });
     return res.status(200).json({ data: totals });
   } catch (err) { return next(err); }

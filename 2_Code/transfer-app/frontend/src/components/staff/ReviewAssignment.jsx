@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
-import { UserRound, Clock, AlertTriangle, ChevronDown, History } from 'lucide-react'
+import { UserRound, Clock, AlertTriangle, ChevronDown, History, UserCog } from 'lucide-react'
 import StatusPill from './StatusPill'
 import { pendingFor, formatDateTime } from '../../lib/staffFormat'
 
 // Current Review Assignment: where the application is, who holds it, which course is blocking completion, every
 // course's evaluator, and the assignment history. All of it comes from the API (ownership.service); staff only.
-export default function ReviewAssignment({ ownership }) {
+// onReassign(course): when given (Credit Evaluation Office, administrators), each open course gets a Reassign action
+export default function ReviewAssignment({ ownership, onReassign = null }) {
   const [showCourses, setShowCourses] = useState(true)
   const [showHistory, setShowHistory] = useState(false)
   if (!ownership) return null
@@ -88,6 +89,7 @@ export default function ReviewAssignment({ ownership }) {
                   <th className="px-6 py-2 font-semibold">Course</th><th className="px-3 py-2 font-semibold">Status</th>
                   <th className="px-3 py-2 font-semibold">Evaluator</th><th className="px-3 py-2 font-semibold">Department</th>
                   <th className="px-3 py-2 font-semibold">Assigned</th><th className="px-6 py-2 font-semibold text-right">Waiting</th>
+                  {onReassign && <th className="pr-3 py-2"><span className="sr-only">Reassign</span></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-staff-line2">
@@ -99,6 +101,18 @@ export default function ReviewAssignment({ ownership }) {
                     <td className="px-3 py-2.5 text-staff-ink2">{c.evaluator?.department || '—'}</td>
                     <td className="px-3 py-2.5 text-staff-ink2 whitespace-nowrap">{c.assigned_at ? formatDateTime(c.assigned_at) : '—'}</td>
                     <td className="px-6 py-2.5 text-right tabular-nums text-staff-ink2 whitespace-nowrap">{c.pending_since ? pendingFor(c.pending_since) : '—'}</td>
+                    {onReassign && (
+                      <td className="pr-3 py-2.5 text-right">
+                        {c.review_id && c.pending_since && (
+                          // Compact so the table keeps its width; the label is in the tooltip and for screen readers
+                          <button type="button" onClick={() => onReassign({ review_id: c.review_id, course_code: c.course_code, evaluator_id: c.evaluator?.id || null })}
+                            title={`Reassign ${c.course_code}`} aria-label={`Reassign ${c.course_code}`}
+                            className="inline-grid place-items-center w-8 h-8 rounded-md border border-staff-line text-staff-ink2 hover:bg-staff-bg hover:text-staff-ink">
+                            <UserCog className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
