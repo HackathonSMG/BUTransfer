@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { query } from '../../config/db.js';
 import { createEngine, ENGINE_VERSION } from './engine.js';
 import { parseTranscript } from './transcript-parser.js';
@@ -36,6 +37,21 @@ async function getEngine() {
   return enginePromise;
 }
 
+// A transcript is read when the student adds it (to show what was found) and again when it is stored at submission.
+// The same file gives the same result, so the reading is kept briefly by the file's hash and not repeated.
+const PARSE_CACHE_MS = 15 * 60_000;
+const parseCache = new Map();
+async function parseTranscriptOnce(buffer) {
+  const key = crypto.createHash('sha256').update(buffer).digest('hex');
+  const hit = parseCache.get(key);
+  if (hit && Date.now() - hit.at < PARSE_CACHE_MS) return hit.parsed;
+  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
+  const parsed = await parseTranscript(buffer, aiClient);
+  parseCache.set(key, { parsed, at: Date.now() });
+  if (parseCache.size > 200) parseCache.delete(parseCache.keys().next().value);
+  return parsed;
+}
+
 /** Forces the next evaluation to reload reference data (after equivalencies or decisions change). */
 export function invalidateEngine() {
   enginePromise = null;
@@ -48,8 +64,7 @@ export function invalidateEngine() {
  * BU start term). Catalog titles replace truncated ones, as on import.
  */
 export async function readTranscript(buffer) {
-  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
-  const parsed = await parseTranscript(buffer, aiClient);
+  const parsed = await parseTranscriptOnce(buffer);
   let courses = parsed.courses;
   let knownCodes;
   if (parsed.institution && courses.length) {
@@ -70,8 +85,7 @@ export async function readTranscript(buffer) {
  * Courses are appended after any already on the application, keeping transcript order.
  */
 export async function importTranscript(applicationId, documentId, buffer) {
-  const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
-  const parsed = await parseTranscript(buffer, aiClient);
+  const parsed = await parseTranscriptOnce(buffer);
   if (!parsed.institution || parsed.courses.length === 0) return { institution: parsed.institution, courses: 0 };
 
   // The PDF truncates long titles; use the catalog title when the course is known

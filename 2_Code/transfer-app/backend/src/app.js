@@ -58,6 +58,21 @@ export function createApp() {
     });
   }
 
+  // How long each API request takes: a Server-Timing header (visible in the browser's network panel) and a log line
+  // for slow requests, so production latency is measured rather than guessed. Only the method and path are logged.
+  const SLOW_REQUEST_MS = 1500;
+  app.use('/api', (req, res, next) => {
+    const start = process.hrtime.bigint();
+    const writeHead = res.writeHead;
+    res.writeHead = function timed(...args) {
+      const ms = Number(process.hrtime.bigint() - start) / 1e6;
+      if (!res.headersSent) res.setHeader('Server-Timing', `app;dur=${ms.toFixed(1)}`);
+      if (ms >= SLOW_REQUEST_MS) console.warn(`[Slow request] ${req.method} ${req.baseUrl}${req.path} ${Math.round(ms)} ms`);
+      return writeHead.apply(this, args);
+    };
+    next();
+  });
+
   app.use('/api', apiRoutes);
 
   // Deployments copy the built React app into backend/public and serve it from the same origin;

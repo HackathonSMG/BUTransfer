@@ -12,6 +12,7 @@ import { recordCourseDecision, recommendationOf } from '../credit/memory.service
 import { badRequest, notFound } from '../../utils/errors.js';
 import { courseKnowledge, matchLabel, recordResolution } from './knowledge.service.js';
 import { requestCourseInformation } from './information.service.js';
+import { reassignReview } from './assignment.service.js';
 import { refreshApplicationStatus, notifyCreditOffice } from './lifecycle.service.js';
 import { POLICY, RULE_SOURCES } from '../credit/policy.js';
 import { compareCourses } from '../credit/comparison.js';
@@ -19,6 +20,18 @@ import { getPrecedentIndex } from '../credit/precedent-index.js';
 import { buildBrief, suggestRequest, checkDecision } from './evaluation-context.js';
 
 const OPEN = ['new', 'in_progress', 'info_requested'];
+
+// The review package the evaluator's page last loaded, reused by the consistency check while the decision dialog is
+// open (it is re-checked on every outcome change). Kept for a minute and dropped as soon as the course changes.
+const CHECK_CONTEXT_MS = 60_000;
+const checkContext = new Map();
+function rememberCheckContext(reviewId, userId, pkg) {
+  checkContext.set(`${reviewId}|${userId}`, { pkg, at: Date.now() });
+  if (checkContext.size > 500) checkContext.delete(checkContext.keys().next().value);
+}
+function forgetCheckContext(reviewId) {
+  for (const key of checkContext.keys()) if (key.startsWith(`${reviewId}|`)) checkContext.delete(key);
+}
 const BU_CODE = /\bCAS [A-Z]{2} \d{3}\b/g;
 export const DECISIONS = ['accept', 'equivalent', 'different_course', 'elective', 'no_credit', 'reject'];
 
@@ -191,6 +204,7 @@ export async function getReview(reviewId, userId) {
   // The evaluation context: the evidence above summarised, and a specific request drawn from its gaps
   pkg.brief = buildBrief(pkg);
   pkg.suggested_request = suggestRequest(pkg);
+  rememberCheckContext(reviewId, userId, pkg);
   return pkg;
 }
 
@@ -200,7 +214,10 @@ export async function getReview(reviewId, userId) {
  * Takes the same body as decideReview; records nothing and never blocks the decision.
  */
 export async function checkReviewDecision(reviewId, { decision, bu_course: buCourse, elective_label: electiveLabel, units, conflict_action: conflictAction }, user) {
-  const pkg = await getReview(reviewId, user.id);
+  // Ownership is always checked first, so a course reassigned meanwhile can't be checked from a cached package
+  await ownReview(reviewId, user.id);
+  const cached = checkContext.get(`${reviewId}|${user.id}`);
+  const pkg = cached && Date.now() - cached.at < CHECK_CONTEXT_MS ? cached.pkg : await getReview(reviewId, user.id);
   let outcome;
   let award = null;
   let comparison = pkg.comparison;
@@ -297,9 +314,11 @@ export async function decideReview(reviewId, { decision, reason, bu_course: buCo
   }
 
   // A course with a conflict: record how the evaluator settled it for this transcript
-  if (conflictAction) {
-    const { rows: [tc] } = await query(`SELECT institution, COALESCE(catalog_code, course_code) AS code FROM transcript_courses WHERE id = $1`, [r.transcript_course_id]);
-    const { rows: [d] } = await query(`SELECT bu_award FROM course_decisions WHERE transcript_course_id = $1`, [r.transcript_course_id]);
+  const settleConflict = async () => {
+    const [{ rows: [tc] }, { rows: [d] }] = await Promise.all([
+      query(`SELECT institution, COALESCE(catalog_code, course_code) AS code FROM transcript_courses WHERE id = $1`, [r.transcript_course_id]),
+      query(`SELECT bu_award FROM course_decisions WHERE transcript_course_id = $1`, [r.transcript_course_id]),
+    ]);
     await recordResolution({ institution: tc.institution, courseCode: tc.code, action: conflictAction, buCourse: d?.bu_award || null, note: why || null, reviewId }, user);
     if (conflictAction === 'override') {
       await notifyCreditOffice({
@@ -308,22 +327,28 @@ export async function decideReview(reviewId, { decision, reason, bu_course: buCo
         data: { reference_number: r.reference_number, institution: tc.institution, course_code: tc.code },
       });
     }
-  }
+  };
 
-  const { rows: [final] } = await query(`SELECT outcome FROM course_decisions WHERE transcript_course_id = $1`, [r.transcript_course_id]);
+  // Independent steps run together (each one is a database round trip). Order is kept where it matters: the review
+  // is closed before its transfer request is checked, and the application status is computed last.
+  const [{ rows: [final] }] = await Promise.all([
+    query(`SELECT outcome FROM course_decisions WHERE transcript_course_id = $1`, [r.transcript_course_id]),
+    conflictAction ? settleConflict() : null,
+  ]);
   const status = final.outcome === 'no_credit' ? 'rejected' : 'approved';
   await query(`UPDATE course_reviews SET status = $1, completed_at = NOW() WHERE id = $2`, [status, reviewId]);
-  await query(`UPDATE information_requests SET status = 'resolved', resolved_at = NOW() WHERE transcript_course_id = $1 AND status <> 'resolved'`, [r.transcript_course_id]);
-  await auditLog({ applicationId: r.application_id, action: 'review_decided', actorId: user.id, actorEmail: user.email,
-    oldValue: { status: r.status }, newValue: { status }, details: { review_id: reviewId, decision, reason: why || null } });
-
-  if (r.transfer_request_id) {
-    await query(
-      `UPDATE transfer_requests SET status = 'completed', completed_at = NOW()
-       WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM course_reviews WHERE transfer_request_id = $1 AND status = ANY($2))`,
-      [r.transfer_request_id, OPEN]
-    );
-  }
+  await Promise.all([
+    query(`UPDATE information_requests SET status = 'resolved', resolved_at = NOW() WHERE transcript_course_id = $1 AND status <> 'resolved'`, [r.transcript_course_id]),
+    auditLog({ applicationId: r.application_id, action: 'review_decided', actorId: user.id, actorEmail: user.email,
+      oldValue: { status: r.status }, newValue: { status }, details: { review_id: reviewId, decision, reason: why || null } }),
+    r.transfer_request_id
+      ? query(
+        `UPDATE transfer_requests SET status = 'completed', completed_at = NOW()
+         WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM course_reviews WHERE transfer_request_id = $1 AND status = ANY($2))`,
+        [r.transfer_request_id, OPEN])
+      : null,
+  ]);
+  forgetCheckContext(reviewId);
 
   const transfer = await handOffIfDone(r.application_id, user);
   const applicationStatus = await refreshApplicationStatus(r.application_id, user.id);
@@ -333,6 +358,7 @@ export async function decideReview(reviewId, { decision, reason, bu_course: buCo
 /** Asks the student for the course syllabus (kind 'syllabus') or other information; the review waits for the answer. */
 export async function requestInformation(reviewId, { message, kind = 'information' }, user) {
   const r = await ownReview(reviewId, user.id);
+  forgetCheckContext(reviewId);
   if (!OPEN.includes(r.status)) throw badRequest('This evaluation has already been decided.');
   const text = String(message || '').trim();
   if (!text && kind !== 'syllabus') throw badRequest('Describe the information you need.');
@@ -393,6 +419,47 @@ async function handOffIfDone(applicationId, user) {
   return { request_number: tr.request_number, courses: batch.length };
 }
 
+// Why an evaluator hands a course back. Department and expertise go to the best eligible evaluator (never back to
+// the requester), else the Credit Evaluation Office queue; additional review and correction go to the office queue.
+export const REASSIGN_REASONS = {
+  different_department: { label: 'Course belongs to a different department', to: 'best_eligible', noteRequired: false },
+  outside_expertise: { label: 'Outside my area of expertise', to: 'best_eligible', noteRequired: false },
+  additional_review: { label: 'Needs additional review', to: 'office', noteRequired: true },
+  correction: { label: 'Evaluation needs correction', to: 'office', noteRequired: true },
+};
+
+/**
+ * The evaluator hands an open course back for reassignment. The move goes through reassignReview, so the
+ * assignment history keeps every holder (the requester's assignment ends with this reason) and the audit trail
+ * records who asked and why. Nothing about the course is decided or lost.
+ */
+export async function requestReassignment(reviewId, { reason, note }, user) {
+  const r = await ownReview(reviewId, user.id);
+  forgetCheckContext(reviewId);
+  if (!OPEN.includes(r.status)) throw badRequest('Only an open course can be handed back for reassignment.');
+  const kind = REASSIGN_REASONS[reason];
+  if (!kind) throw badRequest(`Reason must be one of: ${Object.keys(REASSIGN_REASONS).join(', ')}.`);
+  const text = String(note || '').trim();
+  if (kind.noteRequired && !text) throw badRequest('Describe what needs to be reviewed or corrected.');
+
+  // The requester's assignment ends with the reason they gave; reassignReview then records the new holder
+  await query(`UPDATE review_assignments SET end_reason = $1 WHERE review_id = $2 AND ended_at IS NULL`,
+    [`Handed back: ${kind.label}${text ? ` (${text})` : ''}`, reviewId]);
+  const why = `${kind.label}, requested by ${user.full_name}${text ? ` · ${text}` : ''}`;
+  const moved = await reassignReview(reviewId, kind.to === 'office' ? null : 'auto', user, why);
+  await auditLog({ applicationId: r.application_id, action: 'reassignment_requested', actorId: user.id, actorEmail: user.email,
+    details: { review_id: reviewId, reason, note: text || null, to: moved.evaluator || 'Credit Evaluation Office' } });
+  if (!moved.evaluator_id) {
+    const { rows: [tc] } = await query(`SELECT course_code FROM transcript_courses WHERE id = $1`, [r.transcript_course_id]);
+    await notifyCreditOffice({
+      applicationId: r.application_id, type: 'assignment_needed', title: `Reassignment requested: ${tc?.course_code} (${r.reference_number})`,
+      message: `${user.full_name} handed back ${tc?.course_code}: ${kind.label.toLowerCase()}${text ? ` — ${text}` : ''}.`,
+      data: { reference_number: r.reference_number, review_id: reviewId },
+    });
+  }
+  return { review_id: reviewId, to: moved.evaluator || null, queue: moved.queue };
+}
+
 /**
  * Asks the Credit Evaluation Office (or administrators) to review a potential equivalency conflict; recorded
  * as an 'additional_review' resolution step and in the audit trail.
@@ -416,4 +483,4 @@ export async function escalate(reviewId, { note }, user) {
   return { escalated: true, notified: recipients.rows.length };
 }
 
-export default { getReview, checkReviewDecision, startReview, decideReview, requestInformation, escalate, DECISIONS };
+export default { getReview, checkReviewDecision, startReview, decideReview, requestInformation, requestReassignment, escalate, DECISIONS, REASSIGN_REASONS };

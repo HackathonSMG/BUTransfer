@@ -52,22 +52,22 @@ function scrubReason(reason, application) {
  * @param {{ applicationId, courseId, action: 'approve'|'change'|'reject', outcome?, buAward?, reason?, decisionType?, units?, conflictAction?, user }} input
  */
 export async function recordCourseDecision({ applicationId, courseId, action, outcome, buAward, reason, decisionType, units, conflictAction = null, user }) {
-  const { rows: [course] } = await query(
-    `SELECT tc.*, a.student_name, a.student_email, a.student_phone
-     FROM transcript_courses tc JOIN applications a ON a.id = tc.application_id
-     WHERE tc.id = $1 AND tc.application_id = $2`,
-    [courseId, applicationId]
-  );
+  // The three lookups are independent, so they run together (one database round trip instead of three)
+  const [{ rows: [course] }, { rows: [posted] }, { rows: [ev] }] = await Promise.all([
+    query(
+      `SELECT tc.*, a.student_name, a.student_email, a.student_phone
+       FROM transcript_courses tc JOIN applications a ON a.id = tc.application_id
+       WHERE tc.id = $1 AND tc.application_id = $2`,
+      [courseId, applicationId]),
+    query(`SELECT 1 FROM credit_postings WHERE transcript_course_id = $1`, [courseId]),
+    query(
+      `SELECT ce.* FROM course_evaluations ce
+       WHERE ce.transcript_course_id = $1
+         AND ce.ai_evaluation_id = (SELECT id FROM ai_evaluations WHERE application_id = $2 ORDER BY created_at DESC LIMIT 1)`,
+      [courseId, applicationId]),
+  ]);
   if (!course) throw notFound('Transcript course');
-  const { rows: [posted] } = await query(`SELECT 1 FROM credit_postings WHERE transcript_course_id = $1`, [courseId]);
   if (posted) throw badRequest('This course has already been posted to the student record; its decision can no longer change.');
-
-  const { rows: [ev] } = await query(
-    `SELECT ce.* FROM course_evaluations ce
-     WHERE ce.transcript_course_id = $1
-       AND ce.ai_evaluation_id = (SELECT id FROM ai_evaluations WHERE application_id = $2 ORDER BY created_at DESC LIMIT 1)`,
-    [courseId, applicationId]
-  );
   const rec = recommendationOf(ev);
 
   let decision;
