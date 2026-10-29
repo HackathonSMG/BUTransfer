@@ -9,6 +9,9 @@ import Button from '../ui/Button'
 // The evaluation report for staff: missing documents, flags, the course-evaluation summary and the full report.
 // Students are already admitted, so no admission-eligibility score is shown.
 
+// Badge colour for each flag type the backend reports (buildEvaluationResult in application.service.js)
+const FLAG_VARIANTS = { positive: 'success', concern: 'warning', critical: 'error' }
+
 export default function AIEvaluationReport({ evaluation, onTrigger, triggering = false }) {
   const [showFullReport, setShowFullReport] = useState(false)
 
