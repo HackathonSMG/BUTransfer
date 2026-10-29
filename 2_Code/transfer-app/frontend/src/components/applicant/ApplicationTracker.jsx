@@ -185,7 +185,6 @@ function CreditSummary({ summary, complete }) {
   ]
   const counts = [
     ['Courses Evaluated', `${summary.decided} of ${summary.courses}`],
-    ['Matched Automatically', summary.courses_matched_automatically],
     ['With Department Review', summary.courses_in_department_review],
     ['Waiting for Your Syllabus', summary.courses_awaiting_syllabus],
     ['Courses Pending', summary.pending]
@@ -213,7 +212,7 @@ function CreditSummary({ summary, complete }) {
         ))}
       </div>
       <p className={`mx-5 sm:mx-6 mb-4 rounded-lg px-3.5 py-2.5 text-sm ${summary.needs_student_action && !complete ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'bg-gray-50 text-gray-700'}`}>{next}</p>
-      <dl className="grid grid-cols-2 sm:grid-cols-5 border-t border-gray-100">
+      <dl className="grid grid-cols-2 sm:grid-cols-4 border-t border-gray-100">
         {counts.map(([k, v]) => (
           <div key={k} className="px-5 sm:px-6 py-3 border-gray-100 [&:not(:last-child)]:sm:border-r">
             <dt className="text-[11.5px] text-gray-500">{k}</dt>
