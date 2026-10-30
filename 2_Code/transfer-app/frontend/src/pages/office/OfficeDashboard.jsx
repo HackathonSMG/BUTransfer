@@ -190,29 +190,32 @@ function FinalReview({ rows, total }) {
 function FinalReviewRow({ a }) {
   const duplicate = a.duplicate_status === 'suspected'
   const ready = groupOf(a) === 'ready'
-  const decided = a.decided_unposted + a.posted
+  const pending = Math.max(0, a.courses - a.decided_unposted - a.posted)
   const tint = duplicate ? 'bg-amber-50 text-amber-800' : ready ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
   const share = n => `${a.courses > 0 ? Math.min(100, (n / a.courses) * 100) : 0}%`
   return (
     <Link to={`/office/applications/${a.id}`} className="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2 px-6 py-3 hover:bg-staff-bg">
       <span className={`w-9 h-9 rounded-full grid place-items-center text-[12px] font-semibold flex-shrink-0 ${tint}`} aria-hidden="true">{initials(a.student_name)}</span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2 text-[15px] font-medium text-staff-ink">
-          <span className="truncate">{a.student_name}</span>
-          {duplicate && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 whitespace-nowrap"><Copy className="w-3 h-3" aria-hidden="true" />Possible duplicate</span>}
-        </span>
+        <span className="block truncate text-[15px] font-medium text-staff-ink">{a.student_name}</span>
         <span className="block text-[12.5px] text-staff-muted truncate"><span className="font-mono">{a.reference_number}</span> · {a.transfer_from_institution}</span>
+        {duplicate && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 whitespace-nowrap"><Copy className="w-3 h-3" aria-hidden="true" />Possible duplicate</span>}
       </span>
-      <span className="w-full sm:w-40 flex-shrink-0">
+      <span className="w-full sm:w-44 flex-shrink-0" title={`${a.decided_unposted} ready to post, ${a.posted} posted, ${pending} still pending, of ${a.courses} courses`}>
         <span className="flex h-1.5 rounded-full bg-staff-line2 overflow-hidden" aria-hidden="true">
           <span className="bg-slate-400" style={{ width: share(a.posted) }} />
           <span className="bg-emerald-500" style={{ width: share(a.decided_unposted) }} />
+          <span className="bg-amber-400" style={{ width: share(pending) }} />
         </span>
-        <span className="block text-[11.5px] text-staff-muted mt-1 tabular-nums">
-          {a.decided_unposted} to post{a.posted ? ` · ${a.posted} posted` : ''} of {a.courses}{decided < a.courses ? ` · ${a.courses - decided} pending` : ''}
+        {/* What the bar shows, by colour: ready to post, already posted, still with departments */}
+        <span className="mt-1 flex flex-wrap gap-x-2.5 text-[11.5px] tabular-nums leading-snug">
+          <span className="inline-flex items-center gap-1 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />{a.decided_unposted} to post</span>
+          {a.posted > 0 && <span className="inline-flex items-center gap-1 text-staff-muted"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" aria-hidden="true" />{a.posted} posted</span>}
+          {pending > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" aria-hidden="true" />{pending} pending</span>}
+          <span className="text-staff-muted">of {a.courses}</span>
         </span>
       </span>
-      <span className="flex-shrink-0 sm:w-[118px] flex sm:justify-end">
+      <span className="flex-shrink-0 sm:w-[172px] flex sm:justify-end">
         {duplicate ? (
           <span className="inline-flex items-center rounded-lg border border-staff-line bg-white px-3 py-1.5 text-[12.5px] font-medium text-staff-ink">Resolve first</span>
         ) : ready ? (
