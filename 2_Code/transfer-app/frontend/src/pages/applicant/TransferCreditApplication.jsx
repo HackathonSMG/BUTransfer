@@ -273,7 +273,7 @@ export function SubmissionFlow({ accountEmail, onBehalf = null }) {
             <ReviewCard icon={Landmark} tone="sky" title={`Transcripts (${transcripts.length})`} subtitle="Open a college to see its courses; correct any that were read wrongly"
               right={<button type="button" onClick={() => setStep(1)} className="text-[13px] font-semibold text-brand hover:underline">Add or remove</button>}>
               <ul className="divide-y divide-gray-100">
-                {transcripts.map(t => <TranscriptSummary key={t.key} t={t} defaultOpen={transcripts.length <= 2} onReview={review => reviewTranscript(t.key, review)} />)}
+                {transcripts.map(t => <TranscriptSummary key={t.key} t={t} onReview={review => reviewTranscript(t.key, review)} />)}
               </ul>
             </ReviewCard>
 
@@ -796,10 +796,12 @@ const COURSE_FIELDS = [
 const sameValue = (a, b) => String(a ?? '').trim() === String(b ?? '').trim()
 const changedFields = (original, course) => COURSE_FIELDS.filter(f => !sameValue(original[f.key], course[f.key])).map(f => f.label.toLowerCase())
 
-function TranscriptSummary({ t, onReview, defaultOpen = false }) {
+function TranscriptSummary({ t, onReview }) {
   const r = t.result
   const review = t.review
-  const [open, setOpen] = useState(Boolean(r?.check_carefully) || defaultOpen)
+  // Starts collapsed; the header says when a transcript needs a careful check. It starts open only when the
+  // college is missing from the transcript, because the required college field is inside
+  const [open, setOpen] = useState(t.status === 'read' && !r?.institution)
   const [editing, setEditing] = useState(false)
   const setInstitution = (institution) => onReview({ ...review, institution })
   // Not read automatically: only the institution is asked for; the office enters the courses
@@ -827,6 +829,10 @@ function TranscriptSummary({ t, onReview, defaultOpen = false }) {
             {r.courses.length} course{r.courses.length === 1 ? '' : 's'} found · {r.credit_system || 'calendar not shown'}{r.student?.student_id ? ` · Student ID ${r.student.student_id}` : ''}
             {(edits > 0 || institutionEdited) && <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 text-brand font-medium"><Pencil className="w-3 h-3" />{edits + (institutionEdited ? 1 : 0)} edited</span>}
           </span>
+          {r.check_carefully && (
+            <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-800"><AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              Please check carefully: {open ? 'correct any course that was read wrongly' : 'open to review each course'}</span>
+          )}
         </span>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

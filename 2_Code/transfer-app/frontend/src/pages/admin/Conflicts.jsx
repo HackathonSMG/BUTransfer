@@ -51,8 +51,8 @@ export default function Conflicts() {
   const [state, setState] = useState({ loading: true, rows: [], error: null })
   const [resolving, setResolving] = useState(null)
   const [marking, setMarking] = useState(null)
-  // Which conflicts are open in full; until one is toggled, the most urgent is
-  const [expanded, setExpanded] = useState(null)
+  // Which conflicts are open in full; all start collapsed
+  const [expanded, setExpanded] = useState(() => new Set())
 
   const load = useCallback(async () => {
     try {
@@ -67,10 +67,10 @@ export default function Conflicts() {
 
   // Most open reviews first: those conflicts reach evaluators soonest
   const rows = [...state.rows].sort((a, b) => b.open_reviews - a.open_reviews)
-  const isOpen = (c, i) => (expanded ? expanded.has(keyOf(c)) : i === 0)
-  const toggle = (c, i) => setExpanded(prev => {
-    const next = new Set(prev || (rows[0] ? [keyOf(rows[0])] : []))
-    if (isOpen(c, i)) next.delete(keyOf(c)); else next.add(keyOf(c))
+  const isOpen = (c) => expanded.has(keyOf(c))
+  const toggle = (c) => setExpanded(prev => {
+    const next = new Set(prev)
+    if (next.has(keyOf(c))) next.delete(keyOf(c)); else next.add(keyOf(c))
     return next
   })
 

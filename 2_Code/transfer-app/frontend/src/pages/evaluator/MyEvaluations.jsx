@@ -122,7 +122,7 @@ export default function MyEvaluations() {
           <>
             <ul className="divide-y divide-staff-line2">
               {groupByApplication(state.rows).map(g => (
-                <ApplicationGroup key={g.application_id} g={g} defaultOpen={Boolean(search) || g.rows.length === 1} />
+                <ApplicationGroup key={g.application_id} g={g} defaultOpen={Boolean(search)} />
               ))}
             </ul>
             <div className="px-5 py-3 border-t border-staff-line2 text-[12.5px] text-staff-muted flex flex-wrap gap-x-5 gap-y-1">

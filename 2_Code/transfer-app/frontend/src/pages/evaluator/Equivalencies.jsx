@@ -47,7 +47,7 @@ export default function Equivalencies() {
   const [institution, setInstitution] = useState('')
   const [status, setStatus] = useState('active')
   const [shown, setShown] = useState(PAGE_SIZE)
-  const [collapsed, setCollapsed] = useState(() => new Set())
+  const [expanded, setExpanded] = useState(() => new Set()) // institution groups start collapsed
 
   const load = useCallback(async () => {
     setState(p => ({ ...p, loading: true }))
@@ -107,7 +107,7 @@ export default function Equivalencies() {
     return [...by.values()]
   }, [rows, shown, tab])
 
-  const toggleGroup = (key) => setCollapsed(prev => {
+  const toggleGroup = (key) => setExpanded(prev => {
     const next = new Set(prev)
     next.has(key) ? next.delete(key) : next.add(key)
     return next
@@ -237,7 +237,7 @@ export default function Equivalencies() {
               /* Grouped by institution; each row reads left to right as a mapping */
               groups.map((g, gi) => {
                 const key = `${tab}:${g.institution}`
-                const open = !collapsed.has(key)
+                const open = expanded.has(key)
                 const listId = `eq-group-${tab}-${gi}`
                 return (
                   <div key={key}>

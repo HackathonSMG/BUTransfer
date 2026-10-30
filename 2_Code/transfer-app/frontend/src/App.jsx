@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import Layout from './components/layout/Layout'
+import ScrollToTop from './components/layout/ScrollToTop'
 
 import Home from './pages/Home'
 import TransferCreditApplication from './pages/applicant/TransferCreditApplication'
@@ -45,6 +46,7 @@ function EvaluatorHome() {
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         {/* Public applicant routes: no account needed */}
         <Route path="/" element={<Layout isPublic><Home /></Layout>} />
