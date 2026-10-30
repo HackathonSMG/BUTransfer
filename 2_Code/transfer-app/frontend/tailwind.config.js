@@ -18,6 +18,8 @@ export default {
           dark: '#990000',
           light: '#ff3333'
         },
+        // Warm page background for the student pages
+        paper: '#faf8f6',
         // Staff portal surfaces and text, taken from the Transfer Credit Copilot prototype
         staff: {
           bg: '#f6f7f9',
@@ -35,7 +37,9 @@ export default {
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.03)',
         lift: '0 1px 3px rgba(16,24,40,.06), 0 4px 12px rgba(16,24,40,.05)',
-        pop: '0 12px 32px rgba(16,24,40,.14)'
+        pop: '0 12px 32px rgba(16,24,40,.14)',
+        // Cards that sit over the red band
+        raised: '0 12px 32px -12px rgba(16,24,40,.22)'
       }
     }
   },

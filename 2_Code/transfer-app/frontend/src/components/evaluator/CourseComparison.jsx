@@ -17,7 +17,7 @@ const CREDIT_NOTE = {
   unknown: 'Credit hours not known for one of the courses'
 }
 
-export default function CourseComparison({ comparison: c, src, buCourses = [] }) {
+export default function CourseComparison({ comparison: c, src, buCourses = [], number = null }) {
   const [showTopics, setShowTopics] = useState(false)
   if (!c) return null
   const oc = c.outcome_coverage
@@ -27,7 +27,10 @@ export default function CourseComparison({ comparison: c, src, buCourses = [] })
     <section className="staff-card mt-6 overflow-hidden" aria-labelledby="course-comparison">
       <div className="px-6 sm:px-8 pt-6 pb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="course-comparison" className="text-[17px] font-semibold text-staff-ink">Course comparison</h2>
+          <h2 id="course-comparison" className="flex items-center gap-2.5 text-[16px] font-semibold text-staff-ink">
+            {number != null && <span className="w-6 h-6 rounded-md bg-staff-ink text-white grid place-items-center text-[12px] font-semibold" aria-hidden="true">{number}</span>}
+            Course comparison
+          </h2>
           <p className="text-[13px] text-staff-muted mt-0.5">
             {c.has_source_text
               ? <>Compared using the {c.based_on.join(', ')}.</>
@@ -35,8 +38,12 @@ export default function CourseComparison({ comparison: c, src, buCourses = [] })
           </p>
         </div>
         {c.has_source_text && oc.total > 0 && (
-          <p className="text-[13px] text-staff-ink2">
-            <span className="text-[22px] font-semibold text-staff-ink tabular-nums">{oc.covered}</span> of {oc.total} BU learning outcomes covered
+          <p className="flex items-center gap-2.5 text-[13px] text-staff-ink2">
+            <span className="w-28 h-2 rounded-full bg-staff-line2 overflow-hidden flex" aria-hidden="true">
+              <span className="bg-emerald-500" style={{ width: `${(oc.covered / oc.total) * 100}%` }} />
+              <span className="bg-amber-400" style={{ width: `${(oc.partial / oc.total) * 100}%` }} />
+            </span>
+            <span><span className="font-display text-[20px] font-semibold text-staff-ink tabular-nums">{oc.covered}</span> of {oc.total} BU learning outcomes covered</span>
             {oc.partial > 0 && <span className="text-staff-muted"> · {oc.partial} partly</span>}
           </p>
         )}

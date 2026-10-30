@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, Check, Lock, Mail, FileSearch, Send, AlertCircle, AlertTriangle, CheckCircle2,
-  UploadCloud, FileText, X, RotateCcw, Loader2, ChevronDown, Pencil
+  FileText, X, RotateCcw, Loader2, ChevronDown, Pencil, ArrowUp, Plus, UserRound, Landmark, Paperclip, MessageSquareText,
+  FileCheck2, Building2, ScanLine, Sparkles, ShieldCheck, Eye
 } from 'lucide-react'
 import notify from '../../lib/notify'
 import {
@@ -14,7 +15,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
-import PublicHero from '../../components/layout/PublicHero'
+import students from '../../assets/campus-students.jpg'
 import { ACCEPTED, MAX_MB, formatSize } from '../../components/applicant/DocumentDropzone'
 import { PROGRAMS, TERMS, PROGRAM_DEPARTMENTS } from '../../lib/application'
 import { homeFor, ROLE_LABELS } from '../../lib/homeFor'
@@ -191,70 +192,65 @@ function SubmissionFlow({ accountEmail }) {
     }
   }
 
-  return (
-    <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
-      <PublicHero title="Transfer Credit Evaluation"
-        intro="For admitted transfer students. Upload the final transcript from every college you attended. We read your details and courses from the transcripts; you confirm them and submit. You then receive a Transfer Credit ID to follow the evaluation. No account is needed.">
-        <span className="inline-flex items-center gap-1.5"><FileSearch className="w-4 h-4" />Details read from your transcript</span>
-        <span className="inline-flex items-center gap-1.5"><Lock className="w-4 h-4" />Nothing is stored until you submit</span>
-        <span className="inline-flex items-center gap-1.5"><Mail className="w-4 h-4" />Updates by email</span>
-      </PublicHero>
+  // Sections the student completes on the review step, for the progress line above the submit button
+  const sections = [finalName.length >= 2, Boolean(finalProgram), Boolean(finalTerm), institutionsOk, Boolean(emailOk)]
+  const sectionsDone = sections.filter(Boolean).length
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        <Stepper step={step} />
-
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mt-6">
-          {existing && !allowAnother ? (
+  // An earlier evaluation for this email: shown on its own, under the band
+  if (existing && !allowAnother) {
+    return (
+      <div className="bg-paper min-h-[calc(100vh-4rem)]">
+        <StepBand step={2} title="Before you submit" intro="We found transcripts already submitted with this email address." />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-raised">
             <ExistingEvaluations email={email.trim()} result={existing} busy={submitting}
               onAnother={() => { setAllowAnother(true); setExisting(null) }} onBack={() => setExisting(null)} />
-          ) : step === 1 ? (
-            <Body title="Upload your official transcript(s)" intro="Add the final transcript from every college you attended. Each file is read as soon as you add it.">
-              <TranscriptDrop onFiles={addTranscripts} />
-              {transcripts.length > 0 && (
-                <ul className="space-y-2">
-                  {transcripts.map(t => <TranscriptItem key={t.key} t={t} onRemove={() => removeTranscript(t.key)} onRetry={() => read(t)} />)}
-                </ul>
-              )}
-              {usable.length > 0 && !reading && readable.length === 0 && (
-                <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2 flex gap-1.5" role="status"><AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />No courses could be read automatically. You can still continue: the Credit Evaluation Office will read your transcript and enter the courses.</p>
-              )}
-            </Body>
-          ) : (
-            <Body title="Review and confirm" intro="Check the details read from your transcripts and correct anything that is wrong. Only what the transcripts did not show is asked for.">
-              {/* Student details */}
-              <section className="rounded-xl border border-gray-200">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-900">Student information</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />Filled in from your transcript. Please check these are right, and edit anything that is wrong.</p>
-                </div>
-                <dl className="divide-y divide-gray-100">
-                  <DetectedField label="Name" value={detected.name} conflict={names.length > 1 ? names : null}
-                    edited={edited.name} onEdit={() => editDetail('name')} onRestore={() => restoreDetail('name')}
-                    input={<Input aria-label="Your full name" value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} placeholder="Your full name" />} />
-                  <DetectedField label="Student ID" value={studentIds.join(', ') || null} optional note="As printed on your transcript" />
-                  <DetectedField label="BU program" value={detected.program} conflict={programs.length > 1 ? programs : null}
-                    edited={edited.program} onEdit={() => editDetail('program')} onRestore={() => restoreDetail('program')}
-                    note="Used for program rules and to route your courses"
-                    input={<Select aria-label="BU program" options={PROGRAMS} value={manual.program} onChange={e => setManual(m => ({ ...m, program: e.target.value }))} placeholder="Select your BU program" />} />
-                  <DetectedField label="BU start term" value={detected.term} conflict={terms.length > 1 ? terms : null}
-                    edited={edited.term} onEdit={() => editDetail('term')} onRestore={() => restoreDetail('term')}
-                    note="All transfer credit must be transferred within one year of starting at BU"
-                    input={<Select aria-label="BU start term" options={TERMS} value={manual.term} onChange={e => setManual(m => ({ ...m, term: e.target.value }))} placeholder="Select your start term" />} />
-                </dl>
-              </section>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-              {/* Transcripts */}
-              <section className="rounded-xl border border-gray-200">
-                <h3 className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-900">Transcripts ({transcripts.length})</h3>
-                <ul className="divide-y divide-gray-100">
-                  {transcripts.map(t => <TranscriptSummary key={t.key} t={t} onReview={review => reviewTranscript(t.key, review)} />)}
-                </ul>
-                <button type="button" onClick={() => setStep(1)} className="px-4 py-3 border-t border-gray-100 w-full text-left text-sm font-medium text-brand hover:bg-gray-50">Add or remove transcripts</button>
-              </section>
+  // ---- Step 2: the transcript on the left, what was read (editable) on the right ----
+  if (step === 2) {
+    return (
+      <div className="bg-paper min-h-[calc(100vh-4rem)]">
+        <StepBand step={2} title="Check what we read" intro="Your transcript is on the left. Correct anything on the right that doesn't match it." />
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <aside className="lg:col-span-5 lg:sticky lg:top-20">
+            <DocumentPreview transcripts={usable} />
+          </aside>
 
-              {/* Contact */}
-              <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-900">Email for updates <span className="font-normal text-gray-500">(not on a transcript)</span></h3>
+          <div className="lg:col-span-7 space-y-5">
+            <ReviewCard icon={UserRound} tone="red" title="You" subtitle="Read from your transcript; the BU details are asked for"
+              right={!(finalName.length >= 2 && finalProgram && finalTerm)
+                ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11.5px] font-medium text-amber-800">To complete</span>
+                : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-medium text-emerald-700">Complete</span>}>
+              <dl className="p-5 sm:p-6 grid sm:grid-cols-2 gap-4">
+                <DetectedField label="Name" value={detected.name} conflict={names.length > 1 ? names : null}
+                  edited={edited.name} onEdit={() => editDetail('name')} onRestore={() => restoreDetail('name')}
+                  input={<Input aria-label="Your full name" value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} placeholder="Your full name" />} />
+                <DetectedField label="Student ID" value={studentIds.join(', ') || null} optional note="As printed on your transcript" />
+                <DetectedField label="BU program" value={detected.program} conflict={programs.length > 1 ? programs : null}
+                  edited={edited.program} onEdit={() => editDetail('program')} onRestore={() => restoreDetail('program')}
+                  note="Routes your courses to the right department"
+                  input={<Select aria-label="BU program" options={PROGRAMS} value={manual.program} onChange={e => setManual(m => ({ ...m, program: e.target.value }))} placeholder="Select your BU program" />} />
+                <DetectedField label="BU start term" value={detected.term} conflict={terms.length > 1 ? terms : null}
+                  edited={edited.term} onEdit={() => editDetail('term')} onRestore={() => restoreDetail('term')}
+                  note="Credit must transfer within a year of starting at BU"
+                  input={<Select aria-label="BU start term" options={TERMS} value={manual.term} onChange={e => setManual(m => ({ ...m, term: e.target.value }))} placeholder="Select your start term" />} />
+              </dl>
+            </ReviewCard>
+
+            <ReviewCard icon={Landmark} tone="sky" title={`Transcripts (${transcripts.length})`} subtitle="Open a college to see its courses; correct any that were read wrongly"
+              right={<button type="button" onClick={() => setStep(1)} className="text-[13px] font-semibold text-brand hover:underline">Add or remove</button>}>
+              <ul className="divide-y divide-gray-100">
+                {transcripts.map(t => <TranscriptSummary key={t.key} t={t} defaultOpen={transcripts.length <= 2} onReview={review => reviewTranscript(t.key, review)} />)}
+              </ul>
+            </ReviewCard>
+
+            <ReviewCard icon={Mail} tone="violet" title="Where we send updates" subtitle="Not on a transcript">
+              <div className="p-5 sm:p-6 space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Input label="Email address" required type="email" autoComplete="email" value={email} disabled={Boolean(accountEmail)}
                     onChange={e => { setEmail(e.target.value); setAllowAnother(false); draft.current = { token: null, uploaded: new Set() } }} placeholder="you@example.com"
@@ -265,88 +261,433 @@ function SubmissionFlow({ accountEmail }) {
                       error={confirmEmail && email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase() ? 'The email addresses do not match' : ''} />
                   )}
                 </div>
-              </section>
+                <Optional icon={Paperclip} title="Supporting documents" hint="optional">
+                  <p className="text-sm text-gray-500 mb-2">For example course descriptions or other academic records. If a department needs a syllabus for a course, we will ask you for it.</p>
+                  <SupportingFiles files={supporting} onChange={setSupporting} />
+                </Optional>
+                <Optional icon={MessageSquareText} title="Additional information" hint="optional">
+                  <textarea value={comments} onChange={e => setComments(e.target.value.slice(0, COMMENTS_MAX))} rows={4} aria-label="Additional information"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                    placeholder="Anything else the transfer credit team should know, for example a course that was renamed." />
+                </Optional>
+              </div>
+            </ReviewCard>
 
-              {/* Optional */}
-              <Optional title="Supporting documents (optional)">
-                <p className="text-sm text-gray-500 mb-2">For example course descriptions or other academic records. If a department needs a syllabus for a course, we will ask you for it.</p>
-                <SupportingFiles files={supporting} onChange={setSupporting} />
-              </Optional>
-              <Optional title="Additional information (optional)">
-                <textarea value={comments} onChange={e => setComments(e.target.value.slice(0, COMMENTS_MAX))} rows={4} aria-label="Additional information"
-                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                  placeholder="Anything else the transfer credit team should know, for example a course that was renamed." />
-              </Optional>
-
-              <label className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors ${ready ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} ${confirmed ? 'border-brand/60 bg-red-50/40' : 'border-gray-200'}`}>
-                <input type="checkbox" checked={confirmed} disabled={!ready} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#cc0000] flex-shrink-0" />
-                <span className="text-sm text-gray-700">I confirm that the information above is correct and I want to submit these transcripts for transfer credit evaluation.</span>
-              </label>
-              {!ready && <p className="text-xs text-gray-500 -mt-3">Complete the details above to confirm.</p>}
-              {progress && <p className="text-sm text-primary-700 flex items-center gap-2"><Spinner size="sm" />{progress}</p>}
-              {submitError && <p className="text-sm text-red-700 flex gap-1.5" role="alert"><AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{submitError}</p>}
-            </Body>
-          )}
-
-          {!(existing && !allowAnother) && (
-            <footer className="flex items-center justify-between gap-3 px-5 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/60 rounded-b-2xl">
-              {step === 1
-                ? <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"><ChevronLeft className="w-4 h-4" />Home</Link>
-                : <Button variant="secondary" onClick={() => setStep(1)} disabled={submitting}><ChevronLeft className="w-4 h-4" />Back</Button>}
-              {step === 1
-                ? <Button onClick={goReview} disabled={reading || usable.length === 0}>{reading ? <><Loader2 className="w-4 h-4 animate-spin" />Reading…</> : <>Review details<ChevronRight className="w-4 h-4" /></>}</Button>
-                : <Button onClick={submit} disabled={!canSubmit} loading={submitting}><Send className="w-4 h-4" />Submit for Credit Evaluation</Button>}
-            </footer>
-          )}
+            {/* Confirm and submit */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-card">
+              <div className="p-5 sm:p-6 space-y-4">
+                <label className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors ${ready ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} ${confirmed ? 'border-brand/60 bg-red-50/40' : 'border-gray-200'}`}>
+                  <input type="checkbox" checked={confirmed} disabled={!ready} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#cc0000] flex-shrink-0" />
+                  <span className="text-sm text-gray-700">I confirm that the information above is correct and I want to submit these transcripts for transfer credit evaluation.</span>
+                </label>
+                <div className="flex items-center gap-3 text-[13px] text-gray-500">
+                  <span className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden" aria-hidden="true">
+                    <span className="block h-full rounded-full bg-gradient-to-r from-brand to-brand-dark transition-all" style={{ width: `${(sectionsDone / sections.length) * 100}%` }} />
+                  </span>
+                  <span>{sectionsDone} of {sections.length} details complete{!ready ? ' · complete the details above to confirm' : ''}</span>
+                </div>
+                {progress && <p className="text-sm text-primary-700 flex items-center gap-2"><Spinner size="sm" />{progress}</p>}
+                {submitError && <p className="text-sm text-red-700 flex gap-1.5" role="alert"><AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{submitError}</p>}
+              </div>
+              <footer className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/60 rounded-b-2xl">
+                <Button variant="secondary" onClick={() => setStep(1)} disabled={submitting}><ChevronLeft className="w-4 h-4" />Back</Button>
+                <Button onClick={submit} disabled={!canSubmit} loading={submitting}><Send className="w-4 h-4" />Submit for Credit Evaluation</Button>
+              </footer>
+            </div>
+          </div>
         </div>
+      </div>
+    )
+  }
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already submitted? <Link to="/track" className="font-semibold text-brand hover:underline">Track your transfer credit</Link>
-        </p>
+  // ---- Step 1: what the student is about to do on the left, the upload on the right; once files are added,
+  // the documents on the left and what was found on the right ----
+  const hasFiles = transcripts.length > 0
+  return (
+    <div className="bg-paper min-h-[calc(100vh-4rem)] relative">
+      <div className={`absolute inset-x-0 top-0 bg-gradient-to-br from-brand to-brand-dark ${hasFiles ? 'h-[200px]' : 'h-[330px]'}`} aria-hidden="true" />
+      <div className="relative max-w-[1216px] mx-auto px-4 sm:px-6 pt-10 pb-14 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <section className="lg:col-span-5">
+          {hasFiles
+            ? <DocumentsPanel transcripts={transcripts} onFiles={addTranscripts} onRemove={removeTranscript} onRetry={read} />
+            : <StoryPanel />}
+        </section>
+
+        <section className="lg:col-span-7">
+          <div className="bg-white rounded-2xl shadow-raised border border-gray-200/70 overflow-hidden">
+            {hasFiles ? (
+              <FoundSummary transcripts={transcripts} readable={readable} usable={usable} reading={reading}
+                student={{ name: detected.name, studentId: studentIds.join(', ') }} />
+            ) : (
+              <>
+                <div className="px-6 sm:px-8 pt-7 pb-6 border-b border-gray-100 flex items-start justify-between gap-6">
+                  <div>
+                    <p className="text-[12px] font-semibold text-brand tracking-wide uppercase">Step 1 of 3</p>
+                    <h2 className="text-[22px] font-semibold text-gray-900 mt-1">Upload your official transcripts</h2>
+                    <p className="text-[14px] text-gray-500 mt-1">Each file is read as soon as you add it. Nothing is stored until you submit.</p>
+                  </div>
+                  <StepDots step={1} />
+                </div>
+                <div className="px-6 sm:px-8 py-7">
+                  <TranscriptDrop onFiles={addTranscripts} />
+                  <div className="mt-6 grid sm:grid-cols-3 gap-3">
+                    <Tip icon={FileCheck2} tone="emerald" title="Use the official copy" text="The PDF your college issued reads best" />
+                    <Tip icon={Building2} tone="sky" title="One per college" text="Add every college you attended" />
+                    <Tip icon={ScanLine} tone="violet" title="Scans are fine" text="The office reads anything we can't" />
+                  </div>
+                </div>
+              </>
+            )}
+            <footer className="flex items-center justify-between gap-3 px-6 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/70">
+              <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"><ChevronLeft className="w-4 h-4" />Home</Link>
+              <Button onClick={goReview} disabled={reading || usable.length === 0}>{reading ? <><Loader2 className="w-4 h-4 animate-spin" />Reading…</> : <>Review details<ChevronRight className="w-4 h-4" /></>}</Button>
+            </footer>
+          </div>
+          <p className="text-center text-sm text-gray-500 mt-5">
+            Already submitted? <Link to="/track" className="font-semibold text-brand hover:underline">Track your transfer credit</Link>
+          </p>
+        </section>
       </div>
     </div>
   )
 }
 
-function TranscriptDrop({ onFiles }) {
+// Before any file: what the student is about to do, the three steps, and what to expect
+function StoryPanel() {
+  return (
+    <div>
+      <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Boston University · Transfer Credit</p>
+      <h1 className="font-display text-[34px] sm:text-[40px] leading-[1.1] font-semibold mt-3 text-white">Bring the credit<br />you've earned with you.</h1>
+      <p className="text-white/85 mt-4 text-[15.5px] leading-relaxed max-w-md">
+        Upload your final transcripts. We read your courses for you, you check them, and the academic departments evaluate each one. No account is needed.
+      </p>
+      <figure className="relative mt-8 rounded-2xl overflow-hidden shadow-raised ring-1 ring-black/5">
+        <img src={students} alt="Students walking on the Boston University campus" className="w-full h-[230px] sm:h-[250px] object-cover object-[center_35%]" />
+        <figcaption className="absolute left-4 bottom-4 right-4 rounded-xl bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3 shadow-sm">
+          <span className="w-9 h-9 rounded-lg bg-red-50 text-brand grid place-items-center flex-shrink-0"><Sparkles className="w-[18px] h-[18px]" /></span>
+          <span className="text-[13.5px] leading-snug text-gray-700"><span className="font-semibold text-gray-900">Read in seconds.</span> Courses, grades and terms come straight from your transcript.</span>
+        </figcaption>
+      </figure>
+      <ol className="mt-8">
+        {[['Upload your transcripts', 'One file from each college you attended'], ['Check what we read', 'Correct anything that was read wrongly'], ['Get your Transfer Credit ID', 'Follow every course until credit is posted']].map(([title, text], i) => (
+          <li key={title} className="flex gap-4" aria-current={i === 0 ? 'step' : undefined}>
+            <span className="flex flex-col items-center">
+              <span className={`w-8 h-8 rounded-full grid place-items-center text-[13px] ${i === 0 ? 'bg-brand text-white font-bold ring-4 ring-red-100' : 'bg-white border border-gray-300 text-gray-500 font-semibold'}`}>{i + 1}</span>
+              {i < 2 && <span className="w-px flex-1 bg-gray-300 my-1" />}
+            </span>
+            <span className={i < 2 ? 'pb-5' : ''}>
+              <span className={`block text-[15px] font-semibold ${i === 0 ? 'text-gray-900' : 'text-gray-700'}`}>{title}</span>
+              <span className={`block text-[13.5px] ${i === 0 ? 'text-gray-600' : 'text-gray-500'}`}>{text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-7 pt-5 border-t border-gray-200 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-gray-500">
+        <span className="inline-flex items-center gap-1.5"><Lock className="w-4 h-4 text-gray-400" />Nothing stored until you submit</span>
+        <span className="inline-flex items-center gap-1.5"><Mail className="w-4 h-4 text-gray-400" />Updates by email</span>
+        <span className="inline-flex items-center gap-1.5"><FileSearch className="w-4 h-4 text-gray-400" />Details read from your transcript</span>
+      </div>
+    </div>
+  )
+}
+
+// After files are added: each document, how it was read, and room for another
+function DocumentsPanel({ transcripts, onFiles, onRemove, onRetry }) {
+  return (
+    <div>
+      <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Step 1 of 3 · Your documents</p>
+      <h1 className="font-display text-[30px] sm:text-[32px] leading-tight font-semibold mt-2 text-white">
+        {transcripts.length} transcript{transcripts.length === 1 ? '' : 's'} added
+      </h1>
+      <p className="text-white/85 mt-1.5 text-[15px]">Each one is read as soon as you add it.</p>
+      <ul className="mt-8 space-y-3">
+        {transcripts.map(t => <TranscriptItem key={t.key} t={t} onRemove={() => onRemove(t.key)} onRetry={() => onRetry(t)} />)}
+      </ul>
+      <div className="mt-3"><TranscriptDrop onFiles={onFiles} compact /></div>
+    </div>
+  )
+}
+
+// What the transcripts showed, at a glance: the student, then each college with its courses
+function FoundSummary({ transcripts, readable, usable, reading, student }) {
+  const unread = transcripts.filter(t => t.status === 'unreadable')
+  return (
+    <>
+      <div className="px-6 sm:px-8 pt-7 pb-5 border-b border-gray-100 flex items-start justify-between gap-6">
+        <div>
+          <p className="text-[12px] font-semibold text-emerald-700 tracking-wide uppercase inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Read from your transcripts</p>
+          <h2 className="text-[22px] font-semibold text-gray-900 mt-1">{reading ? 'Reading your transcripts…' : readable.length ? "Here's what we found" : 'Ready for the office to read'}</h2>
+          <p className="text-[14px] text-gray-500 mt-1">You'll check and correct everything on the next step.</p>
+        </div>
+        <StepDots step={1} />
+      </div>
+      <div className="px-6 sm:px-8 py-6 space-y-5">
+        {student.name && (
+          <div className="flex items-center gap-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3.5">
+            <span className="w-11 h-11 rounded-full bg-gradient-to-br from-brand to-brand-dark text-white grid place-items-center font-semibold flex-shrink-0" aria-hidden="true">{initialsOf(student.name)}</span>
+            <span className="flex-1 min-w-0"><span className="block text-[16px] font-semibold text-gray-900 truncate">{student.name}</span>{student.studentId && <span className="block text-[13px] text-gray-500">Student ID {student.studentId}</span>}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-medium text-emerald-700 whitespace-nowrap"><CheckCircle2 className="w-3.5 h-3.5" />From your transcript</span>
+          </div>
+        )}
+        {readable.map(t => <CollegeGlance key={t.key} r={t.result} />)}
+        {transcripts.filter(t => t.status === 'reading').map(t => (
+          <div key={t.key} className="rounded-xl border border-gray-200 px-5 py-4 flex items-center gap-3 text-[14px] text-gray-600">
+            <Loader2 className="w-4 h-4 animate-spin text-brand" />Reading {t.name}…
+          </div>
+        ))}
+        {unread.map(t => (
+          <div key={t.key} className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 px-5 py-3.5 flex items-center gap-3 text-[13.5px] text-amber-900">
+            <ScanLine className="w-[18px] h-[18px] text-amber-600 flex-shrink-0" />
+            <span><span className="font-semibold">{t.name}</span> will be read by the Credit Evaluation Office. You'll name the college on the next step.</span>
+          </div>
+        ))}
+        {usable.length > 0 && !reading && readable.length === 0 && (
+          <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2 flex gap-1.5" role="status"><AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />No courses could be read automatically. You can still continue: the Credit Evaluation Office will read your transcript and enter the courses.</p>
+        )}
+      </div>
+    </>
+  )
+}
+
+function CollegeGlance({ r }) {
+  const credits = r.courses.reduce((n, c) => n + (Number(c.credits) || 0), 0)
+  const termCount = uniq(r.courses.map(c => c.term)).length
+  return (
+    <div className="rounded-xl border border-gray-200">
+      <div className="px-5 py-4 flex items-center gap-3 border-b border-gray-100">
+        <span className="w-10 h-10 rounded-lg bg-sky-50 text-sky-700 grid place-items-center flex-shrink-0"><Landmark className="w-5 h-5" /></span>
+        <span className="min-w-0"><span className="block text-[15px] font-semibold text-gray-900 truncate">{r.institution || 'College not shown on the transcript'}</span><span className="block text-[12.5px] text-gray-500">{r.credit_system ? `${r.credit_system} calendar` : 'Calendar not shown'}</span></span>
+      </div>
+      <div className="grid grid-cols-3 divide-x divide-gray-100">
+        <Figure value={r.courses.length} label={r.courses.length === 1 ? 'course' : 'courses'} />
+        <Figure value={credits ? Math.round(credits * 10) / 10 : '—'} label="credits on the transcript" />
+        <Figure value={termCount || '—'} label={termCount === 1 ? 'term' : 'terms'} />
+      </div>
+      <div className="px-5 py-3.5 border-t border-gray-100 flex flex-wrap gap-1.5">
+        {r.courses.slice(0, 12).map((c, i) => <span key={i} className="rounded-full border border-gray-200 px-2 py-0.5 font-mono text-[11.5px] text-gray-700">{c.course_code}</span>)}
+        {r.courses.length > 12 && <span className="px-1 text-[12px] text-gray-500">+{r.courses.length - 12} more</span>}
+      </div>
+    </div>
+  )
+}
+
+const Figure = ({ value, label }) => (
+  <div className="px-5 py-4"><p className="font-display text-[28px] font-semibold text-gray-900 leading-none tabular-nums">{value}</p><p className="text-[12.5px] text-gray-500 mt-1.5">{label}</p></div>
+)
+
+const TIP_TONES = { emerald: 'bg-emerald-50 text-emerald-600', sky: 'bg-sky-50 text-sky-600', violet: 'bg-violet-50 text-violet-600' }
+const Tip = ({ icon: Icon, tone, title, text }) => (
+  <div className="rounded-xl border border-gray-200 px-4 py-3.5">
+    <span className={`w-8 h-8 rounded-lg grid place-items-center ${TIP_TONES[tone]}`}><Icon className="w-4 h-4" /></span>
+    <p className="text-[13px] font-semibold text-gray-900 mt-2">{title}</p>
+    <p className="text-[12.5px] text-gray-500 mt-0.5">{text}</p>
+  </div>
+)
+
+const StepDots = ({ step }) => (
+  <div className="hidden sm:flex gap-1 mt-1.5" aria-hidden="true">
+    {[1, 2, 3].map(n => <span key={n} className={`w-8 h-1.5 rounded-full ${n <= step ? 'bg-brand' : 'bg-gray-200'}`} />)}
+  </div>
+)
+
+const initialsOf = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+
+// The band across the top of the later steps: the step, its title, and where the student is
+function StepBand({ step, title, intro }) {
+  const steps = ['Upload', 'Review & confirm', 'Transfer Credit ID']
+  return (
+    <div className="bg-gradient-to-br from-brand to-brand-dark text-white">
+      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Step {step} of 3</p>
+          <h1 className="font-display text-[28px] sm:text-[30px] font-semibold leading-tight mt-1">{title}</h1>
+          {intro && <p className="text-white/85 text-[14.5px] mt-1">{intro}</p>}
+        </div>
+        <ol className="flex items-center gap-3 text-[13px]" aria-label="Submission steps">
+          {steps.map((label, i) => {
+            const n = i + 1
+            return (
+              <React.Fragment key={label}>
+                {i > 0 && <li aria-hidden="true" className={`w-8 sm:w-10 h-px ${step >= n ? 'bg-white/60' : 'bg-white/30'}`} />}
+                <li className={`flex items-center gap-2 ${step === n ? 'font-semibold' : step > n ? '' : 'text-white/70'}`} aria-current={step === n ? 'step' : undefined}>
+                  <span className={`w-6 h-6 rounded-full grid place-items-center text-[12px] ${step > n ? 'bg-white text-brand' : step === n ? 'bg-white text-brand font-bold ring-4 ring-white/25' : 'border border-white/50'}`}>
+                    {step > n ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : n}
+                  </span>
+                  <span className="hidden sm:inline">{label}</span>
+                </li>
+              </React.Fragment>
+            )
+          })}
+        </ol>
+      </div>
+    </div>
+  )
+}
+
+// A section of the review step: an icon in its meaning colour, the title, and its content
+const CARD_TONES = { red: 'bg-red-50 text-brand', sky: 'bg-sky-50 text-sky-700', violet: 'bg-violet-50 text-violet-700' }
+function ReviewCard({ icon: Icon, tone, title, subtitle, right, children }) {
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 shadow-card">
+      <header className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+        <span className={`w-9 h-9 rounded-lg grid place-items-center flex-shrink-0 ${CARD_TONES[tone]}`}><Icon className="w-[18px] h-[18px]" /></span>
+        <span className="flex-1 min-w-0"><h2 className="text-[15.5px] font-semibold text-gray-900">{title}</h2>{subtitle && <p className="text-[12.5px] text-gray-500">{subtitle}</p>}</span>
+        {right}
+      </header>
+      {children}
+    </section>
+  )
+}
+
+// The uploaded file itself, shown beside what was read from it. Nothing is uploaded to show it: the browser
+// displays the file the student chose. A PDF or image is shown; other types only by name.
+function DocumentPreview({ transcripts }) {
+  const [key, setKey] = useState(transcripts[0]?.key)
+  const current = transcripts.find(t => t.key === key) || transcripts[0]
+  const [url, setUrl] = useState(null)
+  useEffect(() => {
+    if (!current?.file) return undefined
+    const u = URL.createObjectURL(current.file)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [current?.file])
+  if (!current) return null
+  const type = current.file?.type || ''
+  const r = current.result
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-200 bg-[#eceae6] overflow-hidden shadow-card">
+        <div className="px-4 py-2.5 bg-white border-b border-gray-200 flex items-center gap-2 text-[13px]">
+          <FileText className="w-4 h-4 text-brand flex-shrink-0" /><span className="font-medium text-gray-800 flex-1 truncate">{current.name}</span>
+          <span className="text-gray-400 whitespace-nowrap">{formatSize(current.size)}</span>
+        </div>
+        <div className="p-3">
+          {url && type === 'application/pdf' ? (
+            <iframe title={`Transcript: ${current.name}`} src={`${url}#toolbar=0&navpanes=0&zoom=page-width&view=FitH`} className="w-full h-[460px] lg:h-[560px] rounded bg-white shadow-md" />
+          ) : url && type.startsWith('image/') ? (
+            <img src={url} alt={`Transcript: ${current.name}`} className="w-full max-h-[560px] object-contain rounded bg-white shadow-md" />
+          ) : (
+            <div className="h-[260px] rounded bg-white grid place-items-center text-center text-[13.5px] text-gray-500 px-6">
+              <span><FileText className="w-8 h-8 mx-auto text-gray-300 mb-2" />A preview isn't available for this type of file. It is sent with your submission.</span>
+            </div>
+          )}
+        </div>
+        <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center gap-3 text-[12.5px] whitespace-nowrap overflow-hidden">
+          {current.status === 'read' ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium"><ShieldCheck className="w-4 h-4" />Read automatically</span>
+              <span className="text-gray-300">·</span><span className="text-gray-500 truncate">{r.courses.length} course{r.courses.length === 1 ? '' : 's'}{r.check_carefully ? ' · please check each one' : ''}</span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium"><ScanLine className="w-4 h-4" />Read by the Credit Evaluation Office</span>
+          )}
+        </div>
+      </div>
+      {transcripts.length > 1 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-card p-2">
+          <p className="px-3 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Your transcripts</p>
+          {transcripts.map(t => {
+            const active = t.key === current.key
+            return (
+              <button key={t.key} type="button" onClick={() => setKey(t.key)} aria-pressed={active}
+                className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 text-left ${active ? 'bg-red-50/60 ring-1 ring-brand/20' : 'hover:bg-gray-50'}`}>
+                <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${t.status === 'read' ? 'bg-white text-brand shadow-sm' : 'bg-amber-50 text-amber-700'}`}>
+                  {t.status === 'read' ? <FileText className="w-4 h-4" /> : <ScanLine className="w-4 h-4" />}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13.5px] font-semibold text-gray-900 truncate">{t.status === 'read' ? (t.review?.institution || t.name) : t.name}</span>
+                  <span className="block text-[12px] text-gray-500">{t.status === 'read' ? `${t.result.courses.length} courses` : 'Scanned copy · read by the office'}{active ? ' · showing' : ''}</span>
+                </span>
+                {active ? <Eye className="w-4 h-4 text-brand" /> : <ChevronRight className="w-4 h-4 text-gray-300" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <p className="text-[12.5px] text-gray-500 flex items-start gap-1.5 px-1"><Lock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />Your transcript file is never changed. Corrections are sent beside it, and the office sees both.</p>
+    </div>
+  )
+}
+
+function TranscriptDrop({ onFiles, compact = false }) {
   const input = useRef(null)
   const [over, setOver] = useState(false)
+  const handlers = {
+    role: 'button', tabIndex: 0,
+    onClick: () => input.current?.click(),
+    onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current?.click() } },
+    onDragOver: e => { e.preventDefault(); setOver(true) }, onDragLeave: () => setOver(false),
+    onDrop: e => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files) }
+  }
+  const picker = <input ref={input} type="file" multiple className="sr-only" accept={Object.keys(ACCEPTED).join(',')} onChange={e => { onFiles(e.target.files); e.target.value = '' }} />
+  if (compact) {
+    return (
+      <div {...handlers} className={`rounded-2xl border-2 border-dashed px-4 py-4 flex items-center gap-3 text-[14px] cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${over ? 'border-brand bg-red-50/60' : 'border-gray-300 bg-white/70 hover:border-gray-400'}`}>
+        <span className="w-9 h-9 rounded-lg bg-red-50 text-brand grid place-items-center flex-shrink-0"><Plus className="w-4 h-4" /></span>
+        <span><span className="font-semibold text-brand">Add another transcript</span> <span className="text-gray-500">· one per college · or drop it here</span></span>
+        {picker}
+      </div>
+    )
+  }
   return (
-    <div role="button" tabIndex={0}
-      onClick={() => input.current?.click()}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current?.click() } }}
-      onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
-      onDrop={e => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files) }}
-      className={`rounded-xl border-2 border-dashed px-5 py-9 text-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${over ? 'border-brand bg-red-50/60' : 'border-gray-300 bg-gray-50/60 hover:border-gray-400'}`}>
-      <UploadCloud className={`w-10 h-10 mx-auto ${over ? 'text-brand' : 'text-gray-400'}`} />
-      <p className="mt-2 text-sm text-gray-700"><span className="font-semibold text-brand">Choose transcript files</span> or drag and drop</p>
-      <p className="text-xs text-gray-500 mt-1">One file per college · PDF, JPG and PNG transcripts are read automatically · up to {MAX_MB} MB each</p>
-      <input ref={input} type="file" multiple className="sr-only" accept={Object.keys(ACCEPTED).join(',')} onChange={e => { onFiles(e.target.files); e.target.value = '' }} />
+    <div {...handlers} className={`rounded-2xl border-2 border-dashed px-6 py-11 text-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${over ? 'border-brand bg-red-50/70' : 'border-red-200 bg-gradient-to-b from-red-50/60 to-white hover:border-red-300'}`}>
+      {/* Stacked transcript sheets */}
+      <span className="relative block w-[92px] h-[78px] mx-auto" aria-hidden="true">
+        <span className="absolute left-2 top-2 w-[62px] h-[74px] rounded-md bg-white border border-gray-200 shadow-sm -rotate-[8deg]" />
+        <span className="absolute right-2 top-1 w-[62px] h-[74px] rounded-md bg-white border border-gray-200 shadow-sm rotate-[7deg]" />
+        <span className="absolute left-1/2 -translate-x-1/2 top-0 w-[62px] h-[76px] rounded-md bg-white border border-gray-200 shadow px-2 pt-2 space-y-1.5">
+          <span className="block h-1.5 w-8 rounded bg-brand/80" /><span className="block h-1 rounded bg-gray-200" /><span className="block h-1 rounded bg-gray-200" /><span className="block h-1 w-7 rounded bg-gray-200" /><span className="block h-1 rounded bg-gray-200" />
+        </span>
+        <span className="absolute -right-1 -bottom-2 w-8 h-8 rounded-full bg-brand text-white grid place-items-center ring-4 ring-white"><ArrowUp className="w-4 h-4" strokeWidth={2.5} /></span>
+      </span>
+      <p className="mt-6 text-[16px] text-gray-800"><span className="font-semibold text-brand underline decoration-red-200 underline-offset-4">Choose transcript files</span> or drag them here</p>
+      <p className="mt-3 flex flex-wrap justify-center items-center gap-2 text-[12px]">
+        {['PDF', 'JPG', 'PNG'].map(f => <span key={f} className="rounded-full bg-white border border-gray-200 px-2 py-0.5 font-medium text-gray-600">{f}</span>)}
+        <span className="text-gray-500">read automatically · up to {MAX_MB} MB each</span>
+      </p>
+      {picker}
     </div>
   )
 }
 
 function TranscriptItem({ t, onRemove, onRetry }) {
   const r = t.result
+  const read = t.status === 'read'
+  const scanned = t.status === 'unreadable'
   return (
-    <li className={`rounded-lg border px-3.5 py-3 bg-white ${t.status === 'read' ? 'border-gray-200' : t.status === 'reading' ? 'border-gray-200' : 'border-amber-300'}`}>
-      <div className="flex items-center gap-3">
-        <span className={`w-9 h-9 rounded-lg grid place-items-center flex-shrink-0 ${t.status === 'read' ? 'bg-green-50 text-green-700' : t.status === 'reading' ? 'bg-gray-100 text-gray-500' : 'bg-amber-50 text-amber-700'}`}>
-          {t.status === 'reading' ? <Loader2 className="w-4 h-4 animate-spin" /> : t.status === 'read' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+    <li className={`bg-white rounded-2xl border p-4 flex gap-4 ${read ? 'border-gray-200 shadow-raised' : t.status === 'reading' ? 'border-gray-200 shadow-card' : 'border-amber-200 shadow-card'}`}>
+      {/* Paper thumbnail */}
+      <span className={`relative w-[60px] h-[76px] flex-shrink-0 rounded-md border border-gray-200 overflow-hidden ${scanned ? 'bg-[#f3f1ec]' : 'bg-white shadow-sm'}`} aria-hidden="true">
+        <span className={`absolute inset-2 space-y-1.5 ${scanned ? 'opacity-60 -rotate-2' : ''}`}>
+          <span className={`block h-1.5 w-8 rounded ${scanned ? 'bg-gray-500/60' : 'bg-brand/80'}`} /><span className="block h-1 rounded bg-gray-200" /><span className="block h-1 rounded bg-gray-200" /><span className="block h-1 w-6 rounded bg-gray-200" /><span className="block h-1 rounded bg-gray-200" /><span className="block h-1 w-7 rounded bg-gray-200" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-gray-900 truncate">{t.status === 'read' ? r.institution : t.name}</span>
-          <span className="block text-xs text-gray-500 truncate">
-            {t.status === 'reading' && `Reading ${t.name}…`}
-            {t.status === 'read' && `${r.courses.length} course${r.courses.length === 1 ? '' : 's'} found · ${r.credit_system || 'calendar not shown'} · ${t.name} (${formatSize(t.size)})`}
-            {['unreadable', 'error'].includes(t.status) && `${t.name} (${formatSize(t.size)})`}
+        {t.status === 'reading' && <span className="absolute inset-0 bg-white/70 grid place-items-center"><Loader2 className="w-4 h-4 animate-spin text-brand" /></span>}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-start justify-between gap-2">
+          <span className="min-w-0">
+            <span className="block text-[14.5px] font-semibold text-gray-900 truncate">{read && r.institution ? r.institution : t.name}</span>
+            <span className="block text-[12.5px] text-gray-500 truncate">{read && r.institution ? `${t.name} · ` : ''}{formatSize(t.size)}</span>
+          </span>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-medium whitespace-nowrap ${read ? 'bg-emerald-50 text-emerald-700' : t.status === 'reading' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-800'}`}>
+            {read ? <><CheckCircle2 className="w-3.5 h-3.5" />Read</> : t.status === 'reading' ? 'Reading…' : scanned ? <><Eye className="w-3.5 h-3.5" />Office will read</> : <><AlertTriangle className="w-3.5 h-3.5" />Not uploaded</>}
           </span>
         </span>
+        {read && (
+          <span className="mt-3 flex flex-wrap gap-1.5 text-[11.5px]">
+            <span className="rounded-md bg-emerald-50/80 text-emerald-800 px-2 py-1 inline-flex items-center gap-1"><Check className="w-3 h-3" strokeWidth={3} />{r.courses.length} course{r.courses.length === 1 ? '' : 's'}</span>
+            <span className="rounded-md bg-emerald-50/80 text-emerald-800 px-2 py-1 inline-flex items-center gap-1"><Check className="w-3 h-3" strokeWidth={3} />{r.credit_system || 'Calendar not shown'}</span>
+            {r.student?.name && <span className="rounded-md bg-emerald-50/80 text-emerald-800 px-2 py-1 inline-flex items-center gap-1"><Check className="w-3 h-3" strokeWidth={3} />Your details</span>}
+            {r.check_carefully && <span className="rounded-md bg-amber-50 text-amber-800 px-2 py-1">Please check each course</span>}
+          </span>
+        )}
+        {t.error && <span className="block mt-3 text-[12.5px] leading-snug text-amber-900 bg-amber-50/70 rounded-md px-2.5 py-2">{t.error}</span>}
+        {read && <ReviewNotes notes={r.review_notes} />}
+      </span>
+      <span className="flex flex-col gap-1">
+        {t.status !== 'reading' && <button type="button" onClick={onRemove} className="p-1.5 rounded-md text-gray-300 hover:text-red-600 hover:bg-red-50" aria-label={`Remove ${t.name}`}><X className="w-4 h-4" /></button>}
         {t.status === 'error' && <button type="button" onClick={onRetry} className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100" aria-label={`Try ${t.name} again`}><RotateCcw className="w-4 h-4" /></button>}
-        {t.status !== 'reading' && <button type="button" onClick={onRemove} className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50" aria-label={`Remove ${t.name}`}><X className="w-4 h-4" /></button>}
-      </div>
-      {t.error && <p className="mt-1.5 text-xs text-amber-800">{t.error}{t.status === 'unreadable' && ' You can keep it with your submission; the Credit Evaluation Office will review it.'}</p>}
-      {t.status === 'read' && <ReviewNotes notes={r.review_notes} />}
+      </span>
     </li>
   )
 }
@@ -378,17 +719,17 @@ const COURSE_FIELDS = [
 const sameValue = (a, b) => String(a ?? '').trim() === String(b ?? '').trim()
 const changedFields = (original, course) => COURSE_FIELDS.filter(f => !sameValue(original[f.key], course[f.key])).map(f => f.label.toLowerCase())
 
-function TranscriptSummary({ t, onReview }) {
+function TranscriptSummary({ t, onReview, defaultOpen = false }) {
   const r = t.result
   const review = t.review
-  const [open, setOpen] = useState(Boolean(r?.check_carefully))
+  const [open, setOpen] = useState(Boolean(r?.check_carefully) || defaultOpen)
   const [editing, setEditing] = useState(false)
   const setInstitution = (institution) => onReview({ ...review, institution })
   // Not read automatically: only the institution is asked for; the office enters the courses
   if (t.status !== 'read') {
     return (
-      <li className="px-4 py-3 space-y-2">
-        <p className="text-sm text-amber-800 flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />{t.name}: courses not read automatically; the Credit Evaluation Office will read this transcript.</p>
+      <li className="px-5 sm:px-6 py-4 space-y-3">
+        <p className="text-sm text-amber-800 flex gap-2.5"><span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 grid place-items-center flex-shrink-0"><ScanLine className="w-4 h-4" /></span><span><span className="font-semibold">{t.name}</span><br />Courses not read automatically; the Credit Evaluation Office will read this transcript.</span></p>
         {review && (
           <Input label="College or university on this transcript" required value={review.institution} onChange={e => setInstitution(e.target.value)} placeholder="For example Northfield Community College"
             error={review.institution && review.institution.trim().length < 2 ? 'Enter the name of the college' : ''} />
@@ -402,18 +743,18 @@ function TranscriptSummary({ t, onReview }) {
   const institutionEdited = Boolean(r.institution) && !sameValue(r.institution, review.institution)
   return (
     <li>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-gray-50">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full px-5 sm:px-6 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-gray-50">
         <span>
           <span className="block text-sm font-semibold text-gray-900">{review.institution || <span className="text-amber-700">College not shown on the transcript</span>}</span>
           <span className="block text-xs text-gray-500">
             {r.courses.length} course{r.courses.length === 1 ? '' : 's'} found · {r.credit_system || 'calendar not shown'}{r.student?.student_id ? ` · Student ID ${r.student.student_id}` : ''}
-            {(edits > 0 || institutionEdited) && <span className="ml-1.5 text-brand font-medium">· {edits + (institutionEdited ? 1 : 0)} edited by you</span>}
+            {(edits > 0 || institutionEdited) && <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 text-brand font-medium"><Pencil className="w-3 h-3" />{edits + (institutionEdited ? 1 : 0)} edited</span>}
           </span>
         </span>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-4 pb-4 space-y-3">
+        <div className="px-5 sm:px-6 pb-5 space-y-3">
           {r.check_carefully && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               This transcript has a layout we see less often. Please check each course carefully and correct anything that was read wrongly.</p>
@@ -426,23 +767,25 @@ function TranscriptSummary({ t, onReview }) {
           {institutionEdited && <EditedNote original={r.institution} onRestore={() => setInstitution(r.institution)} />}
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-gray-500 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />From your transcript</p>
-            <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+            <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-red-50">
               {editing ? <><Check className="w-3.5 h-3.5" />Done editing</> : <><Pencil className="w-3.5 h-3.5" />Correct a course</>}
             </button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-5 sm:-mx-6">
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                {COURSE_FIELDS.map(f => <th key={f.key} className={`py-1.5 pr-3 ${f.numeric || f.key === 'grade' ? 'text-right' : ''}`}>{f.label}</th>)}
-                <th className="py-1.5 w-8"><span className="sr-only">Changes</span></th>
+              <thead><tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50/80">
+                <th className="pl-5 sm:pl-6 pr-3 py-2 w-0"><span className="sr-only">Read or corrected</span></th>
+                {COURSE_FIELDS.map(f => <th key={f.key} className={`py-2 pr-3 ${f.numeric || f.key === 'grade' ? 'text-right' : ''}`}>{f.label}</th>)}
+                <th className="py-2 pr-5 sm:pr-6 w-8"><span className="sr-only">Changes</span></th>
               </tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {review.courses.map((c, i) => {
                   const changed = changedFields(r.courses[i], c)
                   return (
-                    <tr key={i} className={changed.length ? 'bg-red-50/40' : ''}>
+                    <tr key={i} className={changed.length ? 'bg-red-50/50' : ''}>
+                      <td className="pl-5 sm:pl-6 pr-3 py-2"><span className={`block w-1 h-7 rounded-full ${changed.length ? 'bg-brand' : 'bg-emerald-400/70'}`} title={changed.length ? 'Corrected by you' : 'As on your transcript'} /></td>
                       {COURSE_FIELDS.map(f => (
-                        <td key={f.key} className={`py-1.5 pr-3 align-top ${f.numeric || f.key === 'grade' ? 'text-right' : ''}`}>
+                        <td key={f.key} className={`py-2 pr-3 align-middle ${f.numeric || f.key === 'grade' ? 'text-right' : ''}`}>
                           {editing ? (
                             <input aria-label={`${f.label}, course ${i + 1}`} value={c[f.key] ?? ''} inputMode={f.numeric ? 'decimal' : undefined}
                               onChange={e => setCourse(i, f.key, f.numeric ? e.target.value.replace(/[^\d.]/g, '') : e.target.value)}
@@ -450,12 +793,14 @@ function TranscriptSummary({ t, onReview }) {
                           ) : (
                             <span className={`${f.key === 'course_code' ? 'font-mono text-gray-900 whitespace-nowrap' : f.key === 'grade' ? 'font-medium' : f.key === 'title' ? 'text-gray-700' : 'text-gray-500 whitespace-nowrap'}`}
                               title={sameValue(r.courses[i][f.key], c[f.key]) ? 'From your transcript' : `Edited by you. Transcript shows: ${r.courses[i][f.key] ?? 'nothing'}`}>
-                              {c[f.key] === '' || c[f.key] == null ? <span className="text-amber-700">not shown</span> : c[f.key]}
+                              {!sameValue(r.courses[i][f.key], c[f.key]) && r.courses[i][f.key] != null && r.courses[i][f.key] !== '' && <span className="mr-1.5 text-[12px] text-gray-400 line-through">{r.courses[i][f.key]}</span>}
+                              {c[f.key] === '' || c[f.key] == null ? <span className="text-amber-700">not shown</span>
+                                : <span className={sameValue(r.courses[i][f.key], c[f.key]) ? '' : 'font-semibold text-brand'}>{c[f.key]}</span>}
                             </span>
                           )}
                         </td>
                       ))}
-                      <td className="py-1.5 align-top text-right">
+                      <td className="py-2 pr-5 sm:pr-6 align-middle text-right">
                         {changed.length > 0 && (
                           <button type="button" onClick={() => restoreCourse(i)} className="p-1 rounded text-gray-400 hover:text-gray-800" aria-label={`Restore course ${i + 1} as read from the transcript`} title={`Edited: ${changed.join(', ')}. Restore the transcript's values`}>
                             <RotateCcw className="w-3.5 h-3.5" />
@@ -468,6 +813,10 @@ function TranscriptSummary({ t, onReview }) {
               </tbody>
             </table>
           </div>
+          <p className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-gray-500">
+            <span className="inline-flex items-center gap-1.5"><span className="w-1 h-3 rounded-full bg-emerald-400/70" />As on your transcript</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-1 h-3 rounded-full bg-brand" />Corrected by you; the original is kept</span>
+          </p>
           {edits > 0 && <p className="text-xs text-gray-500">Your corrections are sent with the transcript. The Credit Evaluation Office sees both what the transcript shows and what you changed; the file itself is not changed.</p>}
         </div>
       )}
@@ -488,38 +837,41 @@ function EditedNote({ original, onRestore }) {
 // A value read from the transcript is marked "From your transcript" and can be edited (the transcript's value is
 // kept and can be restored); a missing one asks for input (only for fields that are needed)
 function DetectedField({ label, value, conflict, input, note, optional = false, edited = false, onEdit, onRestore }) {
+  const state = value && edited ? 'edited' : value ? 'read' : optional ? 'none' : 'missing'
+  const box = { edited: 'border-brand/40 bg-red-50/30', read: 'border-gray-200', none: 'border-gray-200', missing: 'border-amber-300 bg-amber-50/30' }[state]
+  const chip = {
+    edited: <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-brand"><Pencil className="w-3 h-3" aria-hidden="true" />Edited</span>,
+    read: <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700"><CheckCircle2 className="w-3 h-3" aria-hidden="true" />From your transcript</span>,
+    missing: <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"><AlertCircle className="w-3 h-3" aria-hidden="true" />{conflict ? 'Transcripts differ' : 'Not on transcript'}</span>,
+    none: null
+  }[state]
   return (
-    <div className="px-4 py-3 grid sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 items-start">
-      <dt className="text-sm text-gray-500 pt-0.5">{label}</dt>
-      <dd className="min-w-0">
-        {value && edited ? (
+    <div className={`rounded-xl border px-4 py-3 min-w-0 ${box}`}>
+      <dt className="flex items-center justify-between gap-2 text-[12px] font-medium text-gray-500">{label}{chip}</dt>
+      <dd className="mt-1.5 min-w-0">
+        {state === 'edited' ? (
           <>
             {input}
             <EditedNote original={value} onRestore={onRestore} />
           </>
-        ) : value ? (
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-sm font-medium text-gray-900">{value}</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
-              <CheckCircle2 className="w-3 h-3" aria-hidden="true" />From your transcript
-            </span>
+        ) : state === 'read' ? (
+          <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5">
+            <span className="text-[16px] font-semibold text-gray-900 break-words">{value}</span>
             {onEdit && (
               <button type="button" onClick={onEdit} className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline" aria-label={`Edit ${label}`}>
                 <Pencil className="w-3 h-3" aria-hidden="true" />Edit
               </button>
             )}
           </span>
-        ) : optional ? (
-          <span className="text-sm text-gray-400">Not shown on the transcript</span>
+        ) : state === 'none' ? (
+          <span className="block py-1.5 text-sm text-gray-400">Not shown on the transcript</span>
         ) : (
           <>
-            <span className="flex items-center gap-1 text-xs text-amber-700 mb-1.5"><AlertTriangle className="w-3.5 h-3.5" />
-              {conflict ? `Your transcripts show different values (${conflict.join(' / ')}). Please enter the correct one.` : 'Not on your transcript. Please enter it.'}
-            </span>
+            {conflict && <span className="block text-xs text-amber-800 mb-1.5">Your transcripts show {conflict.join(' / ')}. Please choose the correct one.</span>}
             {input}
           </>
         )}
-        {note && <span className="block text-xs text-gray-500 mt-1">{note}</span>}
+        {note && <span className="block text-xs text-gray-500 mt-1.5">{note}</span>}
       </dd>
     </div>
   )
@@ -550,12 +902,13 @@ function SupportingFiles({ files, onChange }) {
   )
 }
 
-function Optional({ title, children }) {
+function Optional({ icon: Icon, title, hint, children }) {
   const [open, setOpen] = useState(false)
   return (
-    <section className="rounded-xl border border-gray-200">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full px-4 py-3 flex items-center justify-between text-left text-sm font-semibold text-gray-900 hover:bg-gray-50 rounded-xl">
-        {title}<ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+    <section className={`rounded-xl ${open ? 'border border-gray-200' : 'bg-gray-50'}`}>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full px-4 py-3 flex items-center gap-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-100/70 rounded-xl">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}{title}{hint && <span className="text-gray-400 font-normal">{hint}</span>}
+        <ChevronDown className={`ml-auto w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </section>
@@ -604,34 +957,3 @@ function ExistingEvaluations({ email, result, busy, onAnother, onBack }) {
   )
 }
 
-function Stepper({ step }) {
-  const steps = ['Upload Transcripts', 'Review & Confirm', 'Transfer Credit ID']
-  return (
-    <ol className="flex items-start" aria-label="Submission steps">
-      {steps.map((label, i) => {
-        const n = i + 1
-        const done = step > n
-        const current = step === n
-        return (
-          <li key={label} className="flex-1 flex flex-col items-center relative" aria-current={current ? 'step' : undefined}>
-            {i > 0 && <span className={`absolute top-4 right-1/2 w-full h-0.5 ${step >= n ? 'bg-brand' : 'bg-gray-200'}`} aria-hidden="true" />}
-            <span className={`relative z-10 w-8 h-8 rounded-full grid place-items-center text-sm font-semibold ring-4 ring-gray-50 ${done ? 'bg-brand text-white' : current ? 'bg-white text-brand border-2 border-brand' : 'bg-white text-gray-400 border-2 border-gray-200'}`}>{done ? <Check className="w-4 h-4" /> : n}</span>
-            <span className={`mt-2 text-[11px] sm:text-xs text-center font-medium leading-tight px-1 ${current ? 'text-gray-900' : 'text-gray-500'}`}>{label}</span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
-function Body({ title, intro, children }) {
-  return (
-    <div className="px-5 sm:px-8 py-7 space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-        {intro && <p className="text-sm text-gray-500 mt-1">{intro}</p>}
-      </div>
-      {children}
-    </div>
-  )
-}

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Stamp, Inbox, Copy, CalendarClock, ArrowRight, CheckCircle2, GitCompare, Flag } from 'lucide-react'
+import { Stamp, Inbox, Copy, CalendarClock, ArrowRight, CheckCircle2, GitCompare, Flag, Building2, Sparkles, BadgeCheck, FileText, Activity } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getOfficeOverview, placeOfficeQueue, processExistingApplications } from '../../api/office'
 import { useAuth } from '../../hooks/useAuth'
-import PageHeader from '../../components/staff/PageHeader'
-import Metric from '../../components/staff/Metric'
+import PageHeader, { BannerAction } from '../../components/staff/PageHeader'
+import Metric, { MetricBadge } from '../../components/staff/Metric'
+import { SectionTitle, ActivityTimeline } from '../../components/staff/Section'
 import StatusPill from '../../components/staff/StatusPill'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
+import { greeting } from '../../lib/staffFormat'
 import ImpactPanel from '../../components/staff/ImpactPanel'
 
 // The Credit Evaluation Office's working view: what to post, what to place, what to resolve. Every number comes
@@ -76,15 +77,16 @@ export default function OfficeDashboard() {
         subtitle="Process each evaluation's courses, place the ones without a specialist, and post decided transfer credit."
         actions={<>
           <Button size="sm" variant="secondary" onClick={processExisting} loading={processing} title="Apply established equivalencies, duplicate checks and assignment to evaluations processed earlier">Process existing evaluations</Button>
-          <Link to="/admin/applications" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800">All applications<ArrowRight className="w-4 h-4" /></Link>
+          <BannerAction as={Link} to="/admin/applications"><span className="w-6 h-6 rounded-full bg-white/20 grid place-items-center"><ArrowRight className="w-3.5 h-3.5" /></span>All applications</BannerAction>
         </>}
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Awaiting final review" value={c.ready_for_posting} detail={`fully decided · ${c.applications_with_unposted} evaluations have decided courses`} accent={c.ready_for_posting > 0} />
-        <Metric label="With departments" value={c.in_department_review} detail={`${c.queued_reviews} queued for a hand-off`} />
-        <Metric label="Settled without department work" value={c.established_applied + c.policy_applied} detail={`${c.established_applied} established equivalencies · ${c.policy_applied} policy outcomes`} />
-        <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} evaluations complete`} />
+        <Metric label="Awaiting final review" value={c.ready_for_posting} detail={`fully decided · ${c.applications_with_unposted} evaluations have decided courses`} icon={Stamp} tone="emerald" badge={c.ready_for_posting > 0 && <MetricBadge tone="emerald">Ready to post</MetricBadge>} />
+        <Metric label="With departments" value={c.in_department_review} detail={`${c.queued_reviews} queued for a hand-off`} icon={Building2} tone="amber" />
+        <Metric label="Settled without department work" value={c.established_applied + c.policy_applied} detail={`${c.established_applied} established equivalencies · ${c.policy_applied} policy outcomes`} icon={Sparkles} tone="violet"
+          bar={[{ value: c.established_applied, tone: 'violet', label: 'established' }, { value: c.policy_applied, tone: 'sky', label: 'policy' }]} />
+        <Metric label="Credits posted" value={c.credits_posted} detail={`${c.courses_posted} courses · ${c.completed_applications} evaluations complete`} icon={BadgeCheck} tone="sky" />
       </div>
 
       <ImpactPanel impact={d.impact} />
@@ -132,8 +134,8 @@ export default function OfficeDashboard() {
 
         <div className="space-y-6">
           <section className="staff-card">
-            <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Needs a decision</h2>
-            <ul className="divide-y divide-staff-line2 border-t border-staff-line2 text-[14px]">
+            <SectionTitle icon={GitCompare} tone="amber" title="Needs a decision" />
+            <ul className="divide-y divide-staff-line2 text-[14px]">
               {d.escalations.map((e, i) => (
                 <li key={`esc-${i}`}>
                   <Link to="/admin/conflicts" className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
@@ -185,29 +187,19 @@ export default function OfficeDashboard() {
           </section>
 
           <section className="staff-card">
-            <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Syllabi</h2>
-            <div className="grid grid-cols-2 border-t border-staff-line2 divide-x divide-staff-line2">
-              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Waiting on students</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_pending}</p></div>
-              <div className="px-6 py-4"><p className="text-[13px] text-staff-ink2">Received, in review</p><p className="text-[26px] font-semibold text-staff-ink tabular-nums">{c.syllabi_received}</p></div>
+            <SectionTitle icon={FileText} tone="violet" title="Syllabi" />
+            <div className="grid grid-cols-2 divide-x divide-staff-line2">
+              <div className="px-6 py-4"><p className="font-display text-[28px] font-semibold text-amber-700 tabular-nums leading-none">{c.syllabi_pending}</p><p className="text-[13px] text-staff-ink2 mt-1.5">Waiting on students</p></div>
+              <div className="px-6 py-4"><p className="font-display text-[28px] font-semibold text-emerald-700 tabular-nums leading-none">{c.syllabi_received}</p><p className="text-[13px] text-staff-ink2 mt-1.5">Received, in review</p></div>
             </div>
           </section>
 
           <section className="staff-card">
-            <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Recent activity</h2>
+            <SectionTitle icon={Activity} tone="sky" title="Recent activity" />
             {d.recent_activity.length === 0 ? (
-              <p className="px-6 pb-6 text-sm text-staff-muted">No activity yet.</p>
+              <p className="px-6 py-6 text-sm text-staff-muted">No activity yet.</p>
             ) : (
-              <ul className="border-t border-staff-line2">
-                {d.recent_activity.slice(0, 6).map((r, i) => (
-                  <li key={i} className="flex items-baseline justify-between gap-3 px-6 py-3 text-[14px]">
-                    <span className="min-w-0">
-                      <span className="block text-staff-ink truncate">{activityLabel(r.action)}</span>
-                      <span className="block text-[12.5px] text-staff-muted truncate">{[r.reference_number, r.actor].filter(Boolean).join(' · ')}</span>
-                    </span>
-                    <span className="text-[12.5px] text-staff-muted whitespace-nowrap">{timeAgo(r.created_at)}</span>
-                  </li>
-                ))}
-              </ul>
+              <ActivityTimeline rows={d.recent_activity.slice(0, 6)} context={r => [r.reference_number, r.actor].filter(Boolean).join(' · ')} />
             )}
           </section>
         </div>
@@ -219,14 +211,11 @@ export default function OfficeDashboard() {
 function Queue({ icon: Icon, title, rows, render, empty, action, total }) {
   return (
     <section className="staff-card">
-      <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-3">
-        <h2 className="flex items-center gap-2 text-[17px] font-semibold text-staff-ink"><Icon className="w-[18px] h-[18px] text-staff-ink2" />{title}<span className="text-staff-muted font-normal">({total ?? rows.length})</span></h2>
-        {action}
-      </div>
+      <SectionTitle icon={Icon} title={<>{title} <span className="text-staff-muted font-normal">({total ?? rows.length})</span></>} right={action} />
       {rows.length === 0 ? (
-        <p className="flex items-center gap-2 px-6 pb-5 text-[14px] text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{empty}</p>
+        <p className="flex items-center gap-2 px-6 py-5 text-[14px] text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{empty}</p>
       ) : (
-        <ul className="divide-y divide-staff-line2 border-t border-staff-line2">{rows.map((r, i) => <li key={r.id || i}>{render(r)}</li>)}</ul>
+        <ul className="divide-y divide-staff-line2">{rows.map((r, i) => <li key={r.id || i}>{render(r)}</li>)}</ul>
       )}
     </section>
   )

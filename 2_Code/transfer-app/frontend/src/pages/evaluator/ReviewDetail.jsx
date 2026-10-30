@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowDown, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck, UserCog } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck, UserCog, GraduationCap, Landmark, UserCheck, Sparkles, Compass, CircleDashed, BookOpen, Library, ScrollText, MessagesSquare } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getReview, startReview, decideReview, checkReviewDecision, requestReviewInfo, escalateReview, requestReassignment, searchBuCourses, getDocumentLink } from '../../api/my'
 import StatusPill from '../../components/staff/StatusPill'
@@ -184,54 +184,62 @@ export default function ReviewDetail() {
     <div className="max-w-5xl mx-auto pb-32">
       <BackLink />
 
-      {/* Who and what */}
-      <header className="flex flex-wrap items-end justify-between gap-4 mt-4 mb-6">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[13px] font-medium text-staff-muted">
-            <span className="font-mono">{app.reference_number}</span>
-            <StatusPill tone={status.tone}>{status.label}</StatusPill>
-            {r.priority === 'high' && <span className="text-[12px] font-semibold text-red-700">High priority</span>}
-          </p>
-          <h1 className="text-[30px] leading-tight text-staff-ink mt-1">{app.student_name}</h1>
-          <p className="text-[15px] text-staff-ink2 mt-1">{app.transfer_to_program} · transferring from {app.transfer_from_institution}</p>
-          {r.assignment_context?.length > 0 && (
-            <p className="text-[13px] text-staff-muted mt-2">
-              <span className="font-medium text-staff-ink2">Assignment context:</span> {r.assignment_context.join(' · ')}
+      {/* Who and what: the case header, with where this course is in its journey */}
+      <section className="staff-card overflow-hidden mt-4 mb-6">
+        <div className="px-6 sm:px-7 pt-6 pb-5 flex flex-wrap items-start gap-5">
+          <span className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white grid place-items-center text-[18px] font-semibold shadow-sm flex-shrink-0" aria-hidden="true">{initials(app.student_name)}</span>
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-staff-muted">
+              <span className="font-mono">{app.reference_number}</span>
+              <StatusPill tone={status.tone}>{status.label}</StatusPill>
+              {r.priority === 'high' && <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[12px] font-semibold text-red-700"><Flag className="w-3 h-3" />High priority</span>}
             </p>
-          )}
+            <h1 className="text-[30px] leading-tight text-staff-ink mt-1">{app.student_name}</h1>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] text-staff-ink2">
+              {app.transfer_to_program && <span className="inline-flex items-center gap-1.5"><GraduationCap className="w-4 h-4 text-staff-muted" />{app.transfer_to_program}</span>}
+              {app.transfer_from_institution && <span className="inline-flex items-center gap-1.5"><Landmark className="w-4 h-4 text-staff-muted" />{src?.institution || app.transfer_from_institution}</span>}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {d.syllabus && <DocumentButton id={d.syllabus.document_id} label="View syllabus" icon={Paperclip} />}
+            <Button variant="secondary" onClick={() => setTranscriptOpen(true)}>
+              <FileText className="w-4 h-4" />
+              View transcript
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {d.syllabus && <DocumentButton id={d.syllabus.document_id} label="View syllabus" icon={Paperclip} />}
-          <Button variant="secondary" onClick={() => setTranscriptOpen(true)}>
-            <FileText className="w-4 h-4" />
-            View transcript
-          </Button>
-        </div>
-      </header>
+        <ProgressTrack status={r.status} />
+        {r.assignment_context?.length > 0 && (
+          <p className="px-6 sm:px-7 py-2.5 border-t border-staff-line2 text-[12.5px] text-staff-muted flex items-start gap-2">
+            <UserCheck className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /><span><span className="font-medium text-staff-ink2">Assignment context:</span> {r.assignment_context.join(' · ')}</span>
+          </p>
+        )}
+      </section>
 
       <StatusBanner d={d} />
       <AttentionNotes d={d} />
 
-      {/* The evaluation */}
-      <section className="staff-card p-6 sm:p-8">
-        <h2 className="text-[17px] font-semibold text-staff-ink mb-5">Course evaluation</h2>
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-3 md:gap-5">
+      {/* 1. The match: transfer course, the verdict, BU course; then the signals behind the recommendation */}
+      <section className="staff-card">
+        <NumberedTitle n={1} title="Course match" />
+        <div className="px-6 sm:px-8 pt-1 pb-6 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_150px_minmax(0,1fr)] items-stretch gap-3 md:gap-0">
           <CourseBox
-            label="Transfer course"
+            label={`Transfer course${src?.institution ? ` · ${src.institution}` : ''}`}
             code={src?.course_code}
             title={src?.title}
-            meta={[src?.institution, src?.source_credits != null ? `${Number(src.source_credits)} ${src.credit_system === 'Quarter' ? 'quarter ' : ''}credits` : 'Credits not on transcript', src?.term, src?.grade && `Grade ${src.grade}`]}
+            chips={[
+              src?.term,
+              src?.grade && `Grade ${src.grade}`,
+              src?.source_credits != null ? `${Number(src.source_credits)} ${src.credit_system === 'Quarter' ? 'quarter ' : ''}credits` : { text: 'Credits not on transcript', warn: true }
+            ]}
           />
-          <span className="grid place-items-center text-staff-muted">
-            <ArrowRight className="hidden md:block w-6 h-6" />
-            <ArrowDown className="md:hidden w-6 h-6" />
-          </span>
+          <Verdict r={r} />
           {r.target_bu_course ? (
             <CourseBox
               label="Boston University course"
               code={r.target_bu_course}
               title={buCourses.map(c => c.title).join(' + ') || null}
-              meta={['Boston University', buCourses.length ? `${buCourses.reduce((n, c) => n + Number(c.credits || 0), 0)} credits` : null, bu?.program]}
+              chips={[buCourses.length ? `${buCourses.reduce((n, c) => n + Number(c.credits || 0), 0)} credits` : null, bu?.program]}
               emphasis
             />
           ) : (
@@ -241,15 +249,14 @@ export default function ReviewDetail() {
           )}
         </div>
 
-        <div className="mt-6 pt-6 border-t border-staff-line2 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4 items-center">
-          <MatchSummary r={r} />
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-staff-ink2">
-              System recommendation
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-staff-muted border border-staff-line rounded px-1.5 py-px">Advisory</span>
+        <div className="px-6 sm:px-8 pb-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+          <div className={`rounded-xl border p-4 ${proposed ? 'border-emerald-200 bg-emerald-50/50' : 'border-staff-line bg-staff-bg'}`}>
+            <p className={`flex flex-wrap items-center gap-2 text-[12px] font-semibold ${proposed ? 'text-emerald-800' : 'text-staff-ink2'}`}>
+              <Sparkles className="w-3.5 h-3.5" />System recommendation
+              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-staff-muted bg-white border border-staff-line rounded px-1.5 py-px">Advisory</span>
             </p>
-            <p className="text-[18px] font-semibold text-staff-ink mt-1">{proposed?.label || 'Evaluator to decide'}</p>
-            <p className="text-[14px] text-staff-ink2 mt-1">{basisSentence(r)}</p>
+            <p className="text-[17px] font-semibold text-staff-ink mt-1.5">{proposed?.label || 'Evaluator to decide'}</p>
+            <p className="text-[13px] text-staff-ink2 mt-0.5">{basisSentence(r)}</p>
             <KnowledgeCues k={k} onConflicts={() => openSection('conflicts')} onPrevious={() => openSection('previous')} />
             <button
               type="button"
@@ -258,13 +265,16 @@ export default function ReviewDetail() {
             >
               View supporting evidence
             </button>
-            <p className="mt-3 text-[12.5px] text-staff-muted">The recommendation explains the evidence; the department evaluator makes the final academic decision.</p>
           </div>
+          <PrecedentSignal k={k} onPrevious={() => openSection('previous')} />
+          <CoverageSignal comparison={d.comparison} />
         </div>
+        <p className="px-6 sm:px-8 pb-6 -mt-2 text-[12.5px] text-staff-muted">The recommendation explains the evidence; the department evaluator makes the final academic decision.</p>
       </section>
 
       {/* The evidence below in one place: what supports the proposal, where it differs, what needs attention */}
       <EvaluationContext
+        n={2}
         brief={d.brief}
         onRequestSyllabus={isOpen ? () => openDialog('info') : null}
         onConflicts={() => openSection('conflicts')}
@@ -272,28 +282,29 @@ export default function ReviewDetail() {
       />
 
       {/* Why the recommendation fits: BU outcomes and topics against the transfer course's description and syllabus */}
-      <CourseComparison comparison={d.comparison} src={src} buCourses={buCourses} />
+      <CourseComparison comparison={d.comparison} src={src} buCourses={buCourses} number={3} />
 
       {/* Details on demand */}
       <section className="staff-card mt-6 divide-y divide-staff-line2">
-        <Disclosure title="Transfer course details">
+        <NumberedTitle n={d.comparison ? 4 : 3} title="More details" />
+        <Disclosure icon={BookOpen} title="Transfer course details">
           <CourseDetails c={src} institution={src?.institution} />
         </Disclosure>
-        <Disclosure title={buCourses.length > 1 ? 'BU course details (combined award)' : 'BU course details'}>
+        <Disclosure icon={Library} title={buCourses.length > 1 ? 'BU course details (combined award)' : 'BU course details'}>
           {buCourses.length ? (
             <div className="space-y-6">{buCourses.map(c => <CourseDetails key={c.course_code} c={c} institution="Boston University" heading={buCourses.length > 1 ? c.course_code : null} />)}</div>
           ) : <p className="text-[14px] text-staff-muted">No BU course has been proposed for this course.</p>}
         </Disclosure>
-        <Disclosure id="matching-details" title="Supporting evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
+        <Disclosure id="matching-details" icon={ShieldCheck} title="Supporting evidence" open={evidenceOpen} onToggle={setEvidenceOpen}>
           <Evidence evidence={evidence} src={src} buCourses={buCourses} syllabus={d.syllabus} />
         </Disclosure>
         {previous && (
-          <Disclosure {...sectionProps('previous')} title={`Similar past decisions (${previous.total + (k.similar?.length || 0) + (d.similar_elsewhere?.courses.length || 0)})`}>
+          <Disclosure {...sectionProps('previous')} icon={HistoryIcon} title={`Similar past decisions (${previous.total + (k.similar?.length || 0) + (d.similar_elsewhere?.courses.length || 0)})`}>
             <PreviousDecisions k={k} src={src} target={r.target_bu_course} elsewhere={d.similar_elsewhere} />
           </Disclosure>
         )}
         {conflicts.length > 0 && (
-          <Disclosure {...sectionProps('conflicts')} title={<span className="flex items-center gap-2">Potential equivalency conflict<span className="w-2 h-2 rounded-full bg-amber-500" /></span>}>
+          <Disclosure {...sectionProps('conflicts')} icon={AlertTriangle} title={<span className="flex items-center gap-2">Potential equivalency conflict<span className="w-2 h-2 rounded-full bg-amber-500" /></span>}>
             <Conflicts
               k={k}
               src={src}
@@ -307,11 +318,11 @@ export default function ReviewDetail() {
           </Disclosure>
         )}
         {d.info_requests?.length > 0 && (
-          <Disclosure title={`Requests to the student (${d.info_requests.length})`}>
+          <Disclosure icon={MessagesSquare} title={`Requests to the student (${d.info_requests.length})`}>
             <InfoRequests requests={d.info_requests} />
           </Disclosure>
         )}
-        <Disclosure title="Evaluation history">
+        <Disclosure icon={ScrollText} title="Evaluation history">
           <History d={d} />
         </Disclosure>
       </section>
@@ -321,6 +332,7 @@ export default function ReviewDetail() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3">
           {isOpen ? (
             <>
+              <span className="hidden sm:grid w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 place-items-center flex-shrink-0"><Sparkles className="w-5 h-5" /></span>
               <div className="hidden sm:block min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-staff-muted">System recommendation · the decision is yours</p>
                 <p className="text-[15px] font-semibold text-staff-ink truncate font-mono">{mapping}</p>
@@ -481,25 +493,119 @@ function DocumentButton({ id, label, icon: Icon = FileText }) {
   return <Button variant="secondary" onClick={open} loading={busy}><Icon className="w-4 h-4" />{label}</Button>
 }
 
-// The match as the API describes it: a percentage only for a computed content similarity
-function MatchSummary({ r }) {
+// The match as the API describes it, on the line between the two courses: a percentage only for a computed
+// content similarity, otherwise the named level
+const VERDICT_TONES = {
+  good: { dot: 'bg-emerald-500 text-white', text: 'text-emerald-700', line: 'via-emerald-400' },
+  mid: { dot: 'bg-amber-400 text-amber-950', text: 'text-amber-700', line: 'via-amber-300' },
+  low: { dot: 'bg-rose-500 text-white', text: 'text-rose-700', line: 'via-rose-300' },
+  none: { dot: 'bg-staff-sunk text-staff-muted', text: 'text-staff-muted', line: 'via-staff-line' }
+}
+function Verdict({ r }) {
+  const cls = matchLabelClass(r.match_label)
+  const t = VERDICT_TONES[cls.includes('emerald') ? 'good' : cls.includes('amber') ? 'mid' : cls.includes('rose') ? 'low' : 'none']
+  const scored = r.match_kind === 'score'
+  const label = r.match_kind ? r.match_label : 'Not scored'
   return (
-    <div className="text-center sm:text-left">
-      <p className="text-[13px] font-medium text-staff-ink2">Course match</p>
-      {r.match_kind === 'score' ? (
-        <>
-          <p className="text-[44px] leading-none font-semibold text-staff-ink tabular-nums mt-1">{r.match_percent}%</p>
-          <p className={`text-[14px] font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
-          <p className="text-[12px] text-staff-muted mt-0.5">Content similarity</p>
-        </>
-      ) : r.match_kind === 'level' ? (
-        <>
-          <p className={`text-[22px] leading-tight font-semibold mt-1 ${matchLabelClass(r.match_label)}`}>{r.match_label}</p>
-          <p className="text-[12px] text-staff-muted mt-1">{r.match_basis === 'equivalency' ? 'Established equivalency' : 'Match level in the BU course-match catalog'}</p>
-        </>
-      ) : (
-        <p className="text-[20px] font-semibold text-staff-muted mt-2">Not scored</p>
-      )}
+    <div className="relative flex md:flex-col items-center justify-center gap-3 md:gap-0 py-2 md:py-0" aria-label={`Course match: ${label}`}>
+      <span className={`hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-staff-line ${t.line} to-red-200`} aria-hidden="true" />
+      <span className={`relative w-12 h-12 rounded-full grid place-items-center ring-8 ring-white shadow ${t.dot}`}>
+        {scored ? <span className="text-[13px] font-bold tabular-nums">{r.match_percent}%</span>
+          : r.match_kind ? (t === VERDICT_TONES.good ? <ShieldCheck className="w-6 h-6" /> : <CircleDashed className="w-6 h-6" />)
+          : <ArrowRight className="w-5 h-5" />}
+      </span>
+      <span className={`relative md:mt-2 text-[12px] font-semibold text-center bg-white px-1.5 ${t.text}`}>
+        {label}
+        <span className="block font-normal text-[11px] text-staff-muted">
+          {scored ? 'Content similarity' : r.match_basis === 'equivalency' ? 'Established equivalency' : r.match_kind === 'level' ? 'Course-match catalog' : ''}
+        </span>
+      </span>
+    </div>
+  )
+}
+
+const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+
+// A section title with its number, so the page reads as steps: match, evidence, comparison, details
+function NumberedTitle({ n, title, right }) {
+  return (
+    <div className="px-6 sm:px-8 pt-5 pb-4 flex flex-wrap items-center gap-2.5">
+      <span className="w-6 h-6 rounded-md bg-staff-ink text-white grid place-items-center text-[12px] font-semibold" aria-hidden="true">{n}</span>
+      <h2 className="text-[16px] font-semibold text-staff-ink flex-1">{title}</h2>
+      {right}
+    </div>
+  )
+}
+
+// Where the course is: received, assigned, this review, the department decision, posted
+const TRACK = ['Received', 'Assigned to you', 'Your review', 'Department decision', 'Posted']
+function ProgressTrack({ status }) {
+  if (status === 'withdrawn') return null
+  const decided = ['approved', 'rejected'].includes(status)
+  const current = status === 'queued' ? 1 : decided ? 4 : 2
+  return (
+    <ol className="px-6 sm:px-7 py-3.5 bg-staff-sunk/70 border-t border-staff-line2 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2 text-[13px]" aria-label="Progress">
+      {TRACK.map((step, i) => {
+        const done = i < current
+        const now = i === current && !decided
+        return (
+          <React.Fragment key={step}>
+            {i > 0 && <li aria-hidden="true" className={`hidden md:block flex-1 h-px ${done ? 'bg-emerald-300' : now ? 'bg-amber-300' : 'bg-staff-line'}`} />}
+            <li className={`inline-flex items-center gap-2 whitespace-nowrap ${done ? 'text-emerald-700 font-medium' : now ? 'text-amber-800 font-semibold' : 'text-staff-muted'}`} aria-current={now ? 'step' : undefined}>
+              {done ? <span className="w-5 h-5 rounded-full bg-emerald-500 text-white grid place-items-center"><Check className="w-3 h-3" strokeWidth={3} /></span>
+                : now ? <span className="w-5 h-5 rounded-full bg-amber-400 ring-4 ring-amber-100" />
+                : <span className="w-5 h-5 rounded-full border-2 border-staff-line bg-white" />}
+              {step}
+            </li>
+          </React.Fragment>
+        )
+      })}
+    </ol>
+  )
+}
+
+// What earlier decisions say: the established equivalency's use, else this course's earlier decisions
+function PrecedentSignal({ k, onPrevious }) {
+  const est = k?.established
+  const prev = k?.previous
+  const [big, line] = est?.times_applied > 0
+    ? [`${est.times_applied}×`, `${est.bu_course ? `${est.bu_course}: ` : ''}established equivalency applied ${est.times_applied} time${est.times_applied === 1 ? '' : 's'}`]
+    : prev?.total > 0
+      ? [String(prev.total), `earlier decision${prev.total === 1 ? '' : 's'} for this course${prev.most_common ? `, most often ${prev.most_common.award}` : ''}`]
+      : ['New', 'This course has not been evaluated before']
+  return (
+    <button type="button" onClick={onPrevious} className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 flex items-center gap-4 text-left hover:border-violet-300">
+      <span className="font-display text-[34px] font-semibold text-violet-800 leading-none whitespace-nowrap">{big}</span>
+      <span className="min-w-0"><span className="block text-[12px] font-semibold text-violet-800">Precedent</span><span className="block text-[13px] text-staff-ink2 mt-0.5">{line}</span></span>
+    </button>
+  )
+}
+
+// How many BU learning outcomes the transfer course's own text shows, as a ring
+function CoverageSignal({ comparison: c }) {
+  const oc = c?.outcome_coverage
+  if (!c?.has_source_text || !oc?.total) {
+    return (
+      <div className="rounded-xl border border-staff-line bg-staff-bg p-4 flex items-center gap-4">
+        <span className="w-[52px] h-[52px] rounded-full border-4 border-staff-line grid place-items-center text-staff-muted flex-shrink-0">—</span>
+        <span><span className="block text-[12px] font-semibold text-staff-ink2">Learning outcomes</span><span className="block text-[13px] text-staff-muted mt-0.5">Not compared yet: no description or syllabus on file</span></span>
+      </div>
+    )
+  }
+  const share = oc.covered / oc.total
+  const tone = share >= 0.75 ? ['border-emerald-200 bg-emerald-50/50', '#059669', '#a7f3d0', 'text-emerald-800'] : share >= 0.4 ? ['border-amber-200 bg-amber-50/50', '#d97706', '#fde68a', 'text-amber-800'] : ['border-rose-200 bg-rose-50/50', '#e11d48', '#fecdd3', 'text-rose-800']
+  const circ = 2 * Math.PI * 15
+  return (
+    <div className={`rounded-xl border p-4 flex items-center gap-4 ${tone[0]}`}>
+      <span className="relative w-[52px] h-[52px] flex-shrink-0" role="img" aria-label={`${oc.covered} of ${oc.total} outcomes covered`}>
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90" aria-hidden="true">
+          <circle cx="18" cy="18" r="15" fill="none" stroke={tone[2]} strokeWidth="4.5" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke={tone[1]} strokeWidth="4.5" strokeLinecap="round" strokeDasharray={`${share * circ} ${circ}`} />
+        </svg>
+        <span className="absolute inset-0 grid place-items-center font-display text-[14px] font-semibold text-staff-ink">{oc.covered}/{oc.total}</span>
+      </span>
+      <span className="min-w-0"><span className={`block text-[12px] font-semibold ${tone[3]}`}>Learning outcomes</span>
+        <span className="block text-[13px] text-staff-ink2 mt-0.5">{oc.covered} of {oc.total} BU outcomes evident in the transfer course{oc.partial ? ` · ${oc.partial} partly` : ''}</span></span>
     </div>
   )
 }
@@ -639,13 +745,18 @@ function BuCoursePicker({ selected, onChange }) {
   )
 }
 
-function CourseBox({ label, code, title, meta, emphasis = false }) {
+function CourseBox({ label, code, title, chips = [], emphasis = false }) {
   return (
-    <div className={`rounded-xl p-5 ${emphasis ? 'bg-primary-50/60 border border-primary-100' : 'bg-staff-bg border border-staff-line2'}`}>
-      <p className="text-[12.5px] font-medium text-staff-muted">{label}</p>
-      <p className={`font-mono text-[22px] font-semibold mt-1 ${emphasis ? 'text-primary-800' : 'text-staff-ink'}`}>{code || '—'}</p>
-      <p className="text-[16px] text-staff-ink mt-0.5">{title || 'Title not on file'}</p>
-      <p className="text-[13px] text-staff-muted mt-2">{meta.filter(Boolean).join(' · ')}</p>
+    <div className={`rounded-xl p-5 border ${emphasis ? 'border-red-200 bg-gradient-to-br from-red-50 to-white' : 'bg-staff-sunk/60 border-staff-line'}`}>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.07em] ${emphasis ? 'text-brand/80' : 'text-staff-muted'}`}>{label}</p>
+      <p className={`font-mono text-[22px] font-semibold mt-2 ${emphasis ? 'text-brand' : 'text-staff-ink'}`}>{code || '—'}</p>
+      <p className="text-[15px] text-staff-ink2 mt-0.5">{title || 'Title not on file'}</p>
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {chips.filter(Boolean).map((c, i) => {
+          const warn = typeof c === 'object' && c.warn
+          return <span key={i} className={`rounded-full px-2 py-0.5 text-[12px] font-medium border ${warn ? 'bg-amber-50 text-amber-800 border-amber-200' : emphasis ? 'bg-white text-staff-ink2 border-red-100' : 'bg-white text-staff-ink2 border-staff-line'}`}>{typeof c === 'object' ? c.text : c}</span>
+        })}
+      </div>
     </div>
   )
 }
@@ -715,10 +826,12 @@ function AttentionNotes({ d }) {
   if (d.combined_with?.length) notes.push(`Evaluated together with ${d.combined_with.map(c => `${c.course_code} ${c.title || ''}`.trim()).join(', ')} from the same transcript.`)
   if (!notes.length) return null
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-5 py-3.5 mb-6 space-y-1.5">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 mb-6 space-y-2">
       {notes.map((n, i) => (
-        <p key={i} className="flex gap-2 text-[14px] text-amber-900">
-          {n.startsWith('Evaluated together') ? <Link2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />}{n}
+        <p key={i} className="flex items-center gap-3 text-[14px] text-amber-900">
+          <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 grid place-items-center flex-shrink-0">
+            {n.startsWith('Evaluated together') ? <Link2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+          </span>{n}
         </p>
       ))}
     </div>
@@ -726,14 +839,14 @@ function AttentionNotes({ d }) {
 }
 
 // Collapsible section; open state can be controlled (Matching evidence opens from the summary link)
-function Disclosure({ id, title, open, onToggle, children }) {
+function Disclosure({ id, icon: Icon, title, open, onToggle, children }) {
   const [inner, setInner] = useState(false)
   const isOpen = open ?? inner
   const toggle = () => (onToggle ? onToggle(!isOpen) : setInner(!isOpen))
   return (
     <div id={id} className="scroll-mt-24">
       <button type="button" onClick={toggle} aria-expanded={isOpen} className="w-full flex items-center justify-between gap-3 px-6 py-4 text-left hover:bg-staff-bg">
-        <span className="text-[15px] font-semibold text-staff-ink">{title}</span>
+        <span className="flex items-center gap-3 text-[15px] font-semibold text-staff-ink">{Icon && <Icon className="w-[18px] h-[18px] text-staff-muted" />}{title}</span>
         <ChevronDown className={`w-5 h-5 text-staff-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen && <div className="px-6 pb-6">{children}</div>}
@@ -883,12 +996,12 @@ const CONTEXT_COLUMNS = { 1: '', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' }
 
 // The evidence on this page in one place, so the evaluator starts from a summary rather than from zero.
 // Every line is a fact the API derived from the records; the next step is a suggestion, never a decision.
-function EvaluationContext({ brief, onRequestSyllabus, onConflicts, onPrevious }) {
+function EvaluationContext({ n, brief, onRequestSyllabus, onConflicts, onPrevious }) {
   if (!brief) return null
   const groups = [
-    { key: 'supporting', title: 'Supporting evidence', items: brief.supporting, icon: Check, tone: 'text-emerald-600' },
-    { key: 'differences', title: 'Differences', items: brief.differences, icon: Minus, tone: 'text-amber-600' },
-    { key: 'attention', title: 'Needs attention', items: brief.attention, icon: AlertTriangle, tone: 'text-red-600' }
+    { key: 'supporting', title: 'Supporting evidence', items: brief.supporting, icon: Check, tone: 'text-emerald-600', box: 'border-emerald-100 bg-emerald-50/40', top: '#10b981', head: 'text-emerald-800' },
+    { key: 'differences', title: 'Differences', items: brief.differences, icon: Minus, tone: 'text-amber-600', box: 'border-amber-100 bg-amber-50/40', top: '#fbbf24', head: 'text-amber-800' },
+    { key: 'attention', title: 'Needs attention', items: brief.attention, icon: AlertTriangle, tone: 'text-red-600', box: 'border-red-100 bg-red-50/40', top: '#ef4444', head: 'text-red-800' }
   ].filter(g => g.items.length)
   const p = brief.precedent
   const precedent = [
@@ -901,18 +1014,16 @@ function EvaluationContext({ brief, onRequestSyllabus, onConflicts, onPrevious }
   ].filter(Boolean)
   const step = brief.next_step
   return (
-    <section className="staff-card p-6 sm:p-8 mt-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-5">
-        <h2 className="text-[17px] font-semibold text-staff-ink">Evaluation context</h2>
-        <p className="text-[12.5px] text-staff-muted">From the course records, the comparison below and earlier decisions</p>
-      </div>
+    <section className="staff-card mt-6">
+      <NumberedTitle n={n} title="Evidence" right={<p className="text-[12.5px] text-staff-muted">From the course records, the comparison below and earlier decisions</p>} />
+      <div className="px-6 sm:px-8 pb-6">
       {groups.length === 0 ? (
         <p className="text-[14px] text-staff-muted">No evidence on file for this course yet.</p>
       ) : (
         <div className={`grid grid-cols-1 gap-6 ${CONTEXT_COLUMNS[groups.length]}`}>
           {groups.map(g => (
-            <div key={g.key} className="min-w-0">
-              <p className="text-[13px] font-semibold text-staff-ink2 mb-2">{g.title}</p>
+            <div key={g.key} className={`min-w-0 rounded-xl border p-4 ${g.box}`} style={{ borderTop: `4px solid ${g.top}` }}>
+              <p className={`text-[13px] font-semibold mb-3 flex items-center justify-between ${g.head}`}>{g.title}<span className="rounded-full bg-white px-2 py-0.5 text-[11.5px]">{g.items.length}</span></p>
               <ul className="space-y-2">
                 {g.items.map((t, i) => (
                   <li key={i} className="flex gap-2 text-[14px] text-staff-ink leading-snug">
@@ -929,11 +1040,11 @@ function EvaluationContext({ brief, onRequestSyllabus, onConflicts, onPrevious }
         {precedent.map((t, i) => <span key={i}>{i > 0 && <span className="text-staff-muted mr-3">·</span>}{t}</span>)}
       </button>
       {step && (
-        <div className="mt-5 pt-5 border-t border-staff-line2 flex flex-wrap items-center gap-3">
-          <ShieldCheck className="w-5 h-5 text-primary-600 flex-shrink-0" />
+        <div className="mt-5 rounded-xl bg-staff-ink text-white px-5 py-3.5 flex flex-wrap items-center gap-3">
+          <Compass className="w-5 h-5 text-white/70 flex-shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-[12.5px] text-staff-muted">Suggested next step · the decision is yours</p>
-            <p className="text-[14.5px] font-medium text-staff-ink">{step.text}</p>
+            <p className="text-[12.5px] text-white/60">Suggested next step · the decision is yours</p>
+            <p className="text-[14.5px] font-medium">{step.text}</p>
           </div>
           {step.action === 'request_syllabus' && onRequestSyllabus && (
             <Button size="sm" variant="secondary" onClick={onRequestSyllabus}><MessageSquare className="w-3.5 h-3.5" />Request syllabus</Button>
@@ -943,6 +1054,7 @@ function EvaluationContext({ brief, onRequestSyllabus, onConflicts, onPrevious }
           )}
         </div>
       )}
+      </div>
     </section>
   )
 }
