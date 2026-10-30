@@ -16,7 +16,17 @@ export function createApp() {
   // limiter sees every user as the proxy's IP and they all share one quota
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
-  app.use(helmet({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: env.NODE_ENV === 'production' }));
+  // The review step previews the student's own transcript from the browser (a blob: URL) beside what was read
+  // from it, so frames, objects (the PDF viewer) and images may load blob: content; the rest is Helmet's default
+  const csp = env.NODE_ENV === 'production' && {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'frame-src': ["'self'", 'blob:'],
+      'object-src': ["'self'", 'blob:'],
+      'img-src': ["'self'", 'data:', 'blob:'],
+    },
+  };
+  app.use(helmet({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: csp }));
 
   const allowedOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(',').map((o) => o.trim())
