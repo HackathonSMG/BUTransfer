@@ -10,6 +10,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import { askAI } from './llm.mjs';
+import { isTestMistake as mistakeError } from './classify.mjs';
 
 const [resultsPath = 'test-results/results.json', outPath = 'qa-report.md'] = process.argv.slice(2);
 const env = process.env;
@@ -54,12 +55,10 @@ const raw = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
 const allTests = [];
 for (const s of raw.suites || []) collect(s, s.file, allTests);
 
-// AI-written tests guess locators and texts. When one fails only because its locator or text didn't match the
-// screen (strict-mode clash, element or text not found), it's the test's mistake, not an app bug: drop it from
-// the report. AI failures that point at the app (page errors, 5xx, wrong status codes, redirects) are kept.
-const TEST_MISTAKE = /strict mode violation|resolved to \d+ elements|element\(s\) not found|waiting for (getBy|locator)|Test timeout of \d+ms exceeded|to(Be(Visible|Enabled|Disabled|Hidden|Checked)|Have(Text|Count|Attribute|Value)|ContainText)\b/i;
-const APP_PROBLEM = /(status|Received)\D{0,12}5\d\d\b|pageerror|page error|Uncaught|TypeError|ReferenceError|net::ERR|response\.status|toBeOK|toHaveURL/i;
-const isTestMistake = (t) => t.ai_generated && t.status === 'failed' && TEST_MISTAKE.test(t.error || '') && !APP_PROBLEM.test(t.error || '');
+// AI-written tests that failed only because their locator or text didn't match the screen are the test's
+// mistake, not an app bug (rules in classify.mjs): leave them out of the report. The test writer also switches off
+// (test.skip) tests that still didn't match after its trial run; those are left out too.
+const isTestMistake = (t) => t.ai_generated && ((t.status === 'failed' && mistakeError(t.error)) || t.status === 'skipped');
 const discarded = allTests.filter(isTestMistake);
 const tests = allTests.filter((t) => !isTestMistake(t));
 
@@ -129,12 +128,12 @@ function fallbackReport(reason) {
     ['| Tag | Problem statement | Status | Passed |', '|---|---|---|---|', ...coverageRows()].join('\n'),
     '',
     '### New regressions',
-    regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n')[0]).slice(0, 160)} |`)].join('\n') : 'None',
+    regressions.length ? ['| Test | Project | Error |', '|---|---|---|', ...regressions.map((t) => `| ${cell(t.title)} | ${t.project} | ${cell((t.error || '').split('\n').map((l) => l.trim()).filter((l) => /^(Error|Locator|Expected|Received)/.test(l)).slice(0, 4).join(' · ')).slice(0, 300)} |`)].join('\n') : 'None',
     '', '### AI-written tests for this build',
     aiTests.length
       ? aiTests.map((t) => `- ${t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭'} ${t.title}${t.error ? ` — ${(t.error || '').split('\n')[0].slice(0, 120)}` : ''}`).join('\n')
-      : `None this run: ${discarded.length ? 'every AI test that failed did not match the screen' : summary.ai_tests.note || 'the test-writer step did not run'}`,
-    ...(discarded.length ? [`_${discarded.length} AI-written test${discarded.length > 1 ? 's were' : ' was'} dropped: ${discarded.length > 1 ? 'they' : 'it'} failed only because the AI's locator or text did not match the screen (not an app bug)._`] : []),
+      : `None this run: ${discarded.length ? 'the AI tests that were written used texts not on the screens' : summary.ai_tests.note || 'the test-writer step did not run'}`,
+    ...(discarded.length ? [`_${discarded.length} AI-written test${discarded.length > 1 ? 's were' : ' was'} dropped: ${discarded.length > 1 ? 'they' : 'it'} used texts that are not on the screens or did not match them, so they were not counted (not app bugs)._`] : []),
     '', '### Known bugs still failing',
     failed.filter((t) => t.known_bug).map((t) => `- #${t.known_bug} ${t.title}`).join('\n') || 'None',
   ].join('\n');

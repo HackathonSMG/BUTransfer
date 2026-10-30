@@ -38,7 +38,7 @@ async function blockSaving(page) {
 
 async function openApplication(page) {
   await page.goto('/apply');
-  await expect(page.getByRole('heading', { name: 'Upload your official transcript(s)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Upload your official transcripts' })).toBeVisible();
 }
 
 /** Adds files in step 1 and waits until each one has been read. */
