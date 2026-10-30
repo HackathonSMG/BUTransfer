@@ -1,27 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare, Stamp, Copy, FileText } from 'lucide-react'
+import { Inbox, UserX, Gauge, MessageSquare, AlertTriangle, ArrowRightLeft, Clock, CheckCircle2, ArrowRight, BarChart3, GitCompare, Stamp, Copy, FileText, Files, Hourglass, BadgeCheck, Users, Flag, Activity } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getOverview, assignPendingApplications, getAdminCounts } from '../../api/admin'
 import PeriodCounts from '../../components/staff/PeriodCounts'
 import { useAuth } from '../../hooks/useAuth'
-import PageHeader from '../../components/staff/PageHeader'
-import Metric from '../../components/staff/Metric'
+import PageHeader, { BannerAction } from '../../components/staff/PageHeader'
+import Metric, { MetricBadge } from '../../components/staff/Metric'
+import { SectionTitle, AttentionList, ActivityTimeline } from '../../components/staff/Section'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-import { greeting, timeAgo, activityLabel } from '../../lib/staffFormat'
+import { greeting } from '../../lib/staffFormat'
 
 // Counted per course or per evaluation by the API; "now" cards are open work, the others follow the chosen period
 const ADMIN_CARDS = [
-  { key: 'transcripts', label: 'Transcripts received', detail: c => `${c.evaluations_received} evaluation${c.evaluations_received === 1 ? '' : 's'}` },
-  { key: 'courses', label: 'Courses received' },
-  { key: 'pending', label: 'Pending evaluations', now: true, detail: () => 'not started' },
-  { key: 'in_progress', label: 'In progress', now: true },
-  { key: 'completed', label: 'Completed evaluations', detail: c => `${c.completed_by_department} by departments` },
-  { key: 'reassigned', label: 'Reassigned' },
-  { key: 'awaiting_credit_office', label: 'Awaiting Credit Office', now: true, detail: c => `${c.awaiting_credit_office_courses} courses`, to: '/office' },
-  { key: 'credit_transfers_completed', label: 'Credit transfers completed', detail: c => `${c.credits_posted} credits posted` }
+  { key: 'transcripts', stage: 'received', label: 'Transcripts received', detail: c => `${c.evaluations_received} evaluation${c.evaluations_received === 1 ? '' : 's'}` },
+  { key: 'courses', stage: 'received', label: 'Courses received' },
+  { key: 'pending', stage: 'progress', label: 'Pending evaluations', now: true, detail: () => 'not started' },
+  { key: 'in_progress', stage: 'progress', label: 'In progress', now: true },
+  { key: 'completed', stage: 'done', label: 'Completed evaluations', detail: c => `${c.completed_by_department} by departments` },
+  { key: 'reassigned', stage: 'progress', label: 'Reassigned' },
+  { key: 'awaiting_credit_office', stage: 'progress', label: 'Awaiting Credit Office', now: true, detail: c => `${c.awaiting_credit_office_courses} courses`, to: '/office' },
+  { key: 'credit_transfers_completed', stage: 'done', label: 'Credit transfers completed', detail: c => `${c.credits_posted} credits posted` }
 ]
 
 export default function AdminDashboard() {
@@ -68,7 +69,7 @@ export default function AdminDashboard() {
   // Only what an administrator should act on, each one click from where it's handled
   const items = [
     a.ready_for_posting > 0 && {
-      icon: Stamp, tone: 'neutral',
+      icon: Stamp, tone: 'good',
       title: `${a.ready_for_posting} evaluation${a.ready_for_posting === 1 ? ' is' : 's are'} fully decided and ready to post`,
       detail: 'Post the transfer credit to the student record.',
       to: '/office', cta: 'Credit Office'
@@ -139,69 +140,62 @@ export default function AdminDashboard() {
         banner
         eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''} · ${today}`}
         title="Transfer Credit Overview"
-        actions={<Link to="/admin/reports" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800"><BarChart3 className="w-4 h-4" />Reports</Link>}
+        subtitle={`${d.applications} credit evaluations · ${d.students} students · ${d.evaluators} evaluators`}
+        actions={<>
+          {a.ready_for_posting > 0 && (
+            <BannerAction as={Link} to="/office" solid>
+              <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center"><Stamp className="w-3.5 h-3.5" /></span>
+              <b>{a.ready_for_posting}</b> ready to post<ArrowRight className="w-3.5 h-3.5 text-staff-muted" />
+            </BannerAction>
+          )}
+          {a.suspected_duplicates > 0 && (
+            <BannerAction as={Link} to="/office">
+              <span className="w-6 h-6 rounded-full bg-amber-400 text-amber-950 grid place-items-center"><Copy className="w-3.5 h-3.5" /></span>
+              <b>{a.suspected_duplicates}</b> possible duplicate{a.suspected_duplicates === 1 ? '' : 's'}<ArrowRight className="w-3.5 h-3.5 text-white/70" />
+            </BannerAction>
+          )}
+          <BannerAction as={Link} to="/admin/reports">
+            <span className="w-6 h-6 rounded-full bg-white/20 grid place-items-center"><BarChart3 className="w-3.5 h-3.5" /></span>Reports
+          </BannerAction>
+        </>}
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric label="Credit evaluations" value={d.applications} detail={`${d.students} students`} to="/admin/applications" />
-        <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" />
-        <Metric label="Completed" value={d.completed_applications} detail={`${d.credits_posted ?? 0} credits posted · ${d.established_applied ?? 0} courses by established equivalency`} />
-        <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" />
+        <Metric label="Credit evaluations" value={d.applications} detail={`${d.students} students`} to="/admin/applications" icon={Files} tone="sky"
+          bar={[{ value: d.open_applications, tone: 'amber', label: 'in review' }, { value: d.completed_applications, tone: 'emerald', label: 'completed' }]} barOf={d.applications} />
+        <Metric label="In review" value={d.open_applications} detail={`${d.reviews.open} courses with evaluators`} to="/admin/applications" icon={Hourglass} tone="amber"
+          badge={d.applications > 0 && <MetricBadge tone="amber">{Math.round((d.open_applications / d.applications) * 100)}% of all</MetricBadge>}
+          bar={{ value: d.open_applications, of: d.applications }} />
+        <Metric label="Completed" value={d.completed_applications} detail={`${d.established_applied ?? 0} courses by established equivalency`} icon={BadgeCheck} tone="emerald"
+          badge={<MetricBadge tone="emerald">{d.credits_posted ?? 0} credits posted</MetricBadge>}
+          bar={{ value: d.completed_applications, of: d.applications }} />
+        <Metric label="Evaluators" value={d.active_evaluators} detail={`${d.evaluators - d.active_evaluators} inactive`} to="/admin/users" icon={Users} tone="violet"
+          bar={[{ value: d.active_evaluators, tone: 'violet', label: 'active' }, { value: d.evaluators - d.active_evaluators, tone: 'slate', label: 'inactive' }]} barOf={d.evaluators} />
       </div>
 
-      <PeriodCounts title="Transfer credit by period" fetchCounts={getAdminCounts} cards={ADMIN_CARDS} />
+      <PeriodCounts title="Transfer credit by period" subtitle="From transcript received to credit posted" fetchCounts={getAdminCounts} cards={ADMIN_CARDS} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 items-start">
         <section className="staff-card">
-          <h2 className="px-6 pt-5 pb-3 text-[17px] font-semibold text-staff-ink">Needs attention</h2>
+          <SectionTitle icon={Flag} title="Needs attention"
+            right={items.length > 0 && <MetricBadge tone="red">{items.length} item{items.length === 1 ? '' : 's'}</MetricBadge>} />
           {items.length === 0 ? (
-            <div className="flex items-center gap-3 px-6 pb-6 text-[15px] text-staff-ink2">
+            <div className="flex items-center gap-3 px-6 py-6 text-[15px] text-staff-ink2">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               Nothing needs your attention right now.
             </div>
           ) : (
-            <ul className="divide-y divide-staff-line2 border-t border-staff-line2">
-              {items.map(item => (
-                <li key={item.title} className="flex items-center gap-4 px-6 py-4">
-                  <span className={`w-9 h-9 rounded-full grid place-items-center flex-shrink-0 ${
-                    item.tone === 'bad' ? 'bg-red-50 text-red-700' : item.tone === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-staff-sunk text-staff-ink2'
-                  }`}>
-                    <item.icon className="w-[18px] h-[18px]" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-medium text-staff-ink">{item.title}</span>
-                    <span className="block text-[13px] text-staff-muted truncate">{item.detail}</span>
-                  </span>
-                  {item.action || (item.to && (
-                    <Link to={item.to} className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800 whitespace-nowrap">
-                      {item.cta}<ArrowRight className="w-4 h-4" />
-                    </Link>
-                  ))}
-                </li>
-              ))}
-            </ul>
+            <AttentionList items={items} />
           )}
         </section>
 
         <section className="staff-card">
-          <div className="flex items-center justify-between px-6 pt-5 pb-3">
-            <h2 className="text-[17px] font-semibold text-staff-ink">Recent activity</h2>
-            <Link to="/admin/audit" className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">View all</Link>
-          </div>
+          <SectionTitle icon={Activity} tone="sky" title="Recent activity"
+            right={<Link to="/admin/audit" className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">View all</Link>} />
           {d.recent_activity.length === 0 ? (
-            <p className="px-6 pb-6 text-sm text-staff-muted">No activity yet.</p>
+            <p className="px-6 py-6 text-sm text-staff-muted">No activity yet.</p>
           ) : (
-            <ul className="border-t border-staff-line2">
-              {d.recent_activity.slice(0, 6).map((r, i) => (
-                <li key={i} className="flex items-baseline justify-between gap-3 px-6 py-3 text-[14px]">
-                  <span className="min-w-0">
-                    <span className="block text-staff-ink truncate">{activityLabel(r.action)}</span>
-                    <span className="block text-[12.5px] text-staff-muted truncate">{[r.reference_number, r.student_name, r.actor].filter(Boolean).join(' · ')}</span>
-                  </span>
-                  <span className="text-[12.5px] text-staff-muted whitespace-nowrap">{timeAgo(r.created_at)}</span>
-                </li>
-              ))}
-            </ul>
+            <ActivityTimeline rows={d.recent_activity.slice(0, 6)} context={r => [r.reference_number, r.student_name, r.actor].filter(Boolean).join(' · ')} />
           )}
         </section>
       </div>
