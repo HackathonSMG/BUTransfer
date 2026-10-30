@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight
+  Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight, LayoutGrid, List
 } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile } from '../../api/admin'
@@ -13,6 +13,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import PageHeader from '../../components/staff/PageHeader'
 import StatusPill from '../../components/staff/StatusPill'
+import { MetricBadge } from '../../components/staff/Metric'
 import { initials, avatarTint, REVIEW_STATUS } from '../../lib/reviews'
 
 const INITIAL_FORM = {
@@ -391,6 +392,208 @@ function EvaluatorRow({ ev, onOpen }) {
   )
 }
 
+const NEAR_CAPACITY = 'Near capacity'
+const isNearCapacity = (ev) => ev.attention.includes(NEAR_CAPACITY)
+
+// Open reviews split by stage: blue new, amber in progress, light amber waiting for the student
+const STAGES = [
+  ['new_reviews', 'new', 'bg-sky-500'],
+  ['in_progress_reviews', 'in progress', 'bg-amber-400'],
+  ['waiting_reviews', 'waiting for students', 'bg-amber-200']
+]
+
+function StageBar({ counts, className = 'h-2 rounded-full' }) {
+  return (
+    <span className={`flex overflow-hidden bg-staff-line2 ${className}`} aria-hidden="true">
+      {STAGES.map(([k, , bar]) => counts[k] > 0 && <span key={k} className={bar} style={{ flexGrow: counts[k] }} />)}
+    </span>
+  )
+}
+
+// Open reviews against capacity as a ring (the percentage comes from the API)
+function CapacityRing({ pct }) {
+  const c = 2 * Math.PI * 15.5
+  const value = Math.min(100, pct || 0)
+  const warn = value >= 80
+  return (
+    <span className="relative w-16 h-16 flex-shrink-0" role="img" aria-label={pct == null ? 'No capacity set' : `${pct}% of capacity`}>
+      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90" aria-hidden="true">
+        <circle cx="18" cy="18" r="15.5" fill="none" stroke={warn ? '#fef3c7' : '#e0f2fe'} strokeWidth="4" />
+        {value > 0 && <circle cx="18" cy="18" r="15.5" fill="none" stroke={warn ? '#d97706' : '#0284c7'} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(value / 100) * c} ${c}`} />}
+      </svg>
+      <span className="absolute inset-0 grid place-items-center font-display tabular-nums text-[13px] font-semibold text-staff-ink">{pct == null ? '—' : `${pct}%`}</span>
+    </span>
+  )
+}
+
+function AvailabilityPill({ ev }) {
+  if (isNearCapacity(ev)) return <MetricBadge tone="amber" icon={AlertTriangle}>Near capacity</MetricBadge>
+  if (!ev.is_active) return <StatusPill tone="neutral">Inactive</StatusPill>
+  if (ev.availability === 'unavailable') {
+    return <StatusPill tone="warn">Unavailable{ev.unavailable_until ? ` until ${ev.unavailable_until.slice(0, 10)}` : ''}</StatusPill>
+  }
+  return <StatusPill tone="ok">Available</StatusPill>
+}
+
+// One evaluator as a card: capacity, open work by stage, recent output and expertise. Opens the profile.
+function EvaluatorCard({ ev, onOpen }) {
+  const near = isNearCapacity(ev)
+  const stale = ev.attention.some(a => a.startsWith('Oldest open'))
+  const otherFlags = ev.attention.filter(a => a !== NEAR_CAPACITY)
+  const stages = STAGES.filter(([k]) => ev[k] > 0).map(([k, label]) => `${ev[k]} ${label}`)
+  const courses = ev.expertise_courses || []
+  const subjects = ev.expertise_subjects || []
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(ev)}
+        className={`staff-card w-full h-full p-5 text-left transition hover:shadow-lift hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${near ? 'ring-1 ring-amber-300 !border-amber-200' : ''} ${ev.is_active ? '' : 'opacity-60'}`}
+      >
+        <span className="flex items-start gap-3">
+          <span className={`w-11 h-11 rounded-full grid place-items-center text-[13px] font-semibold flex-shrink-0 ${avatarTint(ev.full_name)}`}>{initials(ev.full_name)}</span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-semibold text-staff-ink truncate">{ev.full_name}</span>
+            <span className="block text-[12.5px] text-staff-muted truncate">{[ev.title, ev.department].filter(Boolean).join(' · ') || '—'}</span>
+          </span>
+          <AvailabilityPill ev={ev} />
+        </span>
+
+        {ev.open_reviews > 0 ? (
+          <>
+            <span className="mt-4 flex items-center gap-4">
+              <CapacityRing pct={ev.workload_pct} />
+              <span className="flex-1 min-w-0">
+                <StageBar counts={ev} />
+                <span className="block text-[12px] text-staff-muted mt-1.5">
+                  <b className="text-staff-ink">{ev.open_reviews} open</b>
+                  {ev.max_concurrent_cases ? ` of ${ev.max_concurrent_cases}` : ''} · {stages.join(' · ')}
+                  {ev.queued_reviews > 0 && ` · ${ev.queued_reviews} upcoming`}
+                </span>
+              </span>
+            </span>
+            <span className="mt-4 grid grid-cols-3 gap-2 text-center text-[12px]">
+              <span className={`rounded-lg py-2 ${ev.completed_7d > 0 ? 'bg-emerald-50' : 'bg-staff-sunk'}`}>
+                <b className={`block font-display tabular-nums text-[15px] font-semibold ${ev.completed_7d > 0 ? 'text-emerald-700' : 'text-staff-ink'}`}>{ev.completed_7d ?? 0}</b>
+                <span className="text-staff-muted">done 7 days</span>
+              </span>
+              <span className="rounded-lg bg-staff-sunk py-2">
+                <b className="block font-display tabular-nums text-[15px] font-semibold text-staff-ink">{ev.completed_month ?? 0}</b>
+                <span className="text-staff-muted">this month</span>
+              </span>
+              <span className={`rounded-lg py-2 ${stale ? 'bg-amber-50' : 'bg-staff-sunk'}`}>
+                <b className={`block font-display tabular-nums text-[15px] font-semibold ${stale ? 'text-amber-800' : 'text-staff-ink'}`}>{ev.oldest_open_days != null ? `${ev.oldest_open_days}d` : '—'}</b>
+                <span className="text-staff-muted">oldest open</span>
+              </span>
+            </span>
+          </>
+        ) : (
+          <span className="mt-4 block rounded-lg border border-dashed border-staff-line px-4 py-5 text-center text-[12.5px] text-staff-muted">
+            No open reviews{ev.is_active && ev.availability !== 'unavailable' && ev.department ? ` · ready for ${ev.department} courses` : ''}
+            {ev.queued_reviews > 0 && ` · ${ev.queued_reviews} upcoming`}
+            {ev.completed_month > 0 && <span className="block mt-1">{ev.completed_month} completed this month</span>}
+          </span>
+        )}
+
+        {otherFlags.length > 0 && (
+          <span className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-amber-800">
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" /><span className="truncate">{otherFlags[0]}</span>
+          </span>
+        )}
+
+        <span className="mt-4 flex flex-wrap gap-1.5">
+          {courses.length > 0 ? (
+            <>
+              {courses.slice(0, 2).map(c => <span key={c} className="rounded-full px-2 py-0.5 bg-staff-sunk text-staff-ink2 font-mono text-[11px]">{c}</span>)}
+              {courses.length > 2 && <span className="rounded-full px-2 py-0.5 bg-staff-sunk text-staff-ink2 text-[11px]">+{courses.length - 2}</span>}
+            </>
+          ) : subjects.includes('GEN') ? (
+            <span className="text-[12px] text-staff-muted">General credit · all subjects</span>
+          ) : subjects.length > 0 ? (
+            subjects.map(s => <span key={s} className="rounded-full px-2 py-0.5 bg-staff-sunk text-staff-ink2 font-mono text-[11px]">{s}</span>)
+          ) : (
+            <span className="text-[12px] text-staff-muted">Routed by department</span>
+          )}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+// The team in four numbers: who is active, open work against capacity, recent output, who is near capacity
+function TeamSummary({ summary, evaluators }) {
+  const active = evaluators.filter(e => e.is_active)
+  const capacity = active.reduce((n, e) => n + (e.max_concurrent_cases || 0), 0)
+  const month = evaluators.reduce((n, e) => n + (e.completed_month || 0), 0)
+  const week = evaluators.reduce((n, e) => n + (e.completed_7d || 0), 0)
+  const near = evaluators.filter(isNearCapacity)
+  const stat = (value, label, detail, color = 'text-staff-ink') => (
+    <div>
+      <p className={`font-display tabular-nums text-[34px] font-semibold leading-none ${color}`}>{value}</p>
+      <p className="text-[13px] text-staff-ink2 mt-1.5">{label}</p>
+      <p className="text-[12px] text-staff-muted">{detail}</p>
+    </div>
+  )
+  return (
+    <div className="staff-card p-5 grid grid-cols-2 gap-4">
+      {stat(summary.active, `active evaluator${summary.active === 1 ? '' : 's'}`, `${summary.departments} departments · ${summary.courses_covered} BU courses`)}
+      {stat(summary.open_reviews, 'open course reviews', capacity > 0 ? `${Math.round((100 * summary.open_reviews) / capacity)}% of team capacity` : 'No capacity set', 'text-sky-800')}
+      {stat(month, 'completed this month', `${week} in the last 7 days`, 'text-emerald-700')}
+      {near.length > 0 ? (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+          <p className="font-display tabular-nums text-[34px] font-semibold leading-none text-amber-700">{near.length}</p>
+          <p className="text-[13px] text-amber-900 mt-1.5">near capacity</p>
+          <p className="text-[12px] text-amber-800 truncate">
+            {near.length === 1 ? `${near[0].full_name} · ${near[0].open_reviews} open` : near.map(e => e.full_name).join(', ')}
+          </p>
+        </div>
+      ) : stat(0, 'near capacity', 'Everyone has room for new courses')}
+    </div>
+  )
+}
+
+// Open reviews per department, stacked by stage, longest first
+function DepartmentLoad({ evaluators }) {
+  const rows = useMemo(() => {
+    const by = new Map()
+    for (const e of evaluators.filter(x => x.is_active)) {
+      const d = e.department || 'Other'
+      const r = by.get(d) || { department: d, new_reviews: 0, in_progress_reviews: 0, waiting_reviews: 0, open: 0 }
+      for (const [k] of STAGES) r[k] += e[k] || 0
+      r.open = r.new_reviews + r.in_progress_reviews + r.waiting_reviews
+      by.set(d, r)
+    }
+    return [...by.values()].filter(r => r.open > 0).sort((a, b) => b.open - a.open)
+  }, [evaluators])
+  const max = rows[0]?.open || 0
+  return (
+    <div className="staff-card p-5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="text-[14px] font-semibold text-staff-ink">Open reviews by department</h2>
+        <p className="flex flex-wrap gap-3 text-[11.5px] text-staff-muted">
+          {[['New', 'bg-sky-500'], ['In progress', 'bg-amber-400'], ['Waiting for student', 'bg-amber-200']].map(([l, c]) => (
+            <span key={l} className="inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${c}`} aria-hidden="true" />{l}</span>
+          ))}
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-staff-muted py-6 text-center">No open course reviews.</p>
+      ) : (
+        <ul className="space-y-2 text-[12.5px] max-h-[220px] overflow-y-auto">
+          {rows.map(r => (
+            <li key={r.department} className="grid grid-cols-[minmax(0,150px)_1fr_28px] items-center gap-3">
+              <span className="text-staff-ink2 truncate" title={r.department}>{r.department}</span>
+              <span className="sr-only">{r.new_reviews} new, {r.in_progress_reviews} in progress, {r.waiting_reviews} waiting for student</span>
+              <span className="block" title={`${r.new_reviews} new · ${r.in_progress_reviews} in progress · ${r.waiting_reviews} waiting for student`} style={{ width: `${Math.max(4, (r.open / max) * 100)}%` }}><StageBar counts={r} className="h-3 rounded-sm" /></span>
+              <span className="text-right font-semibold text-staff-ink tabular-nums">{r.open}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // Side panel with one evaluator's profile, loaded from the API
 // Available or on leave. Going on leave moves the evaluator's open courses to the best eligible evaluators
 // (the API does the reassignment and keeps the history); returning lets queued office work be placed again.
@@ -557,6 +760,7 @@ export default function UserManagement() {
   const [department, setDepartment] = useState('')
   const [status, setStatus] = useState('active')
   const [attentionOnly, setAttentionOnly] = useState(false)
+  const [view, setView] = useState('cards')
 
   const load = async () => {
     try {
@@ -628,51 +832,72 @@ export default function UserManagement() {
         }
       />
 
-      {summary && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px] text-staff-ink2">
-          <span><b className="text-staff-ink font-semibold">{summary.active}</b> active evaluators</span>
-          <span><b className="text-staff-ink font-semibold">{summary.departments}</b> departments</span>
-          <span><b className="text-staff-ink font-semibold">{summary.courses_covered}</b> BU courses covered</span>
-          <span><b className="text-staff-ink font-semibold">{summary.open_reviews}</b> open reviews</span>
-          {summary.need_attention > 0 && (
-            <button
-              type="button"
-              onClick={() => setAttentionOnly(v => !v)}
-              aria-pressed={attentionOnly}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[14px] font-medium ${attentionOnly ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300'}`}
-            >
-              <AlertTriangle className="w-4 h-4" />{summary.need_attention} need{summary.need_attention === 1 ? 's' : ''} attention
-            </button>
-          )}
-        </div>
+      {summary && evaluators.length > 0 && (
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1.35fr] gap-5" aria-label="Team capacity">
+          <TeamSummary summary={summary} evaluators={evaluators} />
+          <DepartmentLoad evaluators={evaluators} />
+        </section>
       )}
 
-      <section className="staff-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-staff-line2 grid grid-cols-1 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.8fr)] gap-3">
-          <div className="relative">
+      <section>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-staff-muted pointer-events-none" />
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search name, subject or course..." aria-label="Search evaluators"
-              className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-staff-line rounded-lg bg-white placeholder:text-staff-muted focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
             />
           </div>
-          <Select aria-label="Department" placeholder="All departments" options={departments.map(d => ({ value: d, label: d }))} value={department} onChange={e => setDepartment(e.target.value)} />
-          <Select aria-label="Status" placeholder="Active and inactive" options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+          <Select className="w-full sm:w-48" aria-label="Department" placeholder="All departments" options={departments.map(d => ({ value: d, label: d }))} value={department} onChange={e => setDepartment(e.target.value)} />
+          <Select className="w-full sm:w-44" aria-label="Status" placeholder="Active and inactive" options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
             value={status === 'all' ? '' : status} onChange={e => setStatus(e.target.value || 'all')} />
+          {summary?.need_attention > 0 && (
+            <button
+              type="button"
+              onClick={() => setAttentionOnly(v => !v)}
+              aria-pressed={attentionOnly}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium ${attentionOnly ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300'}`}
+            >
+              <AlertTriangle className="w-4 h-4" />{summary.need_attention} need{summary.need_attention === 1 ? 's' : ''} attention
+            </button>
+          )}
+          <div className="ml-auto rounded-lg bg-staff-sunk p-1 flex text-[12.5px] text-staff-muted" role="group" aria-label="View">
+            {[['cards', 'Cards', LayoutGrid], ['table', 'Table', List]].map(([key, label, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                aria-pressed={view === key}
+                className={`px-2.5 py-1 rounded-md inline-flex items-center gap-1 ${view === key ? 'bg-white text-staff-ink font-medium shadow-sm' : 'hover:text-staff-ink'}`}
+              >
+                <Icon className="w-3.5 h-3.5" aria-hidden="true" />{label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {evaluators.length === 0 ? (
-          <EmptyState icon={Users} title="No evaluators yet" description="Import the staff roster to create the evaluator accounts for each department, or add evaluators one at a time." action={() => setImportOpen(true)} actionLabel="Import staff roster" />
+          <div className="staff-card">
+            <EmptyState icon={Users} title="No evaluators yet" description="Import the staff roster to create the evaluator accounts for each department, or add evaluators one at a time." action={() => setImportOpen(true)} actionLabel="Import staff roster" />
+          </div>
         ) : visible.length === 0 ? (
-          <EmptyState icon={Search} title="No evaluators match" description="Try another name, subject or department." />
-        ) : (
-          <ul className="divide-y divide-staff-line2">
-            <li className="hidden md:grid grid-cols-[minmax(0,1.6fr)_6rem_6rem_minmax(0,1fr)_1rem] gap-x-5 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
-              <span>Evaluator</span><span>Pending</span><span>Completed</span><span>Workload</span><span />
-            </li>
-            {visible.map(ev => <EvaluatorRow key={ev.id} ev={ev} onOpen={e => setOpenId(e.id)} />)}
+          <div className="staff-card">
+            <EmptyState icon={Search} title="No evaluators match" description="Try another name, subject or department." />
+          </div>
+        ) : view === 'cards' ? (
+          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {visible.map(ev => <EvaluatorCard key={ev.id} ev={ev} onOpen={e => setOpenId(e.id)} />)}
           </ul>
+        ) : (
+          <div className="staff-card overflow-hidden">
+            <ul className="divide-y divide-staff-line2">
+              <li className="hidden md:grid grid-cols-[minmax(0,1.6fr)_6rem_6rem_minmax(0,1fr)_1rem] gap-x-5 px-6 py-2.5 bg-staff-bg/60 staff-eyebrow">
+                <span>Evaluator</span><span>Pending</span><span>Completed</span><span>Workload</span><span />
+              </li>
+              {visible.map(ev => <EvaluatorRow key={ev.id} ev={ev} onOpen={e => setOpenId(e.id)} />)}
+            </ul>
+          </div>
         )}
       </section>
 
