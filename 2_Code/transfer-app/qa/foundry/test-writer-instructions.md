@@ -64,11 +64,13 @@ disclaimer "...not an official transfer credit decision; academic departments ma
 Colleges with data: Northeastern University, New York University, Pacific Coast State University, Riverside Community College.
 
 /apply (pages/applicant/TransferCreditApplication.jsx), transcript-first, no account:
-- Steps list: role list named "Submission steps" with "Upload Transcripts", "Review & Confirm", "Transfer Credit ID".
+- Steps list: role list named "Submission steps" with "Upload", "Review & confirm", "Transfer Credit ID"
+  (only rendered from step 2 onward; step 1 does not show it).
 - Step 1 heading "Upload your official transcripts"; file input; button "Review details" (disabled until a transcript is read).
   A non-transcript file shows "...use a PDF, Word, JPG or PNG file". Reading a transcript stores nothing,
   but you have no transcript files: do not upload anything.
-- Step 2 heading "Review and confirm" (only reachable after an upload; don't test it).
+- Step 2 heading "Check what we read" (only reachable after an upload; don't test it). A detected student field
+  (name, program, start term) shows an "Auto-filled" badge; a course list shows "N course(s) found · Semester/Quarter".
 - Nothing is saved until "Submit for Credit Evaluation". NEVER click it.
 /track (pages/applicant/TrackApplication.jsx): heading "Transfer Credit Status"; labels "Transfer Credit ID"
 (placeholder "TC-2026-0001", auto upper-case), "Email address"; button "Check Status".

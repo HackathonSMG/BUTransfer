@@ -1,8 +1,8 @@
 // Shared helpers for the transcript-first submission at /apply (pages/applicant/TransferCreditApplication.jsx)
 // and for the team's test-case transcripts in 5_Test_Cases/transcripts.
 //
-// Step 1 "Upload Transcripts" reads each file with POST /api/student/transcripts/read, which stores NOTHING.
-// Step 2 "Review & Confirm" only shows what was read. Data is saved ONLY when "Submit for Credit Evaluation"
+// Step 1 "Upload" reads each file with POST /api/student/transcripts/read, which stores NOTHING.
+// Step 2 "Review & confirm" only shows what was read. Data is saved ONLY when "Submit for Credit Evaluation"
 // is clicked, so tests that stop before that are safe on production. blockSaving() enforces it.
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -49,7 +49,7 @@ async function uploadTranscripts(page, files) {
 
 const reviewDetails = async (page) => {
   await page.getByRole('button', { name: /Review details/ }).click();
-  await expect(page.getByRole('heading', { name: 'Review and confirm' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Check what we read' })).toBeVisible();
 };
 
 function requireWriteSafeSite() {
