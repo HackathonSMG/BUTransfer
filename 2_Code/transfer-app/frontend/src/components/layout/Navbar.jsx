@@ -47,17 +47,18 @@ export default function Navbar() {
                 </button>
               </>
             ) : user ? (
-              // Signed-in staff on a student page: say who is signed in, and offer the way back and a sign-out
+              // Signed-in staff on a student page (for example a tracking link from an email opened in the same
+              // browser): keep the page looking like the student page; a discreet way back and a sign-out, with who
+              // is signed in on hover and for screen readers
               <>
-                <span className="hidden lg:block text-right leading-tight ml-1 pl-3 border-l border-gray-200">
-                  <span className="block text-xs font-medium text-gray-900">{user.full_name || user.email}</span>
-                  <span className="block text-[11px] text-gray-500">{ROLE_LABELS[user.role] || user.role}</span>
-                </span>
-                <Link to={homeFor(user.role)} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <LayoutDashboard className="w-4 h-4" /><span className="hidden sm:inline">My workspace</span>
+                <Link to={homeFor(user.role)} title={`Signed in as ${user.full_name || user.email} (${ROLE_LABELS[user.role] || user.role})`}
+                  className="inline-flex items-center gap-1.5 ml-1 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900">
+                  <LayoutDashboard className="w-4 h-4" /><span className="hidden sm:inline">Staff workspace</span>
+                  <span className="sr-only">, signed in as {user.full_name || user.email}</span>
                 </Link>
-                <button onClick={signOut} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100">
-                  <LogOut className="w-4 h-4" /><span className="hidden sm:inline">Sign out</span>
+                <button onClick={signOut} title="Sign out of the staff workspace" aria-label="Sign out of the staff workspace"
+                  className="inline-flex items-center px-2 py-2 text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-800">
+                  <LogOut className="w-4 h-4" />
                 </button>
               </>
             ) : pathname !== '/login' && (
