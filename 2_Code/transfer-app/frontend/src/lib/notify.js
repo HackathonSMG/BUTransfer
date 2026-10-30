@@ -2,10 +2,12 @@
 // notify.success(text), notify.error(text), notify(text).
 //
 // Where a message appears: an error goes to the innermost open region (the dialog the user is working in, else the
-// page); a success or notice always goes to the page, because the dialog that triggered it usually closes. A message
-// stays until it is dismissed, replaced or the user moves to another page. { keepOnNavigate: true } keeps it for the
+// page); a success or notice always goes to the page, because the dialog that triggered it usually closes. A success
+// or notice closes itself after a few seconds; an error stays until it is dismissed, replaced or the user moves to
+// another page. { keepOnNavigate: true } keeps it for the
 // next page (e.g. a confirmation shown after leaving a page the user no longer has access to).
 
+const AUTO_DISMISS_MS = 6000
 const listeners = new Set()
 let messages = []
 let seq = 0
@@ -21,6 +23,8 @@ function push(kind, text, { keepOnNavigate = false } = {}) {
   // One message per region: the newest replaces the last, so the page never fills with stale notes
   messages = [...messages.filter((m) => m.region !== region), message]
   emit()
+  // Confirmations and notices close themselves; errors stay until dismissed so they are never missed
+  if (kind !== 'error') setTimeout(() => notify.dismiss(message.id), AUTO_DISMISS_MS)
   return message.id
 }
 
