@@ -68,9 +68,11 @@ Colleges with data: Northeastern University, New York University, Pacific Coast 
   (only rendered from step 2 onward; step 1 does not show it).
 - Step 1 heading "Upload your official transcripts"; file input; button "Review details" (disabled until a transcript is read).
   A non-transcript file shows "...use a PDF, Word, JPG or PNG file". Reading a transcript stores nothing,
-  but you have no transcript files: do not upload anything.
+  but you have no transcript files: do not upload anything. Once read, each file's row shows separate chips
+  "N course(s)" and "Semester" or "Quarter" (two different text nodes, not one joined string).
 - Step 2 heading "Check what we read" (only reachable after an upload; don't test it). A detected student field
-  (name, program, start term) shows an "Auto-filled" badge; a course list shows "N course(s) found · Semester/Quarter".
+  (name, program, start term) shows an "Auto-filled" badge; each transcript's accordion button shows one joined
+  line "N course(s) found · Semester/Quarter" (this one IS a single text run, unlike the step 1 chips).
 - Nothing is saved until "Submit for Credit Evaluation". NEVER click it.
 /track (pages/applicant/TrackApplication.jsx): heading "Transfer Credit Status"; labels "Transfer Credit ID"
 (placeholder "TC-2026-0001", auto upper-case), "Email address"; button "Check Status".

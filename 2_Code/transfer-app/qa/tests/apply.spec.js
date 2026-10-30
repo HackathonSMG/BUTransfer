@@ -46,10 +46,12 @@ test.describe('[STEP-2] Each test-case transcript is read correctly (nothing sub
       await A.openApplication(page);
       await A.uploadTranscripts(page, c.transcripts.map((t) => t.path));
 
-      // Step 1: one line per transcript with the college, course count and calendar
+      // Step 1: one line per transcript with the college, course count and calendar. The count and the
+      // calendar are two separate chips (TransferCreditApplication.jsx:752-754), not one joined text run.
       for (const t of c.transcripts) {
         await expect(page.getByText(t.institution).first()).toBeVisible();
-        await expect(page.getByText(new RegExp(`${t.courses.length} courses? found · ${t.calendar}`, 'i')).first()).toBeVisible();
+        await expect(page.getByText(new RegExp(`${t.courses.length} courses?$`, 'i')).first()).toBeVisible();
+        await expect(page.getByText(t.calendar, { exact: true }).first()).toBeVisible();
       }
       if (c.transcripts.some((t) => /quarter/i.test(t.calendar))) {
         test.info().annotations.push({ type: 'RULE-QUARTER', description: 'Quarter-system transcript recognised as Quarter' });
