@@ -60,7 +60,11 @@ test.describe('[STEP-2] Each test-case transcript is read correctly (nothing sub
       // Step 2: details taken from the transcript, so the student is not asked to type them
       await A.reviewDetails(page);
       const t = c.transcripts[0];
-      const field = (label) => page.locator('div').filter({ has: page.locator('dt', { hasText: new RegExp(`^${label}$`) }) }).last();
+      // The <dt> renders the label directly followed by a chip, e.g. "NameAuto-filled: read automatically..."
+      // (DetectedField, jsx:943-944: {label}{chip}, no separator) — so an anchored ^label$ never matches once a
+      // field is read. Match the label as the start of the dt's text instead, with the next field's label
+      // ("BU program"/"BU start term"/"Student ID") never being a prefix of another, so this stays unambiguous.
+      const field = (label) => page.locator('div').filter({ has: page.locator('dt', { hasText: new RegExp(`^${label}`) }) }).last();
       await expect(field('Name')).toContainText(t.student);
       await expect(field('BU program')).toContainText(t.major);
       await expect(field('BU start term')).toContainText(t.start);
