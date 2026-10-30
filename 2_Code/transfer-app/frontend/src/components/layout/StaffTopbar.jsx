@@ -19,12 +19,13 @@ function crumbsFor(pathname, role) {
   if (pathname === '/admin/conflicts') return ['Course Mapping', 'Equivalency Conflicts']
   if (pathname === '/admin/applications') return role === 'credit_office' ? ['Credit Evaluation Office', 'Credit Evaluations'] : ['Administration', 'Credit Evaluations']
   if (pathname === '/evaluator/applications/new') return ['Administration', 'Credit Evaluations', 'New Evaluation']
+  if (pathname === '/staff/upload-transcript') return ['Administration', 'Credit Evaluations', 'Upload transcript for a student']
   if (pathname.startsWith('/evaluator/applications/')) {
     return role === 'admin' ? ['Administration', 'Credit Evaluations', 'Evaluation Report'] : role === 'credit_office' ? ['Credit Evaluation Office', 'Credit Evaluations', 'Evaluation Report'] : ['My Workspace', 'My Evaluations', 'Application Review']
   }
   if (pathname === '/evaluator/equivalencies') return ['Course Mapping', 'Course Equivalencies']
   if (pathname === '/admin') return ['Administration', 'Dashboard']
-  if (pathname === '/admin/users') return ['Administration', 'Evaluators']
+  if (pathname === '/admin/users') return ['Administration', 'Staff']
   if (pathname === '/admin/criteria') return ['Administration', 'Eligibility Criteria']
   if (pathname === '/admin/audit') return ['Administration', 'Audit Logs']
   return ['BU Transfer Portal']

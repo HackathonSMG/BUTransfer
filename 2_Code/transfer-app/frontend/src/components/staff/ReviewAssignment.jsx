@@ -7,7 +7,7 @@ import { pendingFor, formatDateTime } from '../../lib/staffFormat'
 // course's evaluator, and the assignment history. All of it comes from the API (ownership.service); staff only.
 // onReassign(course): when given (Credit Evaluation Office, administrators), each open course gets a Reassign action
 export default function ReviewAssignment({ ownership, onReassign = null }) {
-  const [showCourses, setShowCourses] = useState(true)
+  const [showCourses, setShowCourses] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   if (!ownership) return null
   const { stage_label: stageLabel, tone, summary, owners = [], blocking = [], courses = [], history = [] } = ownership

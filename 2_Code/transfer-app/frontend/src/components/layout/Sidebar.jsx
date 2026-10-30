@@ -55,7 +55,7 @@ const adminSections = [
       { to: '/office', label: 'Credit Office', icon: Stamp, end: true },
       { to: '/admin/applications', label: 'Credit Evaluations', icon: FileText, alsoActive: isApplicationDetail },
       { to: '/evaluator/lookup', label: 'Evaluation Lookup', icon: FileSearch },
-      { to: '/admin/users', label: 'Evaluators', icon: Users },
+      { to: '/admin/users', label: 'Staff', icon: Users },
       { to: '/evaluator/equivalencies', label: 'Course Equivalencies', icon: Library },
       { to: '/admin/conflicts', label: 'Equivalency Conflicts', icon: GitCompare },
       { to: '/admin/reports', label: 'Reports', icon: BarChart3 }

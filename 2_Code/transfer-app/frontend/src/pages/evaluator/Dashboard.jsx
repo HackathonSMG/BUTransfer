@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ClipboardList, FilePlus, SlidersHorizontal, AlertTriangle, UserX, UserRound, Building2, Clock, X, ChevronRight } from 'lucide-react'
+import { ClipboardList, FilePlus, Upload, SlidersHorizontal, AlertTriangle, UserX, UserRound, Building2, Clock, X, ChevronRight } from 'lucide-react'
 import { listApplications } from '../../api/applications'
 import ApplicationFilters from '../../components/evaluator/ApplicationFilters'
 import PageHeader from '../../components/staff/PageHeader'
@@ -102,10 +102,16 @@ export default function ApplicationsList() {
         title="Credit Evaluations"
         subtitle={stats ? `${stats.total} transfer credit evaluations received` : ' '}
         actions={
-          <Button onClick={() => navigate('/evaluator/applications/new')}>
-            <FilePlus className="w-4 h-4" />
-            New Evaluation
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => navigate('/evaluator/applications/new')}>
+              <FilePlus className="w-4 h-4" />
+              New Evaluation
+            </Button>
+            <Button onClick={() => navigate('/staff/upload-transcript')}>
+              <Upload className="w-4 h-4" />
+              Upload transcript for a student
+            </Button>
+          </>
         }
       />
 

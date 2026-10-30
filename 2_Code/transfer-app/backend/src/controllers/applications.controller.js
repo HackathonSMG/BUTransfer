@@ -37,7 +37,14 @@ const evaluatorSubmitSchema = z.object({
   academic_history: z.record(z.any()).optional().default({}),
   personal_statement: z.string().max(5000).optional().nullable(),
   additional_info: z.record(z.any()).optional().default({}),
+  // true: keep it as a draft until the transcripts are attached (POST /applications/:id/submit). Default: submitted now
+  draft: z.boolean().optional().default(false),
+  // true: staff uploading a transcript on the student's behalf (recorded on the application and in the audit log)
+  on_behalf: z.boolean().optional().default(false),
 });
+
+const ROLE_LABELS = { admin: 'Administrator', credit_office: 'Credit Evaluation Office', evaluator: 'Evaluator' };
+const roleLabel = (role) => ROLE_LABELS[role] || role;
 
 const infoRequestSchema = z.object({
   items: z.array(z.object({ type: z.string().min(1), description: z.string().min(1), is_blocking: z.boolean().optional().default(false) })).min(1),
@@ -93,8 +100,33 @@ export async function createApplication(req, res, next) {
   try {
     const parseResult = evaluatorSubmitSchema.safeParse(req.body);
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
-    const application = await applicationService.createApplication(parseResult.data, 'evaluator_submitted', req.user.id);
+    const { draft, on_behalf: onBehalf, ...fields } = parseResult.data;
+    // Who submitted on the student's behalf comes from the session, never from the request
+    const { submitted_on_behalf: _ignored, ...additionalInfo } = fields.additional_info || {};
+    fields.additional_info = onBehalf
+      ? { ...additionalInfo, submitted_on_behalf: { by_id: req.user.id, by_name: req.user.full_name || req.user.email, by_role: req.user.role, at: new Date().toISOString() } }
+      : additionalInfo;
+    const application = await applicationService.createApplication(fields, 'evaluator_submitted', req.user.id, { draft });
     return res.status(201).json({ data: application });
+  } catch (err) { return next(err); }
+}
+
+const staffSubmitSchema = z.object({ applicant_comments: z.string().max(5000).optional().nullable() });
+
+// Staff submit a draft they created for a student (after uploading the transcripts). Same checks and processing as
+// the student's own submission: a transcript is required, the student receives the confirmation email, duplicate
+// detection and the evaluation start.
+export async function submitDraftApplication(req, res, next) {
+  try {
+    const parsed = staffSubmitSchema.safeParse(req.body || {});
+    if (!parsed.success) return next(badRequest('Validation failed', parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return next(notFound('Application'));
+    const name = req.user.full_name || req.user.email;
+    const application = await applicationService.submitApplication(req.params.id, req.user.id, {
+      applicantComments: parsed.data.applicant_comments,
+      reason: `Submitted by ${name} (${roleLabel(req.user.role)}) on behalf of the student`,
+    });
+    return res.status(200).json({ data: { id: application.id, reference_number: application.reference_number, status: application.status, student_email: application.student_email } });
   } catch (err) { return next(err); }
 }
 
@@ -185,4 +217,4 @@ export async function approveAutomaticCourses(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-export default { listApplications, getApplication, createApplication, triggerEvaluation, createInfoRequest, submitDecision, updateStatus, getAuditLog, addNote, decideCourse, approveAutomaticCourses };
+export default { listApplications, getApplication, createApplication, submitDraftApplication, triggerEvaluation, createInfoRequest, submitDecision, updateStatus, getAuditLog, addNote, decideCourse, approveAutomaticCourses };

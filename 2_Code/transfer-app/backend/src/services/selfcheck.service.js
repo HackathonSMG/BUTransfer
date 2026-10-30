@@ -65,7 +65,7 @@ export async function selfCheck({ institution, courses }) {
     const known = cat.get(k)?.[0];
     if (e) {
       status = 'established';
-      likely = e.bu_course ? withTitle(e.bu_course) : 'Elective credit';
+      likely = e.outcome === 'No credit' ? 'No credit' : e.bu_course && e.outcome !== 'Elective credit' ? withTitle(e.bu_course) : 'Elective credit';
       summary = 'This course has an established equivalency. It is normally applied without a syllabus.';
     } else if (d.length) {
       const awards = [...new Set(d.map((x) => x.bu_awarded).filter((x) => x && x !== '—'))];
@@ -92,7 +92,8 @@ export async function selfCheck({ institution, courses }) {
       else if (g.grade === 'P') notes.push(`A Pass grade is reviewed by the department to confirm it meets the ${POLICY.minimumGrade} minimum.`);
       else if (g.eligible === null) notes.push('The final grade will be needed before credit can be awarded.');
     }
-    const units = buCredits(c.credits, c.credit_system);
+    // An established "No credit" equivalency earns nothing, whatever the course's credits
+    const units = e?.outcome === 'No credit' ? 0 : buCredits(c.credits, c.credit_system);
     if (units != null && /quarter/i.test(c.credit_system || '')) notes.push(`Quarter credits convert to two-thirds: ${Number(c.credits)} quarter credits = ${units} BU credits.`);
 
     return {

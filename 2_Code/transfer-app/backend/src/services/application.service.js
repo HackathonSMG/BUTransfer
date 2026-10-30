@@ -43,7 +43,9 @@ export async function createApplication(data, source = 'website', createdBy = nu
   );
 
   const application = result.rows[0];
-  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source } });
+  // Staff uploading a transcript for a student: who did it is part of the creation record
+  const onBehalf = data.additional_info?.submitted_on_behalf || null;
+  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source, ...(onBehalf && { submitted_on_behalf: onBehalf }) } });
   if (draft) return application;
   return finishSubmission(application, createdBy, source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
 }
@@ -69,7 +71,7 @@ async function finishSubmission(application, actorId, reason) {
  * Submits a draft once its documents are attached: at least one transcript is required. The transcript has
  * already been read (courses extracted) on upload, so the evaluation that starts here sees every course.
  */
-export async function submitApplication(applicationId, actorId = null, { applicantComments } = {}) {
+export async function submitApplication(applicationId, actorId = null, { applicantComments, reason = 'Submitted by the applicant' } = {}) {
   const { rows: [application] } = await query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
   if (!application) throw notFound('Application');
   if (application.status !== 'draft') throw badRequest('This application has already been submitted.');
@@ -81,7 +83,7 @@ export async function submitApplication(applicationId, actorId = null, { applica
     await query(`UPDATE applications SET applicant_comments = $1 WHERE id = $2`, [text, applicationId]);
     application.applicant_comments = text;
   }
-  return finishSubmission(application, actorId, 'Submitted by the applicant');
+  return finishSubmission(application, actorId, reason);
 }
 
 // Details an applicant can change while the application is still a draft
@@ -173,7 +175,9 @@ export async function listApplications({ status, source, search, assignedEvaluat
   if (dateFrom) { conditions.push(`COALESCE(a.submitted_at, a.created_at) >= $${idx++}::date`); params.push(dateFrom); }
   if (dateTo) { conditions.push(`COALESCE(a.submitted_at, a.created_at) < $${idx++}::date + 1`); params.push(dateTo); }
   if (search) {
-    conditions.push(`(a.student_name ILIKE $${idx} OR a.student_email ILIKE $${idx} OR a.reference_number ILIKE $${idx} OR a.transfer_from_institution ILIKE $${idx})`);
+    conditions.push(`(a.student_name ILIKE $${idx} OR a.student_email ILIKE $${idx} OR a.reference_number ILIKE $${idx} OR a.transfer_from_institution ILIKE $${idx}`
+      // The Student ID printed on the transcript(s)
+      + ` OR a.academic_history->>'transcript_student_ids' ILIKE $${idx})`);
     params.push(`%${search}%`); idx++;
   }
 

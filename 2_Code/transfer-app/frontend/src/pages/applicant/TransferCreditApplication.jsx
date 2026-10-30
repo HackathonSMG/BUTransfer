@@ -10,12 +10,13 @@ import {
   readTranscriptFile, startApplication, uploadApplicationDocument, submitApplicationForEvaluation,
   checkExistingApplications, emailApplicationNumbers
 } from '../../api/student'
+import { createDraftOnBehalf, uploadDocument as uploadStaffDocument, submitOnBehalf } from '../../api/applications'
 import { useAuth } from '../../hooks/useAuth'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
-import students from '../../assets/campus-students.jpg'
+import students from '../../assets/students-crowd.jpg'
 import { ACCEPTED, MAX_MB, formatSize } from '../../components/applicant/DocumentDropzone'
 import { PROGRAMS, TERMS, PROGRAM_DEPARTMENTS } from '../../lib/application'
 import { homeFor, ROLE_LABELS } from '../../lib/homeFor'
@@ -53,7 +54,11 @@ export default function TransferCreditApplication() {
   return <SubmissionFlow accountEmail={isAuthenticated ? user.email : null} />
 }
 
-function SubmissionFlow({ accountEmail }) {
+// onBehalf (staff only, see pages/staff/UploadForStudent): { user, student: { name, email, earlier }, onChangeStudent,
+// manualEntry }. Staff upload for a student: the same reading, review and corrections, then the staff APIs create a
+// draft on the student's behalf, attach the files and submit it. Without it (the student) nothing here changes.
+export function SubmissionFlow({ accountEmail, onBehalf = null }) {
+  const staff = Boolean(onBehalf)
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [transcripts, setTranscripts] = useState([])
@@ -71,6 +76,16 @@ function SubmissionFlow({ accountEmail }) {
   const [progress, setProgress] = useState('')
   const [submitError, setSubmitError] = useState('')
   const draft = useRef({ token: null, uploaded: new Set() })
+
+  // Staff: the student chosen (or entered) prefills the name and the email; choosing another starts a new draft
+  const chosen = onBehalf?.student || null
+  useEffect(() => {
+    if (!staff || !chosen) return
+    setEmail(chosen.email || '')
+    setManual(m => ({ ...m, name: chosen.name || '' }))
+    setConfirmed(false)
+    draft.current = { token: null, uploaded: new Set() }
+  }, [staff, chosen])
 
   // ---- Transcripts: read each one as it is added ----
   const latest = useRef(transcripts)
@@ -133,7 +148,8 @@ function SubmissionFlow({ accountEmail }) {
   }
   const restoreDetail = (key) => { setEdited(e => ({ ...e, [key]: false })); setConfirmed(false) }
   const reviewTranscript = (key, review) => { patch(key, { review }); setConfirmed(false) }
-  const emailOk = EMAIL.test(email.trim()) && (accountEmail || email.trim().toLowerCase() === confirmEmail.trim().toLowerCase())
+  // Staff enter the student's email once (prefilled from the student chosen); students confirm theirs
+  const emailOk = EMAIL.test(email.trim()) && (accountEmail || staff || email.trim().toLowerCase() === confirmEmail.trim().toLowerCase())
   const ready = usable.length > 0 && !reading && institutionsOk && finalName.length >= 2 && finalProgram && finalTerm && emailOk
   const canSubmit = ready && confirmed && !submitting
 
@@ -145,15 +161,16 @@ function SubmissionFlow({ accountEmail }) {
     setSubmitError('')
     setSubmitting(true)
     try {
-      if (!allowAnother && !draft.current.token) {
+      // Staff see the student's earlier evaluations before starting; a new one is flagged for duplicate review
+      if (!staff && !allowAnother && !draft.current.token) {
         setProgress('Checking for an earlier evaluation…')
         const { data } = await checkExistingApplications(email.trim())
         if (data.exists) { setExisting(data); setSubmitting(false); setProgress(''); window.scrollTo({ top: 0, behavior: 'smooth' }); return }
       }
       if (!draft.current.token) {
-        setProgress('Creating your transfer credit evaluation…')
+        setProgress(staff ? 'Creating the transfer credit evaluation…' : 'Creating your transfer credit evaluation…')
         const programValue = PROGRAMS.find(p => p.label.toLowerCase() === finalProgram.toLowerCase())?.value
-        const { data } = await startApplication({
+        const { data } = await (staff ? createDraftOnBehalf : startApplication)({
           student_name: finalName,
           student_email: email.trim(),
           transfer_from_institution: institutions.join('; '),
@@ -169,7 +186,8 @@ function SubmissionFlow({ accountEmail }) {
             })
           }
         })
-        draft.current = { token: data.secure_token, uploaded: new Set() }
+        // The student's draft is reached by its secure token; the staff one by its id
+        draft.current = { token: staff ? data.id : data.secure_token, uploaded: new Set() }
       }
       const files = [...transcripts.filter(t => t.status !== 'error').map(t => [t, 'transcript']), ...supporting.map(s => [s, 'supporting'])]
       for (const [i, [item, type]] of files.entries()) {
@@ -179,10 +197,17 @@ function SubmissionFlow({ accountEmail }) {
         const reviewed = type === 'transcript' && item.review
           ? { institution: item.review.institution.trim(), courses: item.status === 'read' ? item.review.courses : [] }
           : undefined
-        await uploadApplicationDocument(draft.current.token, item.file, type, undefined, reviewed)
+        if (staff) await uploadStaffDocument(draft.current.token, item.file, type, reviewed)
+        else await uploadApplicationDocument(draft.current.token, item.file, type, undefined, reviewed)
         draft.current.uploaded.add(item.key)
       }
       setProgress('Submitting for credit evaluation…')
+      if (staff) {
+        const { data } = await submitOnBehalf(draft.current.token, comments.trim())
+        notify.success(`Submitted for ${finalName}: Transfer Credit ID ${data.reference_number}. The student has been emailed the confirmation.`, { keepOnNavigate: true })
+        navigate(`/office/applications/${data.id}`, { replace: true })
+        return
+      }
       const { data } = await submitApplicationForEvaluation(draft.current.token, comments.trim())
       navigate('/apply/submitted', { replace: true, state: { ...data, student: finalName.split(' ')[0], institutions } })
     } catch (err) {
@@ -211,25 +236,28 @@ function SubmissionFlow({ accountEmail }) {
     )
   }
 
+  const banner = staff ? <OnBehalfBanner student={chosen} name={finalName} onChange={onBehalf.onChangeStudent} /> : null
+
   // ---- Step 2: the transcript on the left, what was read (editable) on the right ----
   if (step === 2) {
     return (
       <div className="bg-paper min-h-[calc(100vh-4rem)]">
-        <StepBand step={2} title="Check what we read" intro="Your transcript is on the left. Correct anything on the right that doesn't match it." />
+        {banner}
+        <StepBand step={2} title="Check what we read" intro={staff ? "The student's transcript is on the left. Correct anything on the right that doesn't match it." : "Your transcript is on the left. Correct anything on the right that doesn't match it."} />
         <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <aside className="lg:col-span-5 lg:sticky lg:top-20">
             <DocumentPreview transcripts={usable} />
           </aside>
 
           <div className="lg:col-span-7 space-y-5">
-            <ReviewCard icon={UserRound} tone="red" title="You" subtitle="Read from your transcript; the BU details are asked for"
+            <ReviewCard icon={UserRound} tone="red" title={staff ? 'Student' : 'You'} subtitle={staff ? "Read from the student's transcript; the BU details are asked for" : 'Read from your transcript; the BU details are asked for'}
               right={!(finalName.length >= 2 && finalProgram && finalTerm)
                 ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11.5px] font-medium text-amber-800">To complete</span>
                 : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-medium text-emerald-700">Complete</span>}>
               <dl className="p-5 sm:p-6 grid sm:grid-cols-2 gap-4">
                 <DetectedField label="Name" value={detected.name} conflict={names.length > 1 ? names : null}
                   edited={edited.name} onEdit={() => editDetail('name')} onRestore={() => restoreDetail('name')}
-                  input={<Input aria-label="Your full name" value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} placeholder="Your full name" />} />
+                  input={<Input aria-label={staff ? "Student's full name" : 'Your full name'} value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} placeholder={staff ? "Student's full name" : 'Your full name'} />} />
                 <DetectedField label="Student ID" value={studentIds.join(', ') || null} optional note="As printed on your transcript" />
                 <DetectedField label="BU program" value={detected.program} conflict={programs.length > 1 ? programs : null}
                   edited={edited.program} onEdit={() => editDetail('program')} onRestore={() => restoreDetail('program')}
@@ -245,17 +273,17 @@ function SubmissionFlow({ accountEmail }) {
             <ReviewCard icon={Landmark} tone="sky" title={`Transcripts (${transcripts.length})`} subtitle="Open a college to see its courses; correct any that were read wrongly"
               right={<button type="button" onClick={() => setStep(1)} className="text-[13px] font-semibold text-brand hover:underline">Add or remove</button>}>
               <ul className="divide-y divide-gray-100">
-                {transcripts.map(t => <TranscriptSummary key={t.key} t={t} defaultOpen={transcripts.length <= 2} onReview={review => reviewTranscript(t.key, review)} />)}
+                {transcripts.map(t => <TranscriptSummary key={t.key} t={t} onReview={review => reviewTranscript(t.key, review)} />)}
               </ul>
             </ReviewCard>
 
-            <ReviewCard icon={Mail} tone="violet" title="Where we send updates" subtitle="Not on a transcript">
+            <ReviewCard icon={Mail} tone="violet" title={staff ? "Student's email for updates" : 'Where we send updates'} subtitle={staff ? 'The confirmation email and every update go here' : 'Not on a transcript'}>
               <div className="p-5 sm:p-6 space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <Input label="Email address" required type="email" autoComplete="email" value={email} disabled={Boolean(accountEmail)}
-                    onChange={e => { setEmail(e.target.value); setAllowAnother(false); draft.current = { token: null, uploaded: new Set() } }} placeholder="you@example.com"
+                  <Input label={staff ? "Student's email address" : 'Email address'} required type="email" autoComplete="email" value={email} disabled={Boolean(accountEmail)}
+                    onChange={e => { setEmail(e.target.value); setAllowAnother(false); draft.current = { token: null, uploaded: new Set() } }} placeholder={staff ? 'student@example.com' : 'you@example.com'}
                     error={email && !EMAIL.test(email.trim()) ? 'Enter a valid email address' : ''} />
-                  {!accountEmail && (
+                  {!accountEmail && !staff && (
                     <Input label="Confirm email address" required type="email" autoComplete="email" value={confirmEmail} onPaste={e => e.preventDefault()}
                       onChange={e => setConfirmEmail(e.target.value)}
                       error={confirmEmail && email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase() ? 'The email addresses do not match' : ''} />
@@ -278,7 +306,9 @@ function SubmissionFlow({ accountEmail }) {
               <div className="p-5 sm:p-6 space-y-4">
                 <label className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors ${ready ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} ${confirmed ? 'border-brand/60 bg-red-50/40' : 'border-gray-200'}`}>
                   <input type="checkbox" checked={confirmed} disabled={!ready} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#cc0000] flex-shrink-0" />
-                  <span className="text-sm text-gray-700">I confirm that the information above is correct and I want to submit these transcripts for transfer credit evaluation.</span>
+                  <span className="text-sm text-gray-700">{staff
+                    ? "I confirm that the information above is correct and I want to submit these transcripts for transfer credit evaluation on the student's behalf."
+                    : 'I confirm that the information above is correct and I want to submit these transcripts for transfer credit evaluation.'}</span>
                 </label>
                 <div className="flex items-center gap-3 text-[13px] text-gray-500">
                   <span className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden" aria-hidden="true">
@@ -304,31 +334,37 @@ function SubmissionFlow({ accountEmail }) {
   // the documents on the left and what was found on the right ----
   const hasFiles = transcripts.length > 0
   return (
+    <>
+    {banner}
     <div className="bg-paper min-h-[calc(100vh-4rem)] relative">
       <div className={`absolute inset-x-0 top-0 bg-gradient-to-br from-brand to-brand-dark ${hasFiles ? 'h-[200px]' : 'h-[330px]'}`} aria-hidden="true" />
       <div className="relative max-w-[1216px] mx-auto px-4 sm:px-6 pt-10 pb-14 grid grid-cols-1 lg:grid-cols-12 gap-8">
         <section className="lg:col-span-5">
           {hasFiles
-            ? <DocumentsPanel transcripts={transcripts} onFiles={addTranscripts} onRemove={removeTranscript} onRetry={read} />
-            : <StoryPanel />}
+            ? <DocumentsPanel transcripts={transcripts} onFiles={addTranscripts} onRemove={removeTranscript} onRetry={read} staff={staff} />
+            : <StoryPanel staff={staff} />}
         </section>
 
         <section className="lg:col-span-7">
           <div className="bg-white rounded-2xl shadow-raised border border-gray-200/70 overflow-hidden">
             {hasFiles ? (
               <FoundSummary transcripts={transcripts} readable={readable} usable={usable} reading={reading}
-                student={{ name: detected.name, studentId: studentIds.join(', ') }} />
+                student={{ name: detected.name, studentId: studentIds.join(', ') }} staff={staff} />
             ) : (
               <>
                 <div className="px-6 sm:px-8 pt-7 pb-6 border-b border-gray-100 flex items-start justify-between gap-6">
                   <div>
                     <p className="text-[12px] font-semibold text-brand tracking-wide uppercase">Step 1 of 3</p>
-                    <h2 className="text-[22px] font-semibold text-gray-900 mt-1">Upload your official transcripts</h2>
+                    <h2 className="text-[22px] font-semibold text-gray-900 mt-1">{staff ? "Upload the student's official transcripts" : 'Upload your official transcripts'}</h2>
                     <p className="text-[14px] text-gray-500 mt-1">Each file is read as soon as you add it. Nothing is stored until you submit.</p>
                   </div>
                   <StepDots step={1} />
                 </div>
                 <div className="px-6 sm:px-8 py-7">
+                  <div className="mb-4 flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-200/70 px-4 py-3">
+                    <span className="w-8 h-8 rounded-lg bg-white text-emerald-700 grid place-items-center shadow-sm flex-shrink-0" aria-hidden="true"><Sparkles className="w-4 h-4" /></span>
+                    <p className="text-[13.5px] leading-snug text-emerald-900"><span className="font-semibold">Read in seconds.</span> Courses, grades and terms come straight from {staff ? "the student's" : 'your'} transcript; you check them on the next step.</p>
+                  </div>
                   <TranscriptDrop onFiles={addTranscripts} />
                   <div className="mt-6 grid sm:grid-cols-3 gap-3">
                     <Tip icon={FileCheck2} tone="emerald" title="Use the official copy" text="The PDF your college issued reads best" />
@@ -339,34 +375,75 @@ function SubmissionFlow({ accountEmail }) {
               </>
             )}
             <footer className="flex items-center justify-between gap-3 px-6 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/70">
-              <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"><ChevronLeft className="w-4 h-4" />Home</Link>
+              {staff
+                ? <Link to="/admin/applications" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"><ChevronLeft className="w-4 h-4" />Credit Evaluations</Link>
+                : <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"><ChevronLeft className="w-4 h-4" />Home</Link>}
               <Button onClick={goReview} disabled={reading || usable.length === 0}>{reading ? <><Loader2 className="w-4 h-4 animate-spin" />Reading…</> : <>Review details<ChevronRight className="w-4 h-4" /></>}</Button>
             </footer>
           </div>
-          <p className="text-center text-sm text-gray-500 mt-5">
-            Already submitted? <Link to="/track" className="font-semibold text-brand hover:underline">Track your transfer credit</Link>
-          </p>
+          {staff ? (onBehalf.manualEntry && (
+            <p className="text-center text-sm text-gray-500 mt-5">
+              No transcript? <Link to={onBehalf.manualEntry} className="font-semibold text-brand hover:underline">Enter details without a transcript</Link>
+            </p>
+          )) : (
+            <p className="text-center text-sm text-gray-500 mt-5">
+              Already submitted? <Link to="/track" className="font-semibold text-brand hover:underline">Track your transfer credit</Link>
+            </p>
+          )}
         </section>
+      </div>
+    </div>
+    </>
+  )
+}
+
+// Staff mode: whose evaluation this is, on every step, and that the student is emailed (not the staff member)
+function OnBehalfBanner({ student, name, onChange }) {
+  const who = student?.name || name || 'the student'
+  const earlier = student?.earlier?.length || 0
+  return (
+    <div className="bg-gradient-to-r from-[#7a0000] to-brand text-white" role="status">
+      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="w-9 h-9 rounded-full bg-white/15 ring-1 ring-white/30 grid place-items-center text-[13px] font-semibold flex-shrink-0" aria-hidden="true">{initialsOf(who) || <UserRound className="w-4 h-4" />}</span>
+        <span className="flex-1 min-w-0 text-[14px] leading-snug">
+          <span className="block">Uploading on behalf of <span className="font-semibold">{who}</span>{student?.email ? <span className="text-white/80"> · {student.email}</span> : null}</span>
+          <span className="block text-[12.5px] text-white/80">
+            The student receives the confirmation email.
+            {earlier > 0 && ` ${earlier} earlier evaluation${earlier === 1 ? '' : 's'}; a new one is flagged for duplicate review.`}
+          </span>
+        </span>
+        {onChange && (
+          <button type="button" onClick={onChange} className="rounded-full bg-white/15 ring-1 ring-white/30 px-3 py-1 text-[13px] font-medium hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            Change student
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
 // Before any file: what the student is about to do, the three steps, and what to expect
-function StoryPanel() {
+function StoryPanel({ staff = false }) {
   return (
     <div>
       <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Boston University · Transfer Credit</p>
-      <h1 className="font-display text-[34px] sm:text-[40px] leading-[1.1] font-semibold mt-3 text-white">Bring the credit<br />you've earned with you.</h1>
-      <p className="text-white/85 mt-4 text-[15.5px] leading-relaxed max-w-md">
-        Upload your final transcripts. We read your courses for you, you check them, and the academic departments evaluate each one. No account is needed.
-      </p>
+      {staff ? (
+        <>
+          <h1 className="font-display text-[34px] sm:text-[40px] leading-[1.1] font-semibold mt-3 text-white">Upload a transcript<br />for a student.</h1>
+          <p className="text-white/85 mt-4 text-[15.5px] leading-relaxed max-w-md">
+            The student's transcripts are read as on the student form. Check and correct what was read, then submit: the student receives the confirmation email and the Transfer Credit ID.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="font-display text-[34px] sm:text-[40px] leading-[1.1] font-semibold mt-3 text-white">Bring the credit<br />you've earned with you.</h1>
+          <p className="text-white/85 mt-4 text-[15.5px] leading-relaxed max-w-md">
+            Upload your final transcripts. We read your courses for you, you check them, and the academic departments evaluate each one. No account is needed.
+          </p>
+        </>
+      )}
       <figure className="relative mt-8 rounded-2xl overflow-hidden shadow-raised ring-1 ring-black/5">
-        <img src={students} alt="Students walking on the Boston University campus" className="w-full h-[230px] sm:h-[250px] object-cover object-[center_35%]" />
-        <figcaption className="absolute left-4 bottom-4 right-4 rounded-xl bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3 shadow-sm">
-          <span className="w-9 h-9 rounded-lg bg-red-50 text-brand grid place-items-center flex-shrink-0"><Sparkles className="w-[18px] h-[18px]" /></span>
-          <span className="text-[13.5px] leading-snug text-gray-700"><span className="font-semibold text-gray-900">Read in seconds.</span> Courses, grades and terms come straight from your transcript.</span>
-        </figcaption>
+        <img src={students} alt="Students on the Boston University campus" className="w-full h-[230px] sm:h-[250px] object-cover object-[center_28%]" />
       </figure>
       <ol className="mt-8">
         {[['Upload your transcripts', 'One file from each college you attended'], ['Check what we read', 'Correct anything that was read wrongly'], ['Get your Transfer Credit ID', 'Follow every course until credit is posted']].map(([title, text], i) => (
@@ -392,10 +469,10 @@ function StoryPanel() {
 }
 
 // After files are added: each document, how it was read, and room for another
-function DocumentsPanel({ transcripts, onFiles, onRemove, onRetry }) {
+function DocumentsPanel({ transcripts, onFiles, onRemove, onRetry, staff = false }) {
   return (
     <div>
-      <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Step 1 of 3 · Your documents</p>
+      <p className="text-[12.5px] font-semibold tracking-[0.14em] uppercase text-white/75">Step 1 of 3 · {staff ? "The student's documents" : 'Your documents'}</p>
       <h1 className="font-display text-[30px] sm:text-[32px] leading-tight font-semibold mt-2 text-white">
         {transcripts.length} transcript{transcripts.length === 1 ? '' : 's'} added
       </h1>
@@ -409,14 +486,14 @@ function DocumentsPanel({ transcripts, onFiles, onRemove, onRetry }) {
 }
 
 // What the transcripts showed, at a glance: the student, then each college with its courses
-function FoundSummary({ transcripts, readable, usable, reading, student }) {
+function FoundSummary({ transcripts, readable, usable, reading, student, staff = false }) {
   const unread = transcripts.filter(t => t.status === 'unreadable')
   return (
     <>
       <div className="px-6 sm:px-8 pt-7 pb-5 border-b border-gray-100 flex items-start justify-between gap-6">
         <div>
-          <p className="text-[12px] font-semibold text-emerald-700 tracking-wide uppercase inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Read from your transcripts</p>
-          <h2 className="text-[22px] font-semibold text-gray-900 mt-1">{reading ? 'Reading your transcripts…' : readable.length ? "Here's what we found" : 'Ready for the office to read'}</h2>
+          <p className="text-[12px] font-semibold text-emerald-700 tracking-wide uppercase inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />{staff ? "Read from the student's transcripts" : 'Read from your transcripts'}</p>
+          <h2 className="text-[22px] font-semibold text-gray-900 mt-1">{reading ? (staff ? 'Reading the transcripts…' : 'Reading your transcripts…') : readable.length ? "Here's what we found" : 'Ready for the office to read'}</h2>
           <p className="text-[14px] text-gray-500 mt-1">You'll check and correct everything on the next step.</p>
         </div>
         <StepDots step={1} />
@@ -719,10 +796,12 @@ const COURSE_FIELDS = [
 const sameValue = (a, b) => String(a ?? '').trim() === String(b ?? '').trim()
 const changedFields = (original, course) => COURSE_FIELDS.filter(f => !sameValue(original[f.key], course[f.key])).map(f => f.label.toLowerCase())
 
-function TranscriptSummary({ t, onReview, defaultOpen = false }) {
+function TranscriptSummary({ t, onReview }) {
   const r = t.result
   const review = t.review
-  const [open, setOpen] = useState(Boolean(r?.check_carefully) || defaultOpen)
+  // Starts collapsed; the header says when a transcript needs a careful check. It starts open only when the
+  // college is missing from the transcript, because the required college field is inside
+  const [open, setOpen] = useState(t.status === 'read' && !r?.institution)
   const [editing, setEditing] = useState(false)
   const setInstitution = (institution) => onReview({ ...review, institution })
   // Not read automatically: only the institution is asked for; the office enters the courses
@@ -750,6 +829,10 @@ function TranscriptSummary({ t, onReview, defaultOpen = false }) {
             {r.courses.length} course{r.courses.length === 1 ? '' : 's'} found · {r.credit_system || 'calendar not shown'}{r.student?.student_id ? ` · Student ID ${r.student.student_id}` : ''}
             {(edits > 0 || institutionEdited) && <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 text-brand font-medium"><Pencil className="w-3 h-3" />{edits + (institutionEdited ? 1 : 0)} edited</span>}
           </span>
+          {r.check_carefully && (
+            <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-800"><AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              Please check carefully: {open ? 'correct any course that was read wrongly' : 'open to review each course'}</span>
+          )}
         </span>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

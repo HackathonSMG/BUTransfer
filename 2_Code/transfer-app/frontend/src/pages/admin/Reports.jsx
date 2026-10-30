@@ -438,7 +438,7 @@ function useDownloads(d, conflicts) {
         saveCsv('equivalency-catalog', [
           ['ID', 'eq_id'], ['Institution', 'institution'], ['Course code', 'course_code'], ['Title', 'title'], ['BU course', 'bu_course'],
           ['Outcome', 'outcome'], ['Approved on', 'approved_on'], ['Evaluator', 'evaluator'],
-          ['Origin', r => (r.source === 'promoted' ? 'Learned from decisions or office standard' : r.source)], ['Status', 'status'],
+          ['Origin', r => ({ promoted: 'Learned from evaluator decisions', standard: 'Office standard', manual: 'Added by the Credit Evaluation Office', imported: 'Imported' }[r.source] || r.source)], ['Status', 'status'],
           ['Learned from decisions', 'promoted_from']
         ], res.data?.equivalencies || [])
       })

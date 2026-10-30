@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import Layout from './components/layout/Layout'
+import ScrollToTop from './components/layout/ScrollToTop'
 
 import Home from './pages/Home'
 import TransferCreditApplication from './pages/applicant/TransferCreditApplication'
@@ -31,6 +32,7 @@ import SelfCheck from './pages/student/SelfCheck'
 import StudentPortal from './pages/student/StudentPortal'
 import OfficeDashboard from './pages/office/OfficeDashboard'
 import OfficeApplication from './pages/office/OfficeApplication'
+import UploadForStudent from './pages/staff/UploadForStudent'
 
 // /evaluator is the evaluator's dashboard; older links that sent admins here now go to the applications list
 function EvaluatorHome() {
@@ -44,6 +46,7 @@ function EvaluatorHome() {
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         {/* Public applicant routes: no account needed */}
         <Route path="/" element={<Layout isPublic><Home /></Layout>} />
@@ -165,6 +168,17 @@ export default function App() {
           }
         />
 
+        {/* Staff upload a transcript on a student's behalf (the student submission flow in staff mode) */}
+        <Route
+          path="/staff/upload-transcript"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'credit_office']}>
+              <Layout>
+                <UploadForStudent />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         {/* Admin protected routes */}
         <Route
           path="/admin/conflicts"
