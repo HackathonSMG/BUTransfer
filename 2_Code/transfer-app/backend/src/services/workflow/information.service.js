@@ -11,6 +11,7 @@ import { extractText } from '../credit/transcript-parser.js';
 import { rematchCourse } from '../credit/credit.service.js';
 import { badRequest, notFound } from '../../utils/errors.js';
 import { notifyCreditOffice, refreshApplicationStatus } from './lifecycle.service.js';
+import { refreshReviewRecommendation } from './assignment.service.js';
 
 /**
  * Opens a request for one course and moves its review to "waiting on the student".
@@ -87,6 +88,11 @@ export async function receiveInformation(application, requestId, { response, fil
     await query(`UPDATE transcript_courses SET syllabus_document_id = $1, syllabus_text = COALESCE($2, syllabus_text), syllabus_received_at = NOW() WHERE id = $3`,
       [document.id, text, req.transcript_course_id]);
     if (text) compared = Boolean(await rematchCourse(req.transcript_course_id));
+    // The review's proposed BU course and match follow the new comparison; the student's answer is never lost over it
+    if (compared) {
+      await refreshReviewRecommendation(req.transcript_course_id)
+        .catch((err) => console.error('[Syllabus] Review recommendation not refreshed:', err.message));
+    }
   }
 
   // The course goes back to whoever holds it, who is told the student answered

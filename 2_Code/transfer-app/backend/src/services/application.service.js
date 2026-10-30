@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/db.js';
-import { generateReferenceNumber } from '../utils/reference-number.js';
+import { generateReferenceNumber, isReferenceNumberConflict } from '../utils/reference-number.js';
 import { log as auditLog } from './audit.service.js';
 import * as notificationService from './notification.service.js';
 import { notifyApplicant, onStatusChange } from './notifications/applicant-notification.service.js';
@@ -22,10 +22,32 @@ import { notFound, badRequest, forbidden } from '../utils/errors.js';
  * application is submitted and evaluated straight away, as before.
  */
 export async function createApplication(data, source = 'website', createdBy = null, { draft = false } = {}) {
-  const referenceNumber = await generateReferenceNumber();
   const secureToken = uuidv4();
 
-  const result = await query(
+  // Another submission at the same moment can take the same reference number; take the next one and try again
+  const MAX_ATTEMPTS = 5;
+  let referenceNumber;
+  let result;
+  for (let attempt = 1; ; attempt++) {
+    referenceNumber = await generateReferenceNumber();
+    try {
+      result = await insertApplication(data, source, createdBy, referenceNumber, secureToken);
+      break;
+    } catch (err) {
+      if (!isReferenceNumberConflict(err) || attempt >= MAX_ATTEMPTS) throw err;
+    }
+  }
+
+  const application = result.rows[0];
+  // Staff uploading a transcript for a student: who did it is part of the creation record
+  const onBehalf = data.additional_info?.submitted_on_behalf || null;
+  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source, ...(onBehalf && { submitted_on_behalf: onBehalf }) } });
+  if (draft) return application;
+  return finishSubmission(application, createdBy, source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
+}
+
+function insertApplication(data, source, createdBy, referenceNumber, secureToken) {
+  return query(
     `INSERT INTO applications (
        reference_number, source, status, student_name, student_email,
        student_phone, date_of_birth, transfer_from_institution, transfer_from_program,
@@ -41,13 +63,6 @@ export async function createApplication(data, source = 'website', createdBy = nu
      JSON.stringify(data.additional_info || {}), secureToken, createdBy,
      data.student_profile_id || null, '1.0', data.applicant_comments || null]
   );
-
-  const application = result.rows[0];
-  // Staff uploading a transcript for a student: who did it is part of the creation record
-  const onBehalf = data.additional_info?.submitted_on_behalf || null;
-  await auditLog({ applicationId: application.id, action: 'application_created', actorId: createdBy, actorEmail: data.student_email, newValue: { reference_number: referenceNumber, source, status: draft ? 'draft' : 'submitted' }, details: { source, ...(onBehalf && { submitted_on_behalf: onBehalf }) } });
-  if (draft) return application;
-  return finishSubmission(application, createdBy, source === 'evaluator_submitted' ? 'Application raised by staff' : 'Application received');
 }
 
 async function finishSubmission(application, actorId, reason) {
@@ -326,6 +341,8 @@ function buildEvaluationResult(application, documents, eligibility, credit, cred
       flags.push({ type: 'positive', title: 'Additional course review', description: `${agent.reviewed} of the ${agent.sent} course(s) left open were reviewed against past decisions and the BU catalog.` });
     } else if (agent.status === 'failed') {
       flags.push({ type: 'concern', title: 'Additional course review unavailable', description: `The additional review did not complete (${agent.error}); the course-match suggestions are shown.` });
+    } else if (agent.status === 'validation_failed') {
+      flags.push({ type: 'critical', title: 'Transcript check flagged', description: `${agent.details} (${agent.reason.replace(/_/g, ' ')}). The courses were still sent to department evaluators; confirm the transcript before posting.` });
     }
 
     recommendations = `${s.transferred_credits} credits transfer as BU courses and ${s.elective_credits} as elective credit. `
@@ -482,19 +499,16 @@ export async function runEvaluation(evaluationId) {
         console.log(`[Eval]   reviewWithAgent returned: status=${agent.status} reviewed=${agent.reviewed ?? '-'} sent=${agent.sent ?? '-'}`);
 
         if (agent.status === 'validation_failed') {
-          console.log(`[Eval]   Validation FAILED — halting evaluation. reason=${agent.reason} details=${agent.details}`);
-          await query(
-            `UPDATE ai_evaluations SET status = 'completed', validation_status = 'failed',
-               validation_result = $1, completed_at = NOW() WHERE id = $2`,
-            [JSON.stringify({ reason: agent.reason, details: agent.details }), evaluationId]
-          );
-          await updateApplicationStatus(applicationId, 'validation_failed', null,
-            `Agent validation failed: ${agent.reason} — ${agent.details}`);
-          await auditLog({ applicationId, action: 'validation_failed', details: { evaluation_id: evaluationId, reason: agent.reason, details: agent.details } });
-          trace.record('agent', 'Additional course review', { summary: `Stopped: the transcript needs attention (${agent.reason.replace(/_/g, ' ')}).`, status: 'failed' }, ta);
-          await saveTrace(evaluationId, trace);
-          console.log(`[AI] Evaluation ${evaluationId} halted — validation failed: ${agent.reason}`);
-          return;
+          // A warning for the Credit Evaluation Office, not a stop: the agent can only check courses against the BU
+          // transfer catalog, so a real college BU has not evaluated before can fail it. The courses still go to
+          // department evaluators, who make every decision anyway.
+          console.log(`[Eval]   Validation flagged — continuing. reason=${agent.reason} details=${agent.details}`);
+          await auditLog({ applicationId, action: 'validation_failed', details: { evaluation_id: evaluationId, reason: agent.reason, details: agent.details, halted: false } });
+          await lifecycle.notifyCreditOffice({
+            applicationId, type: 'validation_flagged', title: `Transcript check flagged: ${application.reference_number}`,
+            message: `The automated check flagged ${application.student_name}'s transcript (${agent.reason.replace(/_/g, ' ')}): ${agent.details} The courses were still sent to department evaluators.`,
+            data: { reference_number: application.reference_number },
+          }).catch(() => {});
         }
       } catch (err) {
         console.error(`[Eval] STEP 3 FAILED: Agent error — ${err.message}`);
@@ -510,9 +524,10 @@ export async function runEvaluation(evaluationId) {
         summary: agent.status === 'completed' ? `${agent.reviewed} of ${agent.sent} open course${agent.sent === 1 ? '' : 's'} reviewed against past decisions and the BU catalog (recommendations only).`
           : agent.status === 'failed' ? 'Did not complete; the course-match suggestions are used.'
             : agent.status === 'skipped' ? 'Transcript validated; no open courses needed an additional review.'
-              : 'Not configured in this environment; the course-match suggestions are used.',
+              : agent.status === 'validation_failed' ? `Flagged for the Credit Evaluation Office (${agent.reason.replace(/_/g, ' ')}); the course-match suggestions are used and the courses still go to department evaluators.`
+                : 'Not configured in this environment; the course-match suggestions are used.',
         metrics: { reviewed: agent.reviewed ?? 0 },
-        status: agent.status === 'completed' || agent.status === 'skipped' ? 'done' : agent.status === 'failed' ? 'failed' : 'skipped',
+        status: agent.status === 'completed' || agent.status === 'skipped' ? 'done' : agent.status === 'failed' || agent.status === 'validation_failed' ? 'failed' : 'skipped',
       }, ta);
     }
 
@@ -526,10 +541,11 @@ export async function runEvaluation(evaluationId) {
     await query(
       `UPDATE ai_evaluations SET status = 'completed', criteria_results = $1, missing_documents = $2, flags = $3, recommendations = $4, evaluation_report = $5,
          confidence_score = $6, credit_summary = $7, agent_status = $8, agent_error = $9,
-         validation_status = $10, completed_at = NOW() WHERE id = $11`,
+         validation_status = $10, validation_result = COALESCE($12, validation_result), completed_at = NOW() WHERE id = $11`,
       [JSON.stringify(result.criteria_results), JSON.stringify(result.missing_documents), JSON.stringify(result.flags), result.recommendations, result.evaluation_report,
         result.confidence_score, credit ? JSON.stringify(credit.summary) : null, agent.status, agent.error || null,
-        isAgentConfigured() ? 'passed' : 'skipped', evaluationId]
+        agent.status === 'validation_failed' ? 'failed' : isAgentConfigured() ? 'passed' : 'skipped', evaluationId,
+        agent.status === 'validation_failed' ? JSON.stringify({ reason: agent.reason, details: agent.details, halted: false }) : null]
     );
     console.log(`[Eval]   ai_evaluations record updated`);
 

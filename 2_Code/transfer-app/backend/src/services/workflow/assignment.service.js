@@ -348,6 +348,41 @@ export async function assignApplication(applicationId, { held = new Map() } = {}
 }
 
 /**
+ * Recomputes one open course review's recommended BU target and match score from the course's latest evaluation,
+ * the same way assignment does (sponsor match, then equivalency, then the agent's or the engine's suggestion).
+ * Used after the course was compared again (a syllabus arrived), so "Accept" and the match shown follow the new
+ * evidence. The evaluator, status and decision are never changed; a decided review is left alone.
+ * @returns {Promise<object|null>} the updated target fields, or null when the course has no open review
+ */
+export async function refreshReviewRecommendation(transcriptCourseId) {
+  const { rows: [c] } = await query(
+    `SELECT tc.id, tc.institution, COALESCE(tc.catalog_code, tc.course_code) AS code,
+            ce.path, ce.outcome, ce.award, ce.suggestion, ce.confidence, ce.candidates, ce.equivalency_id, ce.precedent_ids,
+            ce.agent_bu_course, ce.agent_confidence, r.id AS review_id
+     FROM transcript_courses tc
+     JOIN course_reviews r ON r.transcript_course_id = tc.id AND r.status = ANY($2)
+     JOIN LATERAL (
+       SELECT ce.* FROM course_evaluations ce JOIN ai_evaluations ae ON ae.id = ce.ai_evaluation_id
+       WHERE ce.transcript_course_id = tc.id ORDER BY ae.created_at DESC LIMIT 1
+     ) ce ON true
+     WHERE tc.id = $1`,
+    [transcriptCourseId, OPEN_STATUSES]
+  );
+  if (!c) return null;
+  const [{ rows: sponsorRows }, { rows: [equivalency] }] = await Promise.all([
+    query(`SELECT peer_institution, peer_course, bu_course, match_level FROM sponsor_course_matches WHERE peer_institution = $1 AND peer_course = $2`,
+      [c.institution, c.code]),
+    c.equivalency_id ? query(`SELECT eq_id, bu_course FROM equivalencies WHERE eq_id = $1 AND status = 'active'`, [c.equivalency_id]) : { rows: [] },
+  ]);
+  const rec = recommend(c, sponsorRows, equivalency);
+  await query(
+    `UPDATE course_reviews SET target_bu_course = $1, match_score = $2, match_basis = $3, sponsor_match_level = $4, priority = $5 WHERE id = $6`,
+    [rec.target, rec.score, rec.basis, rec.level, rec.priority, c.review_id]
+  );
+  return { review_id: c.review_id, target_bu_course: rec.target, match_score: rec.score, match_basis: rec.basis };
+}
+
+/**
  * When no evaluator has open courses on the application but some are queued for a later hand-off (e.g. the open
  * ones were settled by an established equivalency), the next evaluator's courses open now.
  */
@@ -550,4 +585,4 @@ export async function releaseEvaluator(evaluatorId, user, why = 'Evaluator unava
   return { reassigned: moved.length, to_office: moved.filter((m) => !m.evaluator_id).length, moves: moved };
 }
 
-export default { assignApplication, assignPendingApplications, buSubject, chooseEvaluator, eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, openQueuedReviews, SPONSOR_LEVELS };
+export default { assignApplication, assignPendingApplications, refreshReviewRecommendation, buSubject, chooseEvaluator, eligibleEvaluators, reassignReview, releaseEvaluator, placeOfficeQueue, openQueuedReviews, SPONSOR_LEVELS };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Globe, Mail, UserCheck, RefreshCw, ClipboardCheck,
-  MessageSquare, Gavel, FileText, Clock, User, StickyNote, Link2
+  MessageSquare, FileText, Clock, User, StickyNote, Link2
 } from 'lucide-react'
 import notify from '../../lib/notify'
 import {
@@ -10,7 +10,6 @@ import {
 } from '../../api/applications'
 import AIEvaluationReport from '../../components/evaluator/AIEvaluationReport'
 import CreditEvaluation from '../../components/evaluator/CreditEvaluation'
-import DecisionForm from '../../components/evaluator/DecisionForm'
 import InfoRequestForm from '../../components/evaluator/InfoRequestForm'
 import StatusBadge from '../../components/application/StatusBadge'
 import DocumentList from '../../components/application/DocumentList'
@@ -80,7 +79,6 @@ export default function ApplicationDetail() {
   const [auditLog, setAuditLog] = useState([])
   const [triggering, setTriggering] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [showDecision, setShowDecision] = useState(false)
   const [showInfoRequest, setShowInfoRequest] = useState(false)
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
@@ -177,7 +175,6 @@ export default function ApplicationDetail() {
   const SourceIcon = src.Icon
 
   const canEvaluate = ['submitted', 'information_required', 'evaluation_completed'].includes(app.status)
-  const canDecide = ['evaluation_completed', 'under_evaluator_review'].includes(app.status)
 
   return (
     <div className="space-y-5">
@@ -415,17 +412,8 @@ export default function ApplicationDetail() {
               <MessageSquare className="w-4 h-4" />
               Request More Information
             </Button>
-
-            {canDecide && (
-              <Button
-                className="w-full"
-                variant="primary"
-                onClick={() => setShowDecision(true)}
-              >
-                <Gavel className="w-4 h-4" />
-                Submit Decision
-              </Button>
-            )}
+            {/* Decisions are made per course (evaluators) and posted by the Credit Evaluation Office; there is no
+                whole-application approve/reject here, since it bypassed the course decisions and postings */}
           </div>
 
           {/* Quick Notes */}
@@ -467,12 +455,6 @@ export default function ApplicationDetail() {
       </div>
 
       {/* Modals */}
-      <DecisionForm
-        isOpen={showDecision}
-        applicationId={id}
-        onClose={() => setShowDecision(false)}
-        onSuccess={() => load()}
-      />
       <InfoRequestForm
         isOpen={showInfoRequest}
         applicationId={id}
