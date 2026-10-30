@@ -187,13 +187,16 @@ export async function recordStandard({ institution, courseCode, buCourse, outcom
   const { rows: ids } = await query(
     `SELECT decision_id FROM past_decisions WHERE institution = $1 AND course_code = $2 AND status = 'active'`, [institution, courseCode]);
   const { rows: [eq] } = await query(
-    `INSERT INTO equivalencies (eq_id, institution, course_code, title, bu_course, outcome, approved_on, evaluator, source, status, promoted_from, data_source)
+    `INSERT INTO equivalencies (eq_id, institution, course_code, title, bu_course, outcome, approved_on, evaluator, source, status, promoted_from, data_source,
+                               approved_by, approved_at, note)
      VALUES ('EQ-' || nextval('equivalency_number_seq'), $1, $2,
-             (SELECT title FROM catalog_courses WHERE institution = $1 AND course_code = $2), $3, $4, CURRENT_DATE, $5, 'promoted', 'active', $6, 'user')
+             (SELECT title FROM catalog_courses WHERE institution = $1 AND course_code = $2), $3, $4, CURRENT_DATE, $5, 'standard', 'active', $6, 'user',
+             $7, NOW(), $8)
      ON CONFLICT (institution, course_code) DO UPDATE SET bu_course = EXCLUDED.bu_course, outcome = EXCLUDED.outcome, approved_on = CURRENT_DATE,
-       evaluator = EXCLUDED.evaluator, source = 'promoted', status = 'active', promoted_from = EXCLUDED.promoted_from, data_source = 'user'
+       evaluator = EXCLUDED.evaluator, source = 'standard', status = 'active', promoted_from = EXCLUDED.promoted_from, data_source = 'user',
+       approved_by = EXCLUDED.approved_by, approved_at = EXCLUDED.approved_at, note = COALESCE(EXCLUDED.note, equivalencies.note)
      RETURNING eq_id, bu_course, outcome`,
-    [institution, courseCode, award || null, outcome, user.full_name, ids.map((r) => r.decision_id)]
+    [institution, courseCode, award || null, outcome, user.full_name, ids.map((r) => r.decision_id), user.id, note ? String(note).trim().slice(0, 2000) : null]
   );
   invalidateEngine();
   await auditLog({ action: 'equivalency_standardized', actorId: user.id, actorEmail: user.email,

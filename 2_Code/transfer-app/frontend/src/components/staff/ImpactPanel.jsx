@@ -68,7 +68,7 @@ export default function ImpactPanel({ impact: m, compact = false }) {
             <li className="rounded-xl bg-white border border-violet-200 p-4">
               <p className="font-display tabular-nums text-[26px] font-semibold leading-none text-violet-800">{k.equivalencies}</p>
               <p className="text-[12.5px] text-staff-ink2 mt-1.5">established {plural(k.equivalencies, 'equivalency', 'equivalencies')}</p>
-              <p className="text-[11.5px] text-violet-700">{k.learned_equivalencies} learned from decisions or office standards</p>
+              <p className="text-[11.5px] text-violet-700">{k.learned_equivalencies} learned from evaluator decisions</p>
             </li>
             <Arrow />
             <li className="rounded-xl bg-violet-600 text-white p-4">

@@ -127,7 +127,14 @@ export function createEngine({ catalog, equivalencies, pastDecisions, syllabi = 
   function matchCourse(tc, present, result, extraSyllabus) {
     const eq = eqByKey.get(keyOf(tc.institution, tc.course_code));
     if (eq) {
-      const elective = !eq.bu_course;
+      // An equivalency recorded as "No credit" settles the course with no credit; otherwise as before
+      if (/^no credit$/i.test(String(eq.outcome || '').trim())) {
+        return result(
+          { path: 'equivalency', outcome: 'no_credit', award: 'No credit', bu_credits: 0, confidence: 1, equivalency_id: eq.eq_id },
+          [`Approved equivalency ${eq.eq_id}: ${tc.course_code} earns no BU credit.`],
+        );
+      }
+      const elective = !eq.bu_course || /^elective credit$/i.test(String(eq.outcome || '').trim());
       return result(
         { path: 'equivalency', outcome: elective ? 'elective' : 'transfer', award: eq.bu_course || 'Elective credit', confidence: 1, equivalency_id: eq.eq_id, rules: elective ? ['R3'] : [] },
         [`Approved equivalency ${eq.eq_id}: ${tc.course_code} → ${eq.bu_course || 'elective credit'}.`,

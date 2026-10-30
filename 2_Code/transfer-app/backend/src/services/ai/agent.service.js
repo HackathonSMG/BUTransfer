@@ -210,7 +210,7 @@ function derivedOf(ref) {
     for (const e of ref.equivalencies) {
       const k = keyOf(e.institution, e.course_code);
       if (!evidence.has(k)) evidence.set(k, []);
-      evidence.get(k).push(`${e.eq_id}: approved equivalency → ${e.bu_course || 'elective credit'}`);
+      evidence.get(k).push(`${e.eq_id}: approved equivalency → ${e.bu_course || (/no credit/i.test(e.outcome || '') ? 'no credit' : 'elective credit')}`);
     }
     derived.set(ref, { bu, buIndex: new TfIdf(bu.map(describe)), evidence });
   }

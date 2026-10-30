@@ -2,8 +2,10 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   FileText, Scale, Award, BookOpen,
-  ArrowRight, Search, ExternalLink, Shield, Mail
+  ArrowRight, ExternalLink, ShieldCheck, Mail, Sparkles, GraduationCap, Activity
 } from 'lucide-react'
+import aerial from '../assets/campus-aerial.jpg'
+import buSign from '../assets/students-bu-sign.jpg'
 
 const PROCESS_STEPS = [
   {
@@ -16,7 +18,7 @@ const PROCESS_STEPS = [
     icon: FileText,
     step: '02',
     title: 'Apply & Upload',
-    description: 'Submit the final transcript from every college you attended for credit evaluation. No account needed.'
+    description: 'Submit the final transcript from every college you attended for credit evaluation.'
   },
   {
     icon: Scale,
@@ -32,6 +34,12 @@ const PROCESS_STEPS = [
   }
 ]
 
+const HERO_FACTS = [
+  { icon: Sparkles, text: 'Courses read straight from your transcript' },
+  { icon: GraduationCap, text: 'Decided by BU academic departments' },
+  { icon: Activity, text: 'Every course tracked until credit is posted' }
+]
+
 export default function Home() {
   const navigate = useNavigate()
   const [trackInput, setTrackInput] = useState('')
@@ -44,104 +52,110 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-brand to-brand-dark text-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-20 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm mb-6">
-            <Shield className="w-4 h-4" />
-            Boston University Transfer Credit Evaluation System
+      {/* Hero: the campus along the Charles under a BU red gradient from the left (full cover on small screens) */}
+      <section className="relative overflow-hidden bg-[#5c0000]">
+        <img src={aerial} alt="Boston University campus along the Charles River" className="absolute inset-0 w-full h-full object-cover object-[center_45%]" />
+        <div className="absolute inset-0 lg:hidden bg-gradient-to-r from-[#7a0000] via-[#990000]/90 to-[#990000]/75" aria-hidden="true" />
+        <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-[#7a0000] via-[#990000]/85 via-40% to-transparent" aria-hidden="true" />
+        <div className="relative max-w-[1216px] mx-auto px-4 sm:px-6 pt-14 pb-16 sm:pt-20 sm:pb-24">
+          <div className="max-w-[620px] text-white motion-safe:animate-[fade-up_.7s_ease-out_both]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 ring-1 ring-white/25 backdrop-blur px-3 py-1 text-[13px]">
+              <ShieldCheck className="w-4 h-4" />
+              Boston University Transfer Credit Evaluation
+            </span>
+            <h1 className="font-display text-[38px] sm:text-[48px] lg:text-[56px] leading-[1.06] lg:leading-[1.04] font-semibold mt-5">
+              Bring the credit<br className="hidden sm:block" /> you've earned<br className="hidden sm:block" /> to Boston University.
+            </h1>
+            <p className="text-white/90 text-[16px] sm:text-[17px] leading-relaxed mt-5 max-w-[540px]">
+              For admitted transfer students: submit your final transcripts, and follow every course through evaluation until your credit is posted.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+              <Link
+                to="/apply"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-brand px-5 py-3.5 text-[15.5px] font-semibold shadow-lg hover:bg-red-50 transition-colors"
+              >
+                <FileText className="w-5 h-5" />
+                Submit Transcripts for Evaluation
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/self-check"
+                className="inline-flex items-center justify-center gap-2 rounded-xl ring-1 ring-white/60 text-white px-5 py-3.5 text-[15.5px] font-semibold hover:bg-white/10 transition-colors"
+              >
+                <BookOpen className="w-5 h-5" />
+                Preview Course Credit
+              </Link>
+            </div>
+            <p className="mt-6 text-[13.5px] text-white/80">
+              Already submitted?{' '}
+              <Link to="/track" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Track your transfer credit</Link>
+            </p>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
-            Transfer Your Credits<br />to Boston University
-          </h1>
-          <p className="text-lg sm:text-xl text-red-100 mb-8 max-w-2xl mx-auto">
-            For admitted transfer students: submit final transcripts from every college you attended, receive an
-            Transfer Credit ID, and follow every course through evaluation until your credit is posted.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/apply"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-brand font-semibold rounded-xl hover:bg-red-50 transition-colors shadow-lg"
-            >
-              <FileText className="w-5 h-5" />
-              Submit Transcripts for Evaluation
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/self-check"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
-            >
-              <BookOpen className="w-5 h-5" />
-              Preview Course Credit
-            </Link>
-            <Link
-              to="/track"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white font-semibold rounded-xl border-2 border-white/70 hover:bg-white/10 transition-colors"
-            >
-              <Search className="w-5 h-5" />
-              Track Transfer Credit
-            </Link>
-          </div>
-          <p className="mt-6 text-sm text-red-100">
-            No account needed. Academic departments make the final decision on every course.
-          </p>
         </div>
-      </section>
-
-      {/* Process Steps */}
-      <section className="py-16 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">How It Works</h2>
-            <p className="text-gray-500">Four simple steps to your transfer decision</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {PROCESS_STEPS.map((step, i) => (
-              <div key={i} className="relative">
-                {i < PROCESS_STEPS.length - 1 && (
-                  <div className="hidden lg:block absolute top-8 left-full w-full h-0.5 bg-gray-200 z-0" />
-                )}
-                <div className="relative z-10 flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mb-4">
-                    <step.icon className="w-7 h-7 text-brand" />
-                  </div>
-                  <span className="text-xs font-bold text-brand bg-red-50 px-2 py-0.5 rounded-full mb-2">
-                    STEP {step.step}
-                  </span>
-                  <h3 className="font-semibold text-gray-900 mb-2">{step.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{step.description}</p>
-                </div>
-              </div>
+        {/* Three facts on a glass strip at the foot of the photo */}
+        <div className="relative border-t border-white/15 bg-black/20 backdrop-blur-sm">
+          <ul className="max-w-[1216px] mx-auto px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 text-white text-[14px]">
+            {HERO_FACTS.map(f => (
+              <li key={f.text} className="flex items-center gap-2.5">
+                <f.icon className="w-5 h-5 text-white/80 flex-shrink-0" aria-hidden="true" />{f.text}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
-      {/* Track Application */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <Search className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Transfer Credit</h2>
-          <p className="text-gray-500 mb-6">
-            See every course, its evaluation status and the credits awarded. You need your Transfer Credit ID and the email address you submitted with.
-          </p>
-          <form onSubmit={handleTrack} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              aria-label="Transfer Credit ID"
-              placeholder="Transfer Credit ID, e.g. TC-2026-0001"
-              value={trackInput}
-              onChange={(e) => setTrackInput(e.target.value)}
-              className="flex-1 px-4 py-3 text-sm font-mono border border-gray-300 rounded-xl focus:outline-none focus:border-brand focus:ring-2 focus:ring-red-100"
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 bg-brand text-white font-medium rounded-xl hover:bg-brand-dark transition-colors flex-shrink-0 inline-flex items-center justify-center gap-2"
-            >
-              Track Transfer Credit<ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
-          <p className="text-xs text-gray-400 mt-4 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Your Transfer Credit ID is in your confirmation email.</p>
+      {/* How it works: four steps on one connected line (stacked, without the line, on small screens) */}
+      <section className="bg-paper py-16">
+        <div className="max-w-[1216px] mx-auto px-4 sm:px-6">
+          <p className="text-center text-[12.5px] font-semibold tracking-[0.14em] uppercase text-brand">How it works</p>
+          <h2 className="text-center font-display text-[28px] sm:text-[34px] font-semibold text-gray-900 mt-2">From transcript to posted credit</h2>
+          <ol className="relative mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-6">
+            <span className="hidden lg:block absolute top-7 left-[12%] right-[12%] h-px bg-gradient-to-r from-red-200 via-brand to-red-200" aria-hidden="true" />
+            {PROCESS_STEPS.map((step, i) => {
+              const last = i === PROCESS_STEPS.length - 1
+              return (
+                <li key={step.step} className="relative text-center">
+                  <span className={`mx-auto w-14 h-14 rounded-2xl grid place-items-center shadow-card ${last ? 'bg-brand text-white' : 'bg-white ring-1 ring-red-100 text-brand'}`}>
+                    <step.icon className="w-6 h-6" aria-hidden="true" />
+                  </span>
+                  <p className="mt-4 text-[12px] font-bold text-brand">STEP {step.step}</p>
+                  <h3 className="text-[17px] font-semibold text-gray-900 mt-1">{step.title}</h3>
+                  <p className="text-[14px] text-gray-600 mt-1.5 leading-relaxed">{step.description}</p>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      </section>
+
+      {/* Track: the tracker on a red band, framed by the BU sign on the right (photo hidden on small screens) */}
+      <section className="relative overflow-hidden bg-[#5c0000]">
+        <img src={buSign} alt="" aria-hidden="true" className="hidden md:block absolute right-0 top-0 h-full w-1/2 object-cover object-[center_30%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#7a0000] via-[#990000] to-[#990000] md:via-50% md:to-[#990000]/0" aria-hidden="true" />
+        <div className="relative max-w-[1216px] mx-auto px-4 sm:px-6 py-14 text-white">
+          <div className="max-w-[560px]">
+            <h2 className="font-display text-[28px] sm:text-[32px] font-semibold">Track your transfer credit</h2>
+            <p className="text-white/85 mt-2 text-[15px] leading-relaxed">
+              See every course, its evaluation status and the credits awarded. You need your Transfer Credit ID and the email address you submitted with.
+            </p>
+            <form onSubmit={handleTrack} className="mt-6 flex gap-2 rounded-xl bg-white p-1.5 shadow-xl focus-within:ring-2 focus-within:ring-white/70">
+              <input
+                type="text"
+                aria-label="Transfer Credit ID"
+                placeholder="Transfer Credit ID, e.g. TC-2026-0001"
+                value={trackInput}
+                onChange={(e) => setTrackInput(e.target.value)}
+                className="flex-1 min-w-0 px-3 py-2.5 text-[15px] text-gray-900 placeholder:text-gray-400 bg-transparent rounded-lg focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand text-white px-5 py-2.5 text-[15px] font-semibold hover:bg-brand-dark transition-colors flex-shrink-0"
+              >
+                Track<ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+            <p className="text-xs text-white/75 mt-4 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Your Transfer Credit ID is in your confirmation email.</p>
+          </div>
         </div>
       </section>
 

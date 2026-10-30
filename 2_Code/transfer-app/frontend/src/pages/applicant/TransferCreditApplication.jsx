@@ -16,7 +16,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
-import students from '../../assets/campus-students.jpg'
+import students from '../../assets/students-crowd.jpg'
 import { ACCEPTED, MAX_MB, formatSize } from '../../components/applicant/DocumentDropzone'
 import { PROGRAMS, TERMS, PROGRAM_DEPARTMENTS } from '../../lib/application'
 import { homeFor, ROLE_LABELS } from '../../lib/homeFor'
@@ -361,6 +361,10 @@ export function SubmissionFlow({ accountEmail, onBehalf = null }) {
                   <StepDots step={1} />
                 </div>
                 <div className="px-6 sm:px-8 py-7">
+                  <div className="mb-4 flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-200/70 px-4 py-3">
+                    <span className="w-8 h-8 rounded-lg bg-white text-emerald-700 grid place-items-center shadow-sm flex-shrink-0" aria-hidden="true"><Sparkles className="w-4 h-4" /></span>
+                    <p className="text-[13.5px] leading-snug text-emerald-900"><span className="font-semibold">Read in seconds.</span> Courses, grades and terms come straight from {staff ? "the student's" : 'your'} transcript; you check them on the next step.</p>
+                  </div>
                   <TranscriptDrop onFiles={addTranscripts} />
                   <div className="mt-6 grid sm:grid-cols-3 gap-3">
                     <Tip icon={FileCheck2} tone="emerald" title="Use the official copy" text="The PDF your college issued reads best" />
@@ -439,11 +443,7 @@ function StoryPanel({ staff = false }) {
         </>
       )}
       <figure className="relative mt-8 rounded-2xl overflow-hidden shadow-raised ring-1 ring-black/5">
-        <img src={students} alt="Students walking on the Boston University campus" className="w-full h-[230px] sm:h-[250px] object-cover object-[center_35%]" />
-        <figcaption className="absolute left-4 bottom-4 right-4 rounded-xl bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3 shadow-sm">
-          <span className="w-9 h-9 rounded-lg bg-red-50 text-brand grid place-items-center flex-shrink-0"><Sparkles className="w-[18px] h-[18px]" /></span>
-          <span className="text-[13.5px] leading-snug text-gray-700"><span className="font-semibold text-gray-900">Read in seconds.</span> Courses, grades and terms come straight from your transcript.</span>
-        </figcaption>
+        <img src={students} alt="Students on the Boston University campus" className="w-full h-[230px] sm:h-[250px] object-cover object-[center_28%]" />
       </figure>
       <ol className="mt-8">
         {[['Upload your transcripts', 'One file from each college you attended'], ['Check what we read', 'Correct anything that was read wrongly'], ['Get your Transfer Credit ID', 'Follow every course until credit is posted']].map(([title, text], i) => (

@@ -59,3 +59,9 @@
     @apply text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-staff-muted whitespace-nowrap;
   }
 }
+
+/* Landing hero: the text rises in once (used with motion-safe:, so reduced-motion users see it static) */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}

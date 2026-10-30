@@ -4,6 +4,7 @@ import { Mail, ShieldCheck, ArrowRight, LogOut } from 'lucide-react'
 import { trackApplication, emailApplicationNumbers } from '../../api/student'
 import Input from '../../components/ui/Input'
 import PublicHero from '../../components/layout/PublicHero'
+import entrance from '../../assets/campus-entrance.jpg'
 import Button from '../../components/ui/Button'
 import ApplicationTracker from '../../components/applicant/ApplicationTracker'
 
@@ -76,7 +77,7 @@ function TrackForm({ initialNumber, onOpen }) {
 
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
-      <PublicHero title="Transfer Credit Status" width="max-w-xl"
+      <PublicHero title="Transfer Credit Status" width="max-w-xl" image={entrance} imagePosition="object-[center_62%]"
         intro="Enter your Transfer Credit ID and the email address you submitted your transcripts with." />
       <div className="max-w-xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
         <form onSubmit={submit} className="relative bg-white rounded-2xl border border-gray-200 shadow-md p-6 sm:p-8 -mt-4 space-y-5" noValidate>

@@ -203,10 +203,12 @@ async function promoteIfAgreed(client, course, award) {
      VALUES ('EQ-' || nextval('equivalency_number_seq'), $1, $2, $3, $4, 'BU equivalent', CURRENT_DATE, 'Promoted from precedents', 'promoted', $5)
      ON CONFLICT (institution, course_code) DO UPDATE SET bu_course = EXCLUDED.bu_course, status = 'active', source = 'promoted',
        promoted_from = EXCLUDED.promoted_from, approved_on = EXCLUDED.approved_on
+     -- A revoked equivalency was withdrawn on purpose; agreeing decisions must not bring it back
+     WHERE equivalencies.status <> 'revoked'
      RETURNING eq_id, bu_course, promoted_from`,
     [course.institution, course.course_code, course.title, award, rows.map((r) => r.decision_id)]
   );
-  return created;
+  return created || null;
 }
 
 /** Approves every course the engine decided on its own (equivalency, rule or past decision) that has no decision yet. */
@@ -225,9 +227,11 @@ export async function approveAutomatic(applicationId, user) {
 }
 
 export async function getMemory() {
-  const [equivalencies, decisions, stats] = await Promise.all([
-    query(`SELECT eq_id, institution, course_code, title, bu_course, outcome, TO_CHAR(approved_on, 'YYYY-MM-DD') AS approved_on, evaluator, source, status, promoted_from
-           FROM equivalencies ORDER BY (source = 'promoted') DESC, institution, course_code`),
+  const [equivalencies, decisions, stats, pending] = await Promise.all([
+    // note / approved_at come from migration 014; read through to_jsonb so this keeps working before it runs
+    query(`SELECT eq_id, institution, course_code, title, bu_course, outcome, TO_CHAR(approved_on, 'YYYY-MM-DD') AS approved_on, evaluator, source, status, promoted_from,
+             to_jsonb(e)->>'note' AS note, to_jsonb(e)->>'approved_at' AS approved_at
+           FROM equivalencies e ORDER BY (source = 'promoted') DESC, institution, course_code`),
     query(`SELECT decision_id, institution, course_code, proposed_bu, decision, bu_awarded, reason, TO_CHAR(decided_on, 'YYYY-MM-DD') AS decided_on,
              evaluator, source, status
            FROM past_decisions ORDER BY (source = 'evaluator') DESC, decided_on DESC NULLS LAST, decision_id`),
@@ -235,12 +239,14 @@ export async function getMemory() {
              (SELECT COUNT(*)::int FROM past_decisions WHERE source = 'evaluator' AND status = 'active') AS learned_precedents,
              (SELECT COUNT(*)::int FROM equivalencies WHERE source = 'promoted' AND status = 'active') AS promoted_equivalencies
            FROM course_decisions`),
+    query(`SELECT COUNT(*)::int AS n FROM equivalency_proposals WHERE status = 'pending'`)
+      .catch(() => ({ rows: [{ n: 0 }] })),
   ]);
   const s = stats.rows[0];
   return {
     equivalencies: equivalencies.rows,
     past_decisions: decisions.rows,
-    stats: { ...s, agreement_rate: s.decisions ? Math.round((100 * s.matched) / s.decisions) : null, promotion_min_evaluators: PROMOTION_MIN_EVALUATORS },
+    stats: { ...s, pending_proposals: pending.rows[0].n, agreement_rate: s.decisions ? Math.round((100 * s.matched) / s.decisions) : null, promotion_min_evaluators: PROMOTION_MIN_EVALUATORS },
   };
 }
 

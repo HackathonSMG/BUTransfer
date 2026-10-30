@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import BUCrest from '../../components/layout/BUCrest'
 import { homeFor } from '../../lib/homeFor'
+import campus from '../../assets/campus-aerial.jpg'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -52,8 +53,10 @@ export default function Login() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] grid lg:grid-cols-2">
-      {/* Left: BU red panel with an academic illustration */}
-      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[#cc0000] via-[#b00000] to-[#7d0000] text-white px-12 py-14">
+      {/* Left: BU red panel; the campus from above sits in the lower part, faded into the red */}
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#990000] text-white px-12 py-14">
+        <img src={campus} alt="" aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 w-full h-[60%] object-cover object-[center_55%] opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#cc0000] via-[#a00000] via-45% to-[#7a0000]/55" aria-hidden="true" />
         <div className="relative z-10 flex items-center gap-3">
           <span className="w-11 h-12 grid place-items-center rounded-lg bg-white/95"><BUCrest className="w-7 h-8" /></span>
           <span>
@@ -69,8 +72,7 @@ export default function Login() {
             ))}
           </ul>
         </div>
-        <CampusIllustration />
-        <p className="relative z-10 text-[12px] text-red-100/80">Academic departments make the final decision on every course.</p>
+        <p className="relative z-10 pt-5 border-t border-white/20 text-[12px] text-red-100/80">Academic departments make the final decision on every course.</p>
       </aside>
 
       {/* Right: the form */}
@@ -114,21 +116,5 @@ export default function Login() {
         </div>
       </main>
     </div>
-  )
-}
-
-// A simple line drawing of a collegiate building (inline, so no external image is needed)
-function CampusIllustration() {
-  return (
-    <svg viewBox="0 0 520 220" className="pointer-events-none absolute inset-x-0 bottom-0 w-full max-h-[34%] opacity-[0.14]" preserveAspectRatio="xMidYMax meet" aria-hidden="true" fill="none" stroke="#fff" strokeWidth="2">
-      <path d="M20 210h480" />
-      <path d="M60 210V120h400v90" />
-      <path d="M40 120h440L260 40 40 120z" />
-      <circle cx="260" cy="88" r="16" />
-      {[90, 140, 190, 240, 290, 340, 390, 430].map(x => <path key={x} d={`M${x} 130v80`} />)}
-      <path d="M220 210v-48a40 40 0 0 1 80 0v48" />
-      <path d="M245 40V12h30v28" />
-      <path d="M260 12V2" />
-    </svg>
   )
 }

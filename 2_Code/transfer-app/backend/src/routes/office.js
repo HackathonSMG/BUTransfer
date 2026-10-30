@@ -76,7 +76,7 @@ router.get('/overview', async (_req, res, next) => {
                AND NOT EXISTS (SELECT 1 FROM conflict_resolutions x WHERE x.institution = cr.institution AND x.course_code = cr.course_code
                                  AND x.action IN ('resolved', 'use_established') AND x.created_at > cr.created_at)
                AND NOT EXISTS (SELECT 1 FROM equivalencies e WHERE e.institution = cr.institution AND e.course_code = cr.course_code
-                                 AND e.status = 'active' AND e.approved_on >= cr.created_at::date AND e.source = 'promoted')
+                                 AND e.status = 'active' AND e.approved_on >= cr.created_at::date AND e.source IN ('promoted', 'standard', 'manual'))
              ORDER BY cr.created_at DESC LIMIT 10`),
     ]);
     const now = new Date();

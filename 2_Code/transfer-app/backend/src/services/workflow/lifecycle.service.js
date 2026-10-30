@@ -66,7 +66,8 @@ export async function applyEstablished(applicationId) {
   const applied = [];
   for (const c of rows) {
     let decision = null;
-    if (c.path === 'equivalency' && ['transfer', 'elective'].includes(c.outcome) && c.bu_credits != null) {
+    // An established "No credit" equivalency awards no units, so it does not need the transcript credits
+    if (c.path === 'equivalency' && (['transfer', 'elective'].includes(c.outcome) && c.bu_credits != null || c.outcome === 'no_credit')) {
       const k = await courseKnowledge({ institution: c.institution, courseCode: c.code });
       const blocking = k.conflicts.filter((x) => x.type !== 'match_divergence');
       if (blocking.length) {
@@ -74,7 +75,8 @@ export async function applyEstablished(applicationId) {
         continue;
       }
       decision = {
-        outcome: c.outcome, award: c.award, units: c.bu_credits, type: 'established_equivalency', via: 'established_equivalency',
+        outcome: c.outcome, award: c.outcome === 'no_credit' ? null : c.award, units: c.outcome === 'no_credit' ? 0 : c.bu_credits,
+        type: 'established_equivalency', via: 'established_equivalency',
         reason: `Established equivalency ${c.equivalency_id} applied by the Credit Evaluation Office.`,
       };
     } else if (c.path === 'rule' && c.outcome === 'no_credit' && (c.rules || []).some((r) => DETERMINISTIC_RULES.includes(r))) {

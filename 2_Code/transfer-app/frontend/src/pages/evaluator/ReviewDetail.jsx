@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, FileText, ChevronDown, Check, MessageSquare, CheckCircle2, XCircle, Clock, AlertTriangle, BadgeCheck, History as HistoryIcon, Flag, Search, X, Paperclip, Link2, Info, Minus, ShieldCheck, UserCog, GraduationCap, Landmark, UserCheck, Sparkles, Compass, CircleDashed, BookOpen, Library, ScrollText, MessagesSquare } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getReview, startReview, decideReview, checkReviewDecision, requestReviewInfo, escalateReview, requestReassignment, searchBuCourses, getDocumentLink } from '../../api/my'
+import { proposeEquivalency } from '../../api/memory'
 import StatusPill from '../../components/staff/StatusPill'
 import TranscriptDrawer from '../../components/evaluator/TranscriptDrawer'
 import Button from '../../components/ui/Button'
@@ -43,6 +44,30 @@ function decisionPayload(form, text) {
     units: form.units !== '' ? Number(form.units) : null,
     conflict_action: form.conflictAction
   }
+}
+
+// The award a decision would propose as the standard equivalency for this course, or null when it cannot be one
+function proposalAward(form, d) {
+  const proposed = d?.proposed
+  if (form.outcome === 'equivalent') {
+    if (!proposed) return null
+    if (proposed.outcome === 'transfer') return proposed.award ? { outcome: 'BU equivalent', bu_course: proposed.award } : null
+    if (proposed.outcome === 'elective') return { outcome: 'Elective credit', bu_course: null }
+    if (proposed.outcome === 'no_credit') return { outcome: 'No credit', bu_course: null }
+    return null
+  }
+  if (form.outcome === 'different_course') return form.courses.length ? { outcome: 'BU equivalent', bu_course: form.courses.join(' + ') } : null
+  if (form.outcome === 'elective') return { outcome: 'Elective credit', bu_course: null, note: form.elective ? `Elective category: ${form.elective}` : null }
+  if (form.outcome === 'no_credit') return { outcome: 'No credit', bu_course: null }
+  return null
+}
+
+// Offered only when the award differs from the established equivalency (proposing the same one adds nothing)
+function canPropose(form, d) {
+  const award = proposalAward(form, d)
+  if (!award || !d?.source_course) return false
+  const est = d.knowledge?.established
+  return !(est && est.outcome === award.outcome && (est.bu_course || '') === (award.bu_course || ''))
 }
 
 // One sentence on where the proposed BU course came from
@@ -101,7 +126,7 @@ export default function ReviewDetail() {
   const openDecision = (preset = {}) => {
     const d = state.data
     setText('')
-    setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, infoKind: 'syllabus', ...preset })
+    setForm({ outcome: d?.proposed ? 'equivalent' : 'different_course', courses: [], elective: '', units: '', conflictAction: null, infoKind: 'syllabus', propose: false, ...preset })
     setDialog('decide')
   }
   // A request starts from the one drafted from the comparison's gaps; the evaluator edits it before sending
@@ -135,9 +160,26 @@ export default function ReviewDetail() {
         notify.success(form.infoKind === 'syllabus' ? 'Syllabus requested from the student' : 'Information requested from the student')
       } else {
         const res = await decideReview(id, decisionPayload(form, text))
+        // Optional, after the decision is recorded: propose the award as the standard for future transcripts.
+        // A failure here never undoes the decision; it is reported with the confirmation
+        let proposal = null
+        if (form.propose && canPropose(form, d0)) {
+          const award = proposalAward(form, d0)
+          const src = d0.source_course
+          try {
+            await proposeEquivalency({
+              institution: src.institution, course_code: src.catalog_code || src.course_code, title: src.title || null,
+              outcome: award.outcome, bu_course: award.bu_course, note: award.note || null, review_id: id
+            })
+            proposal = 'Proposed as the standard equivalency; the Credit Evaluation Office will review it.'
+          } catch (err) {
+            proposal = `The standard equivalency proposal was not sent: ${err.response?.data?.message || err.message}`
+          }
+        }
         // One confirmation for everything the decision caused; the decision banner below shows the outcome itself
         notify.success([
           form.outcome === 'no_credit' ? 'Recorded: no credit.' : 'Decision recorded.',
+          proposal,
           res.data.transfer && `The remaining courses were handed to the next evaluator (${res.data.transfer.request_number}).`,
           res.data.application_status === 'ready_for_posting' && 'Every course on this application is decided; it is ready for the Credit Evaluation Office.'
         ].filter(Boolean).join(' '))
@@ -695,6 +737,19 @@ function DecisionForm({ d, form, setForm, text, setText }) {
         <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={FIELD}
           placeholder={form.outcome === 'no_credit' ? 'e.g. Content does not cover the data structures required for CAS CS 112.' : form.outcome === 'different_course' ? 'e.g. The syllabus covers discrete mathematics, not programming.' : 'Anything the next evaluator should know.'} />
           </label>
+
+          {canPropose(form, d) && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-staff-line px-3.5 py-3 cursor-pointer hover:bg-staff-bg">
+              <input type="checkbox" className="mt-0.5 accent-current text-primary-600" checked={!!form.propose} onChange={e => set({ propose: e.target.checked })} />
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium text-staff-ink">Propose this as the standard for future transcripts</span>
+                <span className="block text-[12.5px] text-staff-muted">
+                  {(() => { const a = proposalAward(form, d); return `${src?.course_code} → ${a.outcome === 'BU equivalent' ? a.bu_course : a.outcome}.` })()}
+                  {' '}The Credit Evaluation Office approves it before it applies. Your decision on this course is recorded either way.
+                </span>
+              </span>
+            </label>
+          )}
         </>
       )}
     </>
