@@ -12,6 +12,7 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { greeting } from '../../lib/staffFormat'
+import { initials } from '../../lib/reviews'
 import ImpactPanel from '../../components/staff/ImpactPanel'
 
 // The Credit Evaluation Office's working view: what to post, what to place, what to resolve. Every number comes
@@ -93,106 +94,40 @@ export default function OfficeDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 items-start">
         <div className="space-y-6">
-          <Queue
-            icon={Stamp}
-            title="Final review"
-            total={c.applications_with_unposted}
-            empty="No decided courses are waiting to be posted."
-            rows={d.ready_to_post}
-            render={a => (
-              <Link to={`/office/applications/${a.id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-staff-bg">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-medium text-staff-ink truncate">{a.student_name}</span>
-                  <span className="block text-[12.5px] text-staff-muted truncate"><span className="font-mono">{a.reference_number}</span> · {a.transfer_from_institution}</span>
-                </span>
-                <span className="text-[13px] text-staff-ink2 whitespace-nowrap">{a.decided_unposted} to post{a.posted ? ` · ${a.posted} posted` : ''} of {a.courses}</span>
-                {a.duplicate_status === 'suspected' ? <StatusPill tone="warn">Possible duplicate</StatusPill> : <StatusPill status={a.status} />}
-              </Link>
-            )}
-          />
+          <FinalReview rows={d.ready_to_post} total={c.applications_with_unposted} />
 
-          <Queue
-            icon={Inbox}
-            title="Unassigned reviews"
-            empty="Every course has an evaluator."
-            rows={d.office_queue}
-            action={d.office_queue.length > 0 && <Button size="sm" variant="secondary" onClick={place} loading={placing}>Assign where possible</Button>}
-            render={r => (
-              <Link to={`/office/applications/${r.application_id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-staff-bg">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] text-staff-ink truncate"><span className="font-mono font-medium">{r.course_code}</span> {r.title}</span>
-                  <span className="block text-[12.5px] text-staff-muted truncate">{r.institution} · {r.reference_number} · {r.student_name}</span>
-                  <span className={`block text-[12.5px] font-medium truncate ${r.needs_reassignment ? 'text-amber-800' : 'text-rose-800'}`} title={r.assignment_reason || ''}>
-                    {r.needs_reassignment ? `Reassignment required: ${r.evaluator_name} is unavailable` : r.reason_category}
-                  </span>
-                </span>
-                <ArrowRight className="w-4 h-4 text-staff-muted" />
-              </Link>
+          <section className="staff-card">
+            <SectionTitle
+              icon={Inbox}
+              title={<>Unassigned reviews <span className="text-staff-muted font-normal">({d.office_queue.length})</span></>}
+              right={d.office_queue.length > 0 && <Button size="sm" variant="secondary" onClick={place} loading={placing}>Assign where possible</Button>}
+            />
+            {d.office_queue.length === 0 ? (
+              <p className="flex items-center gap-2 px-6 py-5 text-[14px] text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Every course has an evaluator.</p>
+            ) : (
+              <ul className="divide-y divide-staff-line2">
+                {d.office_queue.map((r, i) => (
+                  <li key={r.id || i}>
+                    <Link to={`/office/applications/${r.application_id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-staff-bg">
+                      <span className={`w-1 self-stretch rounded-full flex-shrink-0 ${r.needs_reassignment ? 'bg-amber-400' : 'bg-red-500'}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] text-staff-ink truncate"><span className="font-mono font-medium">{r.course_code}</span> {r.title}</span>
+                        <span className="block text-[12.5px] text-staff-muted truncate">{r.institution} · <span className="font-mono">{r.reference_number}</span> · {r.student_name}</span>
+                        <span className={`block text-[12.5px] font-medium truncate ${r.needs_reassignment ? 'text-amber-800' : 'text-rose-800'}`} title={r.assignment_reason || ''}>
+                          {r.needs_reassignment ? `Reassignment required: ${r.evaluator_name} is unavailable` : r.reason_category}
+                        </span>
+                      </span>
+                      <ArrowRight className="w-4 h-4 text-staff-muted flex-shrink-0" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-          />
+          </section>
         </div>
 
         <div className="space-y-6">
-          <section className="staff-card">
-            <SectionTitle icon={GitCompare} tone="amber" title="Needs a decision" />
-            <ul className="divide-y divide-staff-line2 text-[14px]">
-              {d.escalations.map((e, i) => (
-                <li key={`esc-${i}`}>
-                  <Link to="/admin/conflicts" className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
-                    <Flag className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <span className="min-w-0">
-                      <span className="block font-medium text-staff-ink">Escalation: {e.institution} {e.course_code}</span>
-                      <span className="block text-[12.5px] text-staff-muted">{e.raised_by}{e.note ? `: ${e.note}` : ''}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-              {d.duplicates.map(a => (
-                <li key={a.id}>
-                  <Link to={`/office/applications/${a.id}`} className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
-                    <Copy className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <span className="min-w-0">
-                      <span className="block font-medium text-staff-ink">Potential duplicate: {a.reference_number}</span>
-                      <span className="block text-[12.5px] text-staff-muted">{a.duplicate_reason}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-              {d.deadlines.map(a => (
-                <li key={a.id}>
-                  <Link to={`/office/applications/${a.id}`} className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
-                    <CalendarClock className={`w-4 h-4 flex-shrink-0 mt-0.5 ${a.status === 'passed' ? 'text-red-600' : 'text-amber-600'}`} />
-                    <span className="min-w-0">
-                      <span className="block font-medium text-staff-ink">{a.status === 'passed' ? 'Transfer deadline passed' : 'Transfer deadline approaching'}: {a.reference_number}</span>
-                      <span className="block text-[12.5px] text-staff-muted">
-                        {a.student_name} · started {a.start_term} · deadline {a.deadline}{a.status === 'passed' ? (a.exception ? ' · exception recorded' : ' · needs an exception to post') : ` · ${a.days_left} days left`}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <Link to="/admin/conflicts" className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
-                  <GitCompare className="w-4 h-4 text-staff-ink2 flex-shrink-0 mt-0.5" />
-                  <span className="min-w-0">
-                    <span className="block font-medium text-staff-ink">Equivalency conflicts</span>
-                    <span className="block text-[12.5px] text-staff-muted">Review earlier decisions that disagree and set the standard.</span>
-                  </span>
-                </Link>
-              </li>
-              {!d.duplicates.length && !d.deadlines.length && !d.escalations.length && (
-                <li className="flex items-center gap-2 px-6 py-3.5 text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />No escalations, duplicates or deadline issues.</li>
-              )}
-            </ul>
-          </section>
-
-          <section className="staff-card">
-            <SectionTitle icon={FileText} tone="violet" title="Syllabi" />
-            <div className="grid grid-cols-2 divide-x divide-staff-line2">
-              <div className="px-6 py-4"><p className="font-display text-[28px] font-semibold text-amber-700 tabular-nums leading-none">{c.syllabi_pending}</p><p className="text-[13px] text-staff-ink2 mt-1.5">Waiting on students</p></div>
-              <div className="px-6 py-4"><p className="font-display text-[28px] font-semibold text-emerald-700 tabular-nums leading-none">{c.syllabi_received}</p><p className="text-[13px] text-staff-ink2 mt-1.5">Received, in review</p></div>
-            </div>
-          </section>
+          <NeedsDecision d={d} c={c} />
 
           <section className="staff-card">
             <SectionTitle icon={Activity} tone="sky" title="Recent activity" />
@@ -208,15 +143,133 @@ export default function OfficeDashboard() {
   )
 }
 
-function Queue({ icon: Icon, title, rows, render, empty, action, total }) {
+// Final review groups, from each row's application status (only the rows already loaded are filtered)
+const GROUPS = [
+  { key: 'all', label: 'All' },
+  { key: 'ready', label: 'Ready' },
+  { key: 'evaluators', label: 'With evaluators' },
+  { key: 'info', label: 'Info' }
+]
+const groupOf = a => (a.status === 'ready_for_posting' ? 'ready' : a.status === 'information_required' ? 'info' : 'evaluators')
+
+// Evaluations with decided courses not yet posted: how far each is to posting, and where to take it next.
+// Posting itself happens on the application page.
+function FinalReview({ rows, total }) {
+  const [group, setGroup] = useState('all')
+  const counts = rows.reduce((acc, a) => { acc[groupOf(a)] += 1; return acc }, { all: rows.length, ready: 0, evaluators: 0, info: 0 })
+  const shown = group === 'all' ? rows : rows.filter(a => groupOf(a) === group)
+  const groups = GROUPS.filter(g => g.key === 'all' || counts[g.key] > 0)
+
   return (
     <section className="staff-card">
-      <SectionTitle icon={Icon} title={<>{title} <span className="text-staff-muted font-normal">({total ?? rows.length})</span></>} right={action} />
-      {rows.length === 0 ? (
-        <p className="flex items-center gap-2 px-6 py-5 text-[14px] text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{empty}</p>
+      <SectionTitle
+        icon={Stamp}
+        title={<>Final review <span className="text-staff-muted font-normal">({total ?? rows.length})</span></>}
+        right={groups.length > 2 && (
+          <span className="hidden sm:flex rounded-lg bg-staff-sunk p-1 text-[12.5px]" role="group" aria-label="Show evaluations">
+            {groups.map(g => (
+              <button key={g.key} type="button" onClick={() => setGroup(g.key)} aria-pressed={group === g.key}
+                className={`px-2.5 py-1 rounded-md whitespace-nowrap ${group === g.key ? 'bg-white text-staff-ink font-medium shadow-sm' : 'text-staff-muted hover:text-staff-ink'}`}>
+                {g.label} <span className="tabular-nums">{counts[g.key]}</span>
+              </button>
+            ))}
+          </span>
+        )}
+      />
+      {shown.length === 0 ? (
+        <p className="flex items-center gap-2 px-6 py-5 text-[14px] text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />No decided courses are waiting to be posted.</p>
       ) : (
-        <ul className="divide-y divide-staff-line2">{rows.map((r, i) => <li key={r.id || i}>{render(r)}</li>)}</ul>
+        <ul className="divide-y divide-staff-line2">
+          {shown.map((a, i) => <li key={a.id || i}><FinalReviewRow a={a} /></li>)}
+        </ul>
       )}
     </section>
+  )
+}
+
+function FinalReviewRow({ a }) {
+  const duplicate = a.duplicate_status === 'suspected'
+  const ready = groupOf(a) === 'ready'
+  const decided = a.decided_unposted + a.posted
+  const tint = duplicate ? 'bg-amber-50 text-amber-800' : ready ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
+  const share = n => `${a.courses > 0 ? Math.min(100, (n / a.courses) * 100) : 0}%`
+  return (
+    <Link to={`/office/applications/${a.id}`} className="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2 px-6 py-3 hover:bg-staff-bg">
+      <span className={`w-9 h-9 rounded-full grid place-items-center text-[12px] font-semibold flex-shrink-0 ${tint}`} aria-hidden="true">{initials(a.student_name)}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[15px] font-medium text-staff-ink">
+          <span className="truncate">{a.student_name}</span>
+          {duplicate && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 whitespace-nowrap"><Copy className="w-3 h-3" aria-hidden="true" />Possible duplicate</span>}
+        </span>
+        <span className="block text-[12.5px] text-staff-muted truncate"><span className="font-mono">{a.reference_number}</span> · {a.transfer_from_institution}</span>
+      </span>
+      <span className="w-full sm:w-40 flex-shrink-0">
+        <span className="flex h-1.5 rounded-full bg-staff-line2 overflow-hidden" aria-hidden="true">
+          <span className="bg-slate-400" style={{ width: share(a.posted) }} />
+          <span className="bg-emerald-500" style={{ width: share(a.decided_unposted) }} />
+        </span>
+        <span className="block text-[11.5px] text-staff-muted mt-1 tabular-nums">
+          {a.decided_unposted} to post{a.posted ? ` · ${a.posted} posted` : ''} of {a.courses}{decided < a.courses ? ` · ${a.courses - decided} pending` : ''}
+        </span>
+      </span>
+      <span className="flex-shrink-0 sm:w-[118px] flex sm:justify-end">
+        {duplicate ? (
+          <span className="inline-flex items-center rounded-lg border border-staff-line bg-white px-3 py-1.5 text-[12.5px] font-medium text-staff-ink">Resolve first</span>
+        ) : ready ? (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-[12.5px] font-semibold whitespace-nowrap"><Stamp className="w-3.5 h-3.5" aria-hidden="true" />Review &amp; post</span>
+        ) : (
+          <StatusPill status={a.status} />
+        )}
+      </span>
+    </Link>
+  )
+}
+
+// Escalations, possible duplicates and deadline issues, then the syllabus counts
+function NeedsDecision({ d, c }) {
+  const open = d.escalations.length + d.duplicates.length + d.deadlines.length
+  return (
+    <section className="staff-card">
+      <SectionTitle icon={GitCompare} tone="amber" title="Needs a decision"
+        right={open > 0 && <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[12px] font-medium text-red-700 tabular-nums" aria-label={`${open} open`}>{open}</span>} />
+      <ul className="divide-y divide-staff-line2 text-[13.5px]">
+        {d.escalations.map((e, i) => (
+          <DecisionRow key={`esc-${i}`} to="/admin/conflicts" stripe="bg-amber-400" title={<span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />Escalation · {e.institution} {e.course_code}</span>} detail={`${e.raised_by}${e.note ? `: ${e.note}` : ''}`} />
+        ))}
+        {d.duplicates.map(a => (
+          <DecisionRow key={a.id} to={`/office/applications/${a.id}`} stripe="bg-amber-400" title={<span className="inline-flex items-center gap-1.5"><Copy className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />Possible duplicate · {a.reference_number}</span>} detail={a.duplicate_reason} />
+        ))}
+        {d.deadlines.map(a => (
+          <DecisionRow key={a.id} to={`/office/applications/${a.id}`} stripe={a.status === 'passed' ? 'bg-red-500' : 'bg-amber-400'}
+            title={<span className="inline-flex items-center gap-1.5"><CalendarClock className={`w-3.5 h-3.5 ${a.status === 'passed' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />{a.status === 'passed' ? 'Transfer deadline passed' : 'Transfer deadline approaching'} · {a.reference_number}</span>}
+            detail={`${a.student_name} · started ${a.start_term} · deadline ${a.deadline}${a.status === 'passed' ? (a.exception ? ' · exception recorded' : ' · needs an exception to post') : ` · ${a.days_left} days left`}`} />
+        ))}
+        <DecisionRow to="/admin/conflicts" stripe="bg-staff-line" title="Equivalency conflicts" detail="Review earlier decisions that disagree and set the standard." />
+        {!open && (
+          <li className="flex items-center gap-2 px-6 py-3.5 text-staff-ink2"><CheckCircle2 className="w-4 h-4 text-emerald-600" />No escalations, duplicates or deadline issues.</li>
+        )}
+      </ul>
+      <div className="px-6 py-4 border-t border-staff-line2">
+        <p className="staff-eyebrow flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" aria-hidden="true" />Syllabi</p>
+        <div className="mt-2.5 grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-amber-50/60 px-3 py-2.5"><p className="font-display tabular-nums text-[22px] font-semibold text-amber-700 leading-none">{c.syllabi_pending}</p><p className="text-[12px] text-staff-ink2 mt-1">waiting on students</p></div>
+          <div className="rounded-lg bg-emerald-50/60 px-3 py-2.5"><p className="font-display tabular-nums text-[22px] font-semibold text-emerald-700 leading-none">{c.syllabi_received}</p><p className="text-[12px] text-staff-ink2 mt-1">received, in review</p></div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function DecisionRow({ to, stripe, title, detail }) {
+  return (
+    <li>
+      <Link to={to} className="flex gap-3 px-6 py-3.5 hover:bg-staff-bg">
+        <span className={`w-1 self-stretch rounded-full flex-shrink-0 ${stripe}`} aria-hidden="true" />
+        <span className="min-w-0">
+          <span className="block font-medium text-staff-ink">{title}</span>
+          <span className="block text-[12.5px] text-staff-muted">{detail}</span>
+        </span>
+      </Link>
+    </li>
   )
 }
