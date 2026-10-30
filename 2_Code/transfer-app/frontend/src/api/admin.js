@@ -51,3 +51,14 @@ export const recordStandardEquivalency = (body) =>
 // Process counts for a period and a BU start term: { term?, from?, to? } (dates YYYY-MM-DD, inclusive)
 export const getAdminCounts = (params = {}) =>
   client.get('/admin/counts', { params }).then(r => r.data)
+
+// Staff accounts: { role: 'evaluator' | 'credit_office', email, full_name, password?, ...evaluator fields }
+export const createStaffMember = (data) =>
+  client.post('/admin/staff', data).then(r => r.data)
+
+export const getCreditOfficeStaff = () =>
+  client.get('/admin/staff', { params: { role: 'credit_office' } }).then(r => r.data)
+
+// { full_name?, is_active? }
+export const updateCreditOfficeStaff = (id, data) =>
+  client.put(`/admin/staff/${id}`, data).then(r => r.data)

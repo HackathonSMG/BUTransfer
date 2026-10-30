@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight, LayoutGrid, List
+  Plus, Edit2, Power, Users, X, Upload, Search, AlertTriangle, ChevronRight, LayoutGrid, List, GraduationCap, Landmark, Check
 } from 'lucide-react'
 import notify from '../../lib/notify'
-import { getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile } from '../../api/admin'
+import {
+  getEvaluators, createEvaluator, updateEvaluator, importStaffRoster, getEvaluatorProfile,
+  createStaffMember, getCreditOfficeStaff, updateCreditOfficeStaff
+} from '../../api/admin'
 import { setEvaluatorAvailability } from '../../api/office'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -29,6 +32,44 @@ const INITIAL_FORM = {
 }
 
 const toCode = (s) => s.toUpperCase().replace(/\s+/g, ' ')
+
+// Staff roles an administrator can add here (administrators and students are never created on this page)
+const STAFF_ROLES = [
+  { value: 'evaluator', label: 'Evaluator', icon: GraduationCap, description: 'Reviews transfer courses for a department and decides BU equivalencies.' },
+  { value: 'credit_office', label: 'Credit Office', icon: Landmark, description: 'Places courses with evaluators, finalizes evaluations and posts transfer credit.' }
+]
+const roleLabel = (role) => STAFF_ROLES.find(r => r.value === role)?.label || 'Staff'
+
+// Two option cards; the choice decides which fields the form asks for
+function RoleChoice({ value, onChange }) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-gray-700 mb-2">Role <span className="text-red-500">*</span></legend>
+      <div className="grid sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Role">
+        {STAFF_ROLES.map(({ value: v, label, icon: Icon, description }) => {
+          const on = value === v
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(v)}
+              className={`relative text-left rounded-xl border p-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${on ? 'border-primary-500 bg-primary-50/60 ring-1 ring-primary-500' : 'border-staff-line bg-white hover:border-slate-300'}`}
+            >
+              <span className="flex items-center gap-2.5">
+                <span className={`w-8 h-8 rounded-lg grid place-items-center flex-shrink-0 ${on ? 'bg-primary-600 text-white' : 'bg-staff-sunk text-staff-ink2'}`}><Icon className="w-4 h-4" aria-hidden="true" /></span>
+                <span className="font-semibold text-staff-ink">{label}</span>
+                {on && <Check className="w-4 h-4 text-primary-600 ml-auto" aria-hidden="true" />}
+              </span>
+              <span className="block text-[12.5px] text-staff-muted mt-2 leading-snug">{description}</span>
+            </button>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
 
 function TagInput({ value, onChange, placeholder, format = (s) => s }) {
   const [input, setInput] = useState('')
@@ -80,8 +121,10 @@ function TagInput({ value, onChange, placeholder, format = (s) => s }) {
   )
 }
 
-function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
+function EvaluatorModal({ isOpen, onClose, evaluator, onSave, defaultRole = 'evaluator' }) {
   const isEdit = Boolean(evaluator?.id)
+  const [role, setRole] = useState(defaultRole)
+  const isEvaluator = isEdit || role === 'evaluator'
   const [form, setForm] = useState(INITIAL_FORM)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -103,8 +146,9 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
         : INITIAL_FORM
       )
       setErrors({})
+      setRole(evaluator ? 'evaluator' : defaultRole)
     }
-  }, [isOpen, evaluator])
+  }, [isOpen, evaluator, defaultRole])
 
   const set = (key, value) => {
     setForm(p => ({ ...p, [key]: value }))
@@ -119,6 +163,7 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
     }
     if (!isEdit && !form.password) errs.password = 'Password is required for new accounts'
     if (form.password && form.password.length < 8) errs.password = 'Password must be at least 8 characters'
+    if (!isEvaluator) return errs
     const badSubject = form.expertise_subjects.find(s => !/^[A-Z]{2,4}$/.test(s))
     if (badSubject) errs.expertise_subjects = `"${badSubject}" is not a subject code (use codes such as CS or MA)`
     const badCourse = form.expertise_courses.find(c => !/^[A-Z]{2,4} [A-Z]{2} \d{3}$/.test(c))
@@ -137,22 +182,27 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
       if (isEdit) {
         await updateEvaluator(evaluator.id, payload)
         notify.success('Evaluator updated successfully')
-      } else {
+      } else if (role === 'evaluator') {
         await createEvaluator(payload)
-        notify.success('Evaluator account created')
+        notify.success(`Evaluator account created for ${form.full_name.trim()}`)
+      } else {
+        await createStaffMember({ role, full_name: form.full_name.trim(), email: form.email.trim(), password: form.password })
+        notify.success(`Credit Office account created for ${form.full_name.trim()}`)
       }
-      onSave()
+      onSave(isEdit ? 'evaluator' : role)
       onClose()
     } catch (err) {
-      notify.error(err.response?.data?.message || 'Failed to save evaluator')
+      notify.error(err.response?.data?.message || (isEvaluator ? 'Failed to save evaluator' : 'Failed to create the Credit Office account'))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Evaluator' : 'Add New Evaluator'} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Evaluator' : 'Add staff member'} size="md">
       <div className="space-y-4">
+        {!isEdit && <RoleChoice value={role} onChange={setRole} />}
+
         <Input
           label="Full Name"
           required
@@ -184,6 +234,7 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
           placeholder="••••••••"
         />
 
+        {isEvaluator ? (<>
         <div className="grid sm:grid-cols-2 gap-4">
           <Input
             label="Title"
@@ -241,11 +292,16 @@ function EvaluatorModal({ isOpen, onClose, evaluator, onSave }) {
           />
           <span className="text-sm text-gray-700">Account Active</span>
         </label>
+        </>) : (
+          <p className="text-[12.5px] text-staff-muted rounded-lg bg-staff-sunk px-3 py-2.5">
+            Credit Office staff sign in to the Credit Office workspace. They need no department or expertise; they place courses, finalize evaluations and post credit for all applications.
+          </p>
+        )}
 
         <div className="flex gap-3 justify-end pt-2">
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} loading={saving}>
-            {isEdit ? 'Save Changes' : 'Create Evaluator'}
+            {isEdit ? 'Save Changes' : `Create ${roleLabel(role)} account`}
           </Button>
         </div>
       </div>
@@ -747,6 +803,99 @@ function EvaluatorDrawer({ evaluatorId, onClose, onEdit, onToggle, toggling, onA
   )
 }
 
+// Credit Office staff: who they are, whether they can sign in, and a way to deactivate or reactivate them
+function lastSeen(at) {
+  if (!at) return 'Never signed in'
+  const d = new Date(at)
+  return Number.isNaN(d.getTime()) ? 'Never signed in' : `Last signed in ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+}
+
+function CreditOfficeCard({ member, onToggle }) {
+  return (
+    <li className={`staff-card p-5 flex flex-col ${member.is_active ? '' : 'opacity-70'}`}>
+      <span className="flex items-start gap-3">
+        <span className={`w-11 h-11 rounded-full grid place-items-center text-[13px] font-semibold flex-shrink-0 ${avatarTint(member.full_name)}`}>{initials(member.full_name)}</span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-semibold text-staff-ink truncate">{member.full_name}</span>
+          <span className="block text-[12.5px] text-staff-muted truncate" title={member.email}>{member.email}</span>
+        </span>
+        <StatusPill tone={member.is_active ? 'ok' : 'neutral'}>{member.is_active ? 'Active' : 'Inactive'}</StatusPill>
+      </span>
+      <span className="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-staff-line2">
+        <span className="text-[12px] text-staff-muted truncate">{lastSeen(member.last_sign_in_at)}</span>
+        <Button size="sm" variant="ghost" onClick={() => onToggle(member)}>
+          <Power className="w-4 h-4" />{member.is_active ? 'Deactivate' : 'Reactivate'}
+        </Button>
+      </span>
+    </li>
+  )
+}
+
+function ConfirmToggleModal({ member, onClose, onConfirm, saving }) {
+  const deactivate = member?.is_active
+  return (
+    <Modal isOpen={Boolean(member)} onClose={onClose} title={deactivate ? 'Deactivate Credit Office account?' : 'Reactivate Credit Office account?'} size="sm">
+      {member && (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            {deactivate
+              ? <><b className="text-staff-ink">{member.full_name}</b> will no longer be able to sign in. Their past actions and history stay as they are. You can reactivate the account later.</>
+              : <><b className="text-staff-ink">{member.full_name}</b> will be able to sign in to the Credit Office workspace again.</>}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant={deactivate ? 'danger' : 'primary'} loading={saving} onClick={() => onConfirm(member)}>
+              <Power className="w-4 h-4" />{deactivate ? 'Deactivate' : 'Reactivate'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function CreditOfficeList({ staff, error, onAdd, onToggle }) {
+  if (error) {
+    return <div className="staff-card"><EmptyState icon={AlertTriangle} title="Credit Office staff could not be loaded" description={error} /></div>
+  }
+  if (staff.length === 0) {
+    return (
+      <div className="staff-card">
+        <EmptyState icon={Landmark} title="No Credit Office staff yet" description="Credit Office staff place courses with evaluators, finalize evaluations and post transfer credit. Add the first account to give someone access." action={onAdd} actionLabel="Add Credit Office member" />
+      </div>
+    )
+  }
+  return (
+    <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {staff.map(m => <CreditOfficeCard key={m.id} member={m} onToggle={onToggle} />)}
+    </ul>
+  )
+}
+
+function StaffTabs({ tab, onChange, counts }) {
+  const tabs = [['evaluators', 'Evaluators', counts.evaluators], ['credit_office', 'Credit Office', counts.credit_office]]
+  const onKey = (e, i) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length][0]
+    onChange(next)
+    document.getElementById(`staff-tab-${next}`)?.focus()
+  }
+  return (
+    <div role="tablist" aria-label="Staff" className="border-b border-staff-line2 flex flex-wrap gap-x-1 text-[14px]">
+      {tabs.map(([key, label, count], i) => {
+        const on = tab === key
+        return (
+          <button key={key} id={`staff-tab-${key}`} type="button" role="tab" aria-selected={on} aria-controls={`staff-panel-${key}`} tabIndex={on ? 0 : -1}
+            onClick={() => onChange(key)} onKeyDown={e => onKey(e, i)}
+            className={`px-3 py-2.5 -mb-px border-b-2 whitespace-nowrap ${on ? 'border-brand font-semibold text-staff-ink' : 'border-transparent text-staff-muted hover:text-staff-ink'}`}>
+            {label} <span className="ml-0.5 text-[12.5px] tabular-nums">({count ?? '–'})</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function UserManagement() {
   const [evaluators, setEvaluators] = useState([])
   const [summary, setSummary] = useState(null)
@@ -761,6 +910,10 @@ export default function UserManagement() {
   const [status, setStatus] = useState('active')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [view, setView] = useState('cards')
+  const [tab, setTab] = useState('evaluators')
+  const [office, setOffice] = useState({ staff: [], loaded: false, error: null })
+  const [confirmMember, setConfirmMember] = useState(null)
+  const [officeSaving, setOfficeSaving] = useState(false)
 
   const load = async () => {
     try {
@@ -774,7 +927,31 @@ export default function UserManagement() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Loaded separately so a problem here never hides the evaluators
+  const loadOffice = async () => {
+    try {
+      const res = await getCreditOfficeStaff()
+      setOffice({ staff: res.data || [], loaded: true, error: null })
+    } catch (err) {
+      setOffice(o => ({ ...o, loaded: true, error: err.response?.data?.message || 'Please try again.' }))
+    }
+  }
+
+  useEffect(() => { load(); loadOffice() }, [])
+
+  const handleOfficeToggle = async (member) => {
+    setOfficeSaving(true)
+    try {
+      await updateCreditOfficeStaff(member.id, { is_active: !member.is_active })
+      notify.success(`${member.full_name} ${member.is_active ? 'deactivated' : 'reactivated'}`)
+      setConfirmMember(null)
+      await loadOffice()
+    } catch (err) {
+      notify.error(err.response?.data?.message || 'The account could not be updated')
+    } finally {
+      setOfficeSaving(false)
+    }
+  }
 
   const handleAvailability = async (ev, availability, until) => {
     try {
@@ -822,16 +999,26 @@ export default function UserManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Evaluators"
-        subtitle="Who evaluates which subjects, and how their work is going."
+        title="Staff"
+        subtitle="Evaluators who review courses for their departments, and the Credit Office staff who place courses, finalize evaluations and post credit."
         actions={
           <>
             <Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="w-4 h-4" />Import staff roster</Button>
-            <Button onClick={() => setModal({ open: true, evaluator: null })}><Plus className="w-4 h-4" />Add Evaluator</Button>
+            <Button onClick={() => setModal({ open: true, evaluator: null })}><Plus className="w-4 h-4" />Add staff member</Button>
           </>
         }
       />
 
+      <StaffTabs tab={tab} onChange={setTab} counts={{ evaluators: evaluators.length, credit_office: office.loaded && !office.error ? office.staff.length : null }} />
+
+      {tab === 'credit_office' ? (
+        <div role="tabpanel" id="staff-panel-credit_office" aria-labelledby="staff-tab-credit_office">
+          {!office.loaded
+            ? <div className="flex justify-center py-16"><Spinner size="lg" className="text-primary-600" /></div>
+            : <CreditOfficeList staff={office.staff} error={office.error} onAdd={() => setModal({ open: true, evaluator: null })} onToggle={setConfirmMember} />}
+        </div>
+      ) : (
+      <div role="tabpanel" id="staff-panel-evaluators" aria-labelledby="staff-tab-evaluators" className="space-y-6">
       {summary && evaluators.length > 0 && (
         <section className="grid grid-cols-1 lg:grid-cols-[1fr_1.35fr] gap-5" aria-label="Team capacity">
           <TeamSummary summary={summary} evaluators={evaluators} />
@@ -900,6 +1087,8 @@ export default function UserManagement() {
           </div>
         )}
       </section>
+      </div>
+      )}
 
       <EvaluatorDrawer
         key={drawerKey}
@@ -914,9 +1103,15 @@ export default function UserManagement() {
         isOpen={modal.open}
         onClose={() => setModal({ open: false, evaluator: null })}
         evaluator={modal.evaluator}
-        onSave={() => { load(); setDrawerKey(k => k + 1) }}
+        defaultRole={tab === 'credit_office' ? 'credit_office' : 'evaluator'}
+        onSave={(role) => {
+          if (role === 'credit_office') { loadOffice(); setTab('credit_office'); return }
+          load(); setDrawerKey(k => k + 1)
+          if (!modal.evaluator) setTab('evaluators')
+        }}
       />
-      <ImportRosterModal isOpen={importOpen} onClose={() => setImportOpen(false)} onDone={load} />
+      <ConfirmToggleModal member={confirmMember} onClose={() => !officeSaving && setConfirmMember(null)} onConfirm={handleOfficeToggle} saving={officeSaving} />
+      <ImportRosterModal isOpen={importOpen} onClose={() => setImportOpen(false)} onDone={() => { load(); loadOffice() }} />
     </div>
   )
 }

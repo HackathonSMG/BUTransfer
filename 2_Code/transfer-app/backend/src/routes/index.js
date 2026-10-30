@@ -5,6 +5,7 @@ import applicationsRoutes from './applications.js';
 import documentsRoutes from './documents.js';
 import evaluatorsRoutes from './evaluators.js';
 import adminRoutes from './admin.js';
+import staffRoutes from './staff.js';
 import notificationsRoutes from './notifications.js';
 import intakeRoutes from './intake.js';
 import memoryRoutes from './memory.js';
@@ -22,6 +23,8 @@ router.use('/student', studentRoutes);
 router.use('/applications', applicationsRoutes);
 router.use('/documents', documentsRoutes);
 router.use('/evaluators', evaluatorsRoutes);
+// Staff accounts (evaluators and Credit Office); administrators only. Mounted before /admin so it is matched first.
+router.use('/admin/staff', staffRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/intake', intakeRoutes);

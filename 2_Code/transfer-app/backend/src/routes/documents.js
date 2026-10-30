@@ -5,6 +5,7 @@ import * as notificationService from '../services/notification.service.js';
 import { query } from '../config/db.js';
 import { badRequest, notFound, unauthorized, forbidden } from '../utils/errors.js';
 import { env } from '../config/env.js';
+import { reviewedOf } from '../utils/reviewed.js';
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.post('/', upload.single('file'), async (req, res, next) => {
     let uploadedBy = null;
     let uploadSource = 'student';
     let isAuthenticated = false;
+    let staffName = null;
 
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -34,13 +36,14 @@ router.post('/', upload.single('file'), async (req, res, next) => {
       const token = authHeader.slice(7);
       const { data } = await supabaseAdmin.auth.getUser(token);
       if (data?.user) {
-        const profileResult = await query(`SELECT id, role FROM profiles WHERE id = $1 LIMIT 1`, [data.user.id]);
+        const profileResult = await query(`SELECT id, role, full_name, email FROM profiles WHERE id = $1 LIMIT 1`, [data.user.id]);
         if (profileResult.rows.length > 0) {
           // Transcripts and syllabi come from the student; evaluators view them but never upload them
           if (profileResult.rows[0].role === 'evaluator') return next(forbidden('Evaluators cannot upload application documents.'));
           uploadedBy = profileResult.rows[0].id;
           uploadSource = profileResult.rows[0].role === 'student' ? 'student' : 'evaluator';
           isAuthenticated = true;
+          if (uploadSource === 'evaluator') staffName = profileResult.rows[0].full_name || profileResult.rows[0].email;
         }
       }
     }
@@ -52,7 +55,17 @@ router.post('/', upload.single('file'), async (req, res, next) => {
       if (appResult.rows.length === 0) return next(notFound('Application'));
     }
 
-    const document = await documentService.uploadDocument({ buffer: req.file.buffer, originalName: req.file.originalname, fileSize: req.file.size, mimeType: req.file.mimetype, applicationId: application_id, documentType: document_type, uploadedBy, uploadSource, notes: notes || null });
+    // Staff uploading for a student: the transcript goes with what was confirmed on the review step (as for the
+    // student's own upload), and a draft created on the student's behalf says who uploaded it
+    let reviewed = null;
+    let documentNotes = notes || null;
+    if (staffName) {
+      if (document_type === 'transcript') reviewed = reviewedOf(req.body.reviewed);
+      const { rows: [target] } = await query(`SELECT additional_info FROM applications WHERE id = $1 LIMIT 1`, [application_id]);
+      if (!documentNotes && target?.additional_info?.submitted_on_behalf) documentNotes = `Uploaded by ${staffName} on behalf of the student`;
+    }
+
+    const document = await documentService.uploadDocument({ buffer: req.file.buffer, originalName: req.file.originalname, fileSize: req.file.size, mimeType: req.file.mimetype, applicationId: application_id, documentType: document_type, uploadedBy, uploadSource, notes: documentNotes, reviewed });
 
     const appResult = await query(`SELECT * FROM applications WHERE id = $1 LIMIT 1`, [application_id]);
     if (appResult.rows.length > 0 && appResult.rows[0].assigned_evaluator_id) {

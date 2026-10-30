@@ -134,6 +134,8 @@ router.get('/applications/:id', async (req, res, next) => {
           submitted_at: app.submitted_at, posted_at: app.posted_at, evaluator_name: app.evaluator_name, secure_token: undefined,
           deadline_exception: app.deadline_exception, deadline_exception_by: app.deadline_exception_by_name,
           applicant_comments: app.applicant_comments,
+          // Staff who submitted the transcripts for the student, when they did (who, role, when)
+          submitted_on_behalf: app.additional_info?.submitted_on_behalf || null,
           // Student details changed from what the transcript showed, and details an emailed transcript didn't show
           details_corrected: (app.academic_history?.corrected_fields || []).map((k) => ({ field: k, transcript: app.academic_history?.extracted?.[k] ?? null })),
           details_to_confirm: app.academic_history?.details_to_confirm || [],

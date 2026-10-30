@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/require-role.js';
-import { supabaseAdmin } from '../config/supabase.js';
 import { query } from '../config/db.js';
-import { badRequest, notFound, conflict } from '../utils/errors.js';
+import { badRequest, notFound } from '../utils/errors.js';
 import * as rosterService from '../services/staff/roster.service.js';
+import { createStaffAccount } from '../services/staff/accounts.service.js';
 import { assignPendingApplications, releaseEvaluator } from '../services/workflow/assignment.service.js';
 
 const PW = ['pass', 'word'].join('');
@@ -17,7 +17,7 @@ router.use(requireAuth, requireRole('admin'));
 const subjectList = z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2,4}$/, 'Use subject codes such as CS or MA')).max(20);
 const courseList = z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2,4} [A-Z]{2} \d{3}$/, 'Use BU course codes such as CAS CS 111')).max(60);
 
-const createEvaluatorSchema = z.object({
+export const createEvaluatorSchema = z.object({
   email: z.string().email(),
   full_name: z.string().min(2).max(255),
   title: z.string().max(255).optional().nullable(),
@@ -155,23 +155,10 @@ router.post('/', async (req, res, next) => {
     if (!parseResult.success) return next(badRequest('Validation failed', parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }))));
     const { email, full_name, title, department, specializations, expertise_subjects, expertise_courses, max_concurrent_cases, [PW]: pwValue } = parseResult.data;
 
-    const existing = await query(`SELECT id FROM profiles WHERE email = $1 LIMIT 1`, [email.toLowerCase()]);
-    if (existing.rows.length > 0) return next(conflict(`A user with email ${email} already exists`));
-
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email.toLowerCase(),
-      [PW]: pwValue,
-      email_confirm: true,
-      user_metadata: { full_name, role: 'evaluator' }
+    const userId = await createStaffAccount({
+      role: 'evaluator', email, full_name, [PW]: pwValue,
+      evaluator: { title, department, specializations, expertise_subjects, expertise_courses, max_concurrent_cases },
     });
-    if (authError || !authData?.user) throw new Error(`Failed to create auth user: ${authError?.message}`);
-
-    const userId = authData.user.id;
-    await query(`INSERT INTO profiles (id, role, full_name, email) VALUES ($1, 'evaluator', $2, $3)`, [userId, full_name, email.toLowerCase()]);
-    await query(
-      `INSERT INTO evaluators (id, title, department, specializations, expertise_subjects, expertise_courses, max_concurrent_cases) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, title || null, department || null, specializations, expertise_subjects, expertise_courses, max_concurrent_cases]
-    );
 
     const profile = await query(`SELECT ${EVALUATOR_COLUMNS} FROM profiles p JOIN evaluators e ON e.id = p.id WHERE p.id = $1`, [userId]);
     return res.status(201).json({ data: profile.rows[0] });

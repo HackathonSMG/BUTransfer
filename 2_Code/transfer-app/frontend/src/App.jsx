@@ -31,6 +31,7 @@ import SelfCheck from './pages/student/SelfCheck'
 import StudentPortal from './pages/student/StudentPortal'
 import OfficeDashboard from './pages/office/OfficeDashboard'
 import OfficeApplication from './pages/office/OfficeApplication'
+import UploadForStudent from './pages/staff/UploadForStudent'
 
 // /evaluator is the evaluator's dashboard; older links that sent admins here now go to the applications list
 function EvaluatorHome() {
@@ -165,6 +166,17 @@ export default function App() {
           }
         />
 
+        {/* Staff upload a transcript on a student's behalf (the student submission flow in staff mode) */}
+        <Route
+          path="/staff/upload-transcript"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'credit_office']}>
+              <Layout>
+                <UploadForStudent />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         {/* Admin protected routes */}
         <Route
           path="/admin/conflicts"

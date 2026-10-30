@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Stamp, Copy, CalendarClock, UserCog, FileSearch, AlertTriangle, CheckCircle2, CircleDashed, XCircle, Undo2, Info,
-  Check, BadgeCheck, Hourglass, BookOpen, Workflow, Flag, GraduationCap, CalendarDays, Landmark, Clock
+  Check, BadgeCheck, Hourglass, BookOpen, Workflow, Flag, GraduationCap, CalendarDays, Landmark, Clock, UserCheck
 } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getOfficeApplication, postCredit, recordDeadlineException, resolveDuplicate, returnToEvaluator } from '../../api/office'
@@ -121,13 +121,20 @@ export default function OfficeApplication() {
               <span className="inline-flex items-center gap-1.5"><CalendarDays className="w-4 h-4 text-staff-muted" aria-hidden="true" />{app.expected_start_term ? `Starts ${app.expected_start_term}` : 'Start term not given'}</span>
               <span className="inline-flex items-center gap-1.5"><Landmark className="w-4 h-4 text-staff-muted" aria-hidden="true" />{d.institutions.length > 1 ? `${d.institutions.length} institutions` : d.institutions[0] || app.transfer_from_institution}</span>
             </p>
+            {app.submitted_on_behalf && (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-0.5 text-[12.5px] font-medium text-sky-800">
+                <UserCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                Submitted by {app.submitted_on_behalf.by_name} ({ROLE_NAMES[app.submitted_on_behalf.by_role] || app.submitted_on_behalf.by_role}) on behalf of the student
+                {app.submitted_on_behalf.at && <> · {formatDate(app.submitted_on_behalf.at)}</>}
+              </p>
+            )}
             {app.details_corrected?.length > 0 && (
               <p className="text-[13px] text-amber-800 mt-1.5">
-                Edited by the student: {app.details_corrected.map(c => `${DETAIL_LABELS[c.field] || c.field} (transcript: ${c.transcript || 'not shown'})`).join('; ')}
+                Edited by {editorOf(app)}: {app.details_corrected.map(c => `${DETAIL_LABELS[c.field] || c.field} (transcript: ${c.transcript || 'not shown'})`).join('; ')}
               </p>
             )}
             {renamed.length > 0 && (
-              <p className="text-[13px] text-amber-800 mt-1.5">College name edited by the student: {renamed.map(([now, was]) => `${now} (transcript: ${was || 'not shown'})`).join('; ')}</p>
+              <p className="text-[13px] text-amber-800 mt-1.5">College name edited by {editorOf(app)}: {renamed.map(([now, was]) => `${now} (transcript: ${was || 'not shown'})`).join('; ')}</p>
             )}
             {app.details_to_confirm?.length > 0 && (
               <p className="text-[13px] text-amber-800 mt-1.5">Received by email. To confirm with the student: {app.details_to_confirm.join(', ')}</p>
@@ -206,7 +213,7 @@ export default function OfficeApplication() {
               <div key={institution} className={i > 0 || d.institutions.length > 1 ? 'border-t border-staff-line2' : ''}>
                 {d.institutions.length > 1 && <p className="px-6 pt-3 pb-1 staff-eyebrow">{institution}</p>}
                 <ul className="divide-y divide-staff-line2">
-                  {list.map(c => <CourseRow key={c.id} c={c} owner={owned.get(c.id)} onAssign={() => setAssigning(c)} onReturn={() => setReturning(c)} />)}
+                  {list.map(c => <CourseRow key={c.id} c={c} editor={editorOf(app)} owner={owned.get(c.id)} onAssign={() => setAssigning(c)} onReturn={() => setReturning(c)} />)}
                 </ul>
               </div>
             ))}
@@ -593,7 +600,11 @@ function edgeOf(c) {
   return TONES.amber.edge
 }
 
-function CourseRow({ c, owner, onAssign, onReturn }) {
+// Who corrected what the transcript showed: the student, or the staff member who submitted for them
+const ROLE_NAMES = { admin: 'Administrator', credit_office: 'Credit Evaluation Office' }
+const editorOf = (app) => (app.submitted_on_behalf?.by_name ? `${app.submitted_on_behalf.by_name} for the student` : 'the student')
+
+function CourseRow({ c, editor = 'the student', owner, onAssign, onReturn }) {
   const [open, setOpen] = useState(false)
   const st = STATE[c.state] || STATE.processing
   const who = VIA[c.decided_via] || (c.decided_by ? c.decided_by : c.evaluator_name || (c.queue === 'credit_office' ? 'Credit Evaluation Office' : null))
@@ -615,8 +626,8 @@ function CourseRow({ c, owner, onAssign, onReturn }) {
             {' · '}{c.grade ? `grade ${c.grade}` : 'no grade'}
           </span>
           {corrections.length > 0 && (
-            <span className="block text-[12.5px] text-amber-800" title="The transcript file is unchanged; the student's value is used for evaluation">
-              Edited by the student: {corrections.join('; ')}
+            <span className="block text-[12.5px] text-amber-800" title="The transcript file is unchanged; the corrected value is used for evaluation">
+              Edited by {editor}: {corrections.join('; ')}
             </span>
           )}
         </button>
