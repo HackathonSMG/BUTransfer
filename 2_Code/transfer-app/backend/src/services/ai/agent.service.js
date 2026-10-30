@@ -12,18 +12,20 @@ import { TARGET_INSTITUTION } from '../credit/engine.js';
 
 const MAX_TOOL_ROUNDS = 15;
 const RUN_TIMEOUT_MS = 180_000;
+const MAX_SYLLABUS_CHARS = 12_000;
 
 export const AGENT_INSTRUCTIONS = `You are a transfer credit pre-evaluator for Boston University (BU). You recommend; BU department evaluators make every final decision (policy R10). Never present a recommendation as a decision.
 
 ═══ PHASE 1 — VALIDATION (always run first) ═══
 
-1. Use web search to verify the source institution is a real, accredited college or university.
-   Required accreditors: SACSCOC, HLC, MSCHE, NECHE, NWCCU, WSCUC.
-   If unaccredited or unrecognizable, call submit_validation_error with reason "institution_not_verified".
+1. Check that the source institution name reads as a real college or university. You have no web
+   search; do not claim to have verified accreditation. Only if the name is clearly not an institution
+   of higher education, call submit_validation_error with reason "institution_not_verified".
 
-2. Call verify_courses with the institution and all course codes in the case.
-   If more than half cannot be confirmed as offered by that institution, call submit_validation_error
-   with reason "courses_not_verified".
+2. Call verify_courses with the institution and all course codes in the case. It only knows courses
+   already in the BU transfer catalog, so courses missing from it are normal for an institution BU has
+   not evaluated before and are not a reason to fail validation. Call submit_validation_error with
+   reason "courses_not_verified" only if the course codes themselves are clearly not real course codes.
 
 3. If transcript data has missing credits, grades, or course codes for more than 2 courses, call
    submit_validation_error with reason "insufficient_transcript_data".
@@ -483,7 +485,8 @@ export async function reviewWithAgent(application, credit, opts = {}) {
           bu_credits: result.bu_credits,
           level: cat.level || null,
           description: cat.description || null,
-          syllabus: cat.syllabus || null,
+          // The syllabus the student sent for this course (if any) and the one on file, capped for token limits
+          syllabus: [course.syllabus_text, cat.syllabus].filter(Boolean).join('\n\n').slice(0, MAX_SYLLABUS_CHARS) || null,
           engine_suggestion: result.suggestion,
           engine_reasons: result.reasons,
         };
