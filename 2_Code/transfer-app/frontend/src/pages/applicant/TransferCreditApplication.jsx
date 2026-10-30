@@ -426,7 +426,7 @@ function FoundSummary({ transcripts, readable, usable, reading, student }) {
           <div className="flex items-center gap-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3.5">
             <span className="w-11 h-11 rounded-full bg-gradient-to-br from-brand to-brand-dark text-white grid place-items-center font-semibold flex-shrink-0" aria-hidden="true">{initialsOf(student.name)}</span>
             <span className="flex-1 min-w-0"><span className="block text-[16px] font-semibold text-gray-900 truncate">{student.name}</span>{student.studentId && <span className="block text-[13px] text-gray-500">Student ID {student.studentId}</span>}</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-medium text-emerald-700 whitespace-nowrap"><CheckCircle2 className="w-3.5 h-3.5" />From your transcript</span>
+            <AutoFilled />
           </div>
         )}
         {readable.map(t => <CollegeGlance key={t.key} r={t.result} />)}
@@ -766,7 +766,7 @@ function TranscriptSummary({ t, onReview, defaultOpen = false }) {
           )}
           {institutionEdited && <EditedNote original={r.institution} onRestore={() => setInstitution(r.institution)} />}
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-500 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />From your transcript</p>
+            <p className="flex items-center gap-2 text-xs text-gray-500"><AutoFilled />Each course as read from your transcript</p>
             <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-red-50">
               {editing ? <><Check className="w-3.5 h-3.5" />Done editing</> : <><Pencil className="w-3.5 h-3.5" />Correct a course</>}
             </button>
@@ -824,6 +824,17 @@ function TranscriptSummary({ t, onReview, defaultOpen = false }) {
   )
 }
 
+// Marks a value read automatically from the student's transcript; the full wording is on hover and for screen readers
+function AutoFilled() {
+  return (
+    <span title="Read automatically from your transcript"
+      className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/70 whitespace-nowrap">
+      <Sparkles className="w-3 h-3" aria-hidden="true" />Auto-filled
+      <span className="sr-only">: read automatically from your transcript</span>
+    </span>
+  )
+}
+
 function EditedNote({ original, onRestore }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-1">
@@ -834,14 +845,14 @@ function EditedNote({ original, onRestore }) {
   )
 }
 
-// A value read from the transcript is marked "From your transcript" and can be edited (the transcript's value is
+// A value read from the transcript is marked "Auto-filled" and can be edited (the transcript's value is
 // kept and can be restored); a missing one asks for input (only for fields that are needed)
 function DetectedField({ label, value, conflict, input, note, optional = false, edited = false, onEdit, onRestore }) {
   const state = value && edited ? 'edited' : value ? 'read' : optional ? 'none' : 'missing'
   const box = { edited: 'border-brand/40 bg-red-50/30', read: 'border-gray-200', none: 'border-gray-200', missing: 'border-amber-300 bg-amber-50/30' }[state]
   const chip = {
     edited: <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-brand"><Pencil className="w-3 h-3" aria-hidden="true" />Edited</span>,
-    read: <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700"><CheckCircle2 className="w-3 h-3" aria-hidden="true" />From your transcript</span>,
+    read: <AutoFilled />,
     missing: <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"><AlertCircle className="w-3 h-3" aria-hidden="true" />{conflict ? 'Transcripts differ' : 'Not on transcript'}</span>,
     none: null
   }[state]
