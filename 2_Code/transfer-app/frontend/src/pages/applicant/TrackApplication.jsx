@@ -24,7 +24,7 @@ export default function TrackApplication() {
   if (session) {
     return (
       <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           <ApplicationTracker
             token={session.access_token}
             headerAction={<button type="button" onClick={close} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><LogOut className="w-3.5 h-3.5" />Close</button>}
