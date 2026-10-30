@@ -41,12 +41,12 @@ async function getEngine() {
 // The same file gives the same result, so the reading is kept briefly by the file's hash and not repeated.
 const PARSE_CACHE_MS = 15 * 60_000;
 const parseCache = new Map();
-async function parseTranscriptOnce(buffer) {
+async function parseTranscriptOnce(buffer, mimeType = 'application/pdf') {
   const key = crypto.createHash('sha256').update(buffer).digest('hex');
   const hit = parseCache.get(key);
   if (hit && Date.now() - hit.at < PARSE_CACHE_MS) return hit.parsed;
   const aiClient = isAgentConfigured() ? getProjectClient().getOpenAIClient() : null;
-  const parsed = await parseTranscript(buffer, aiClient);
+  const parsed = await parseTranscript(buffer, aiClient, { mimeType });
   parseCache.set(key, { parsed, at: Date.now() });
   if (parseCache.size > 200) parseCache.delete(parseCache.keys().next().value);
   return parsed;
@@ -59,12 +59,11 @@ export function invalidateEngine() {
 }
 
 /**
- * Reads a transcript PDF without storing anything, the same way an upload does, so the student can confirm
- * what was found before submitting: institution, calendar, courses and the header (name, student ID, BU major,
- * BU start term). Catalog titles replace truncated ones, as on import.
+ * What a transcript file says, as the student sees it on review: the reading, with catalog titles in place of
+ * truncated ones when the institution's course is on file.
  */
-export async function readTranscript(buffer) {
-  const parsed = await parseTranscriptOnce(buffer);
+async function readingOf(buffer, mimeType) {
+  const parsed = await parseTranscriptOnce(buffer, mimeType);
   let courses = parsed.courses;
   let knownCodes;
   if (parsed.institution && courses.length) {
@@ -75,35 +74,91 @@ export async function readTranscript(buffer) {
     const codes = [...titles.rows.map((r) => r.code), ...eq.map((r) => r.course_code)];
     knownCodes = codes.length ? new Set(codes.map(courseKey)) : null;
   }
-  // What may need more review (missing credits, unreadable or Pass grades, repeats, courses not evaluated before)
-  const quality = checkTranscript({ institution: parsed.institution, credit_system: parsed.credit_system, courses }, { knownCodes });
-  return { institution: parsed.institution, credit_system: parsed.credit_system, courses, student: parsed.student || {}, quality };
+  return { ...parsed, courses, knownCodes };
 }
 
 /**
- * Reads the course rows from an uploaded transcript PDF into transcript_courses.
- * Courses are appended after any already on the application, keeping transcript order.
+ * Reads a transcript (PDF, or an image when the AI reader is configured) without storing anything, the same way
+ * an upload does, so the student can confirm or correct what was found before submitting: institution, calendar,
+ * courses and the header (name, student ID, BU major, BU start term), with how it was read.
  */
-export async function importTranscript(applicationId, documentId, buffer) {
-  const parsed = await parseTranscriptOnce(buffer);
-  if (!parsed.institution || parsed.courses.length === 0) return { institution: parsed.institution, courses: 0 };
+export async function readTranscript(buffer, { mimeType = 'application/pdf' } = {}) {
+  const r = await readingOf(buffer, mimeType);
+  // What may need more review (missing credits, unreadable or Pass grades, repeats, courses not evaluated before)
+  const quality = checkTranscript({ institution: r.institution, credit_system: r.credit_system, courses: r.courses }, { knownCodes: r.knownCodes });
+  return { institution: r.institution, credit_system: r.credit_system, courses: r.courses, student: r.student || {}, quality,
+    method: r.method, text_layer: r.text_layer, pages: r.pages };
+}
 
-  // The PDF truncates long titles; use the catalog title when the course is known
-  const titles = await query(`SELECT UPPER(course_code) AS code, title FROM catalog_courses WHERE institution = $1`, [parsed.institution]);
-  const titleOf = new Map(titles.rows.map((r) => [r.code, r.title]));
+const EDITABLE = ['course_code', 'title', 'term', 'source_credits', 'grade'];
+const clip = (v, n) => String(v ?? '').trim().slice(0, n);
+
+/**
+ * The student's confirmed values for one course, checked: text fields are trimmed and capped, credits must be a
+ * number from 0 to 30 or empty, and an empty course code keeps the transcript's. Returns the values and the
+ * fields that differ from the transcript.
+ */
+function confirmedCourse(original, reviewed) {
+  const value = {
+    course_code: clip(reviewed.course_code, 40) || original.course_code,
+    title: clip(reviewed.title, 200),
+    term: clip(reviewed.term, 40) || null,
+    source_credits: reviewed.source_credits === '' || reviewed.source_credits == null ? null : Number(reviewed.source_credits),
+    grade: clip(reviewed.grade, 10),
+  };
+  if (value.source_credits != null && (!Number.isFinite(value.source_credits) || value.source_credits < 0 || value.source_credits > 30)) {
+    value.source_credits = original.source_credits;
+  }
+  const same = (k) => (k === 'source_credits'
+    ? (original[k] == null && value[k] == null) || (original[k] != null && value[k] != null && Number(original[k]) === Number(value[k]))
+    : String(original[k] ?? '').trim() === String(value[k] ?? '').trim());
+  return { value, corrected: EDITABLE.filter((k) => !same(k)) };
+}
+
+/**
+ * Stores the courses of an uploaded transcript in transcript_courses, appended after any already on the application.
+ * reviewed: what the student confirmed on the review step ({ institution?, courses? }, one course per course read,
+ * in the same order). The confirmed values are stored for evaluation and the original reading beside them
+ * (extracted), with the fields the student changed (corrected_fields). Courses can't be added or removed: a list
+ * of another length is ignored and the transcript's reading is stored. The file itself is never changed.
+ */
+export async function importTranscript(applicationId, documentId, buffer, { mimeType = 'application/pdf', reviewed = null } = {}) {
+  const r = await readingOf(buffer, mimeType);
+  const extraction = { method: r.method, pages: r.pages, text_layer: r.text_layer, courses: r.courses.length };
+  await query(`UPDATE application_documents SET extraction = $1 WHERE id = $2`, [JSON.stringify(extraction), documentId])
+    .catch((err) => console.error('[Transcript] Extraction details not stored (migration 013 not run?):', err.message));
+
+  const reviewedInstitution = clip(reviewed?.institution, 200);
+  const institution = reviewedInstitution || r.institution;
+  if (!institution || r.courses.length === 0) return { institution, courses: 0, method: r.method, text_layer: r.text_layer };
+  const institutionCorrected = Boolean(reviewedInstitution) && reviewedInstitution !== r.institution;
+  const reviewedCourses = Array.isArray(reviewed?.courses) && reviewed.courses.length === r.courses.length ? reviewed.courses : null;
+  if (reviewed?.courses && !reviewedCourses) console.warn(`[Transcript] Reviewed courses ignored: ${reviewed.courses.length} sent for ${r.courses.length} read`);
+
   const next = await query(`SELECT COALESCE(MAX(position), 0) AS last FROM transcript_courses WHERE application_id = $1`, [applicationId]);
   let position = Number(next.rows[0].last);
-
-  for (const c of parsed.courses) {
+  let corrected = 0;
+  for (const [i, original] of r.courses.entries()) {
     position += 1;
+    const { value, corrected: fields } = reviewedCourses ? confirmedCourse(original, reviewedCourses[i] || {}) : { value: original, corrected: [] };
+    if (institutionCorrected) fields.push('institution');
+    if (fields.length) corrected += 1;
+    const extracted = { course_code: original.course_code, title: original.title, term: original.term, source_credits: original.source_credits,
+      grade: original.grade, institution: r.institution };
+    const values = [applicationId, documentId, position, institution, value.course_code, value.title, value.term, r.credit_system, value.source_credits, value.grade];
     await query(
-      `INSERT INTO transcript_courses (application_id, document_id, position, institution, course_code, title, term, credit_system, source_credits, grade)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [applicationId, documentId, position, parsed.institution, c.course_code, titleOf.get(c.course_code.toUpperCase()) || c.title,
-        c.term, parsed.credit_system, c.source_credits, c.grade]
-    );
+      `INSERT INTO transcript_courses (application_id, document_id, position, institution, course_code, title, term, credit_system, source_credits, grade,
+         extracted, corrected_fields)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [...values, JSON.stringify(extracted), fields]
+    ).catch(async (err) => {
+      // Before migration 013 the columns for the original reading don't exist: store the confirmed values only
+      if (err.code !== '42703') throw err;
+      await query(`INSERT INTO transcript_courses (application_id, document_id, position, institution, course_code, title, term, credit_system, source_credits, grade)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, values);
+    });
   }
-  return { institution: parsed.institution, courses: parsed.courses.length };
+  return { institution, courses: r.courses.length, corrected, method: r.method, text_layer: r.text_layer };
 }
 
 /**

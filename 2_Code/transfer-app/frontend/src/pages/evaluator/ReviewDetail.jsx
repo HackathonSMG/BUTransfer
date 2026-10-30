@@ -10,7 +10,7 @@ import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { REVIEW_STATUS, DECISION_LABELS, matchLabelClass, formatDate } from '../../lib/reviews'
-import { activityLabel } from '../../lib/staffFormat'
+import { activityLabel, correctionsOf } from '../../lib/staffFormat'
 import CourseComparison from '../../components/evaluator/CourseComparison'
 
 const OPEN = ['new', 'in_progress', 'info_requested']
@@ -710,6 +710,8 @@ function AttentionNotes({ d }) {
   const rules = d.evidence?.rules || []
   if (rules.includes('PASS')) notes.push(`Graded Pass. Confirm it meets the ${d.policy?.minimum_grade || 'C'} minimum before awarding credit.`)
   if (rules.includes('GRADE')) notes.push('The final grade is missing or unreadable. Credit needs a confirmed grade.')
+  const corrections = correctionsOf(src)
+  if (corrections.length) notes.push(`Corrected by the student on submission: ${corrections.join('; ')}. Check against the transcript.`)
   if (d.combined_with?.length) notes.push(`Evaluated together with ${d.combined_with.map(c => `${c.course_code} ${c.title || ''}`.trim()).join(', ')} from the same transcript.`)
   if (!notes.length) return null
   return (

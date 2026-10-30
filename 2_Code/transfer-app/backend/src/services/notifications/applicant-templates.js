@@ -22,6 +22,13 @@ const TEMPLATES = {
       'We will read your transcript and check each course against Boston University\'s transfer equivalency records. Courses that need a closer look are reviewed by the academic department.',
       'We will email you when your evaluation reaches an important stage or if we need anything from you.',
     ],
+    details: (c.detail?.transcripts || []).map((t) => [t.institution, `${plural(t.courses, 'course')} read from the transcript`]),
+    detailsTitle: 'Transcripts received',
+    next: [
+      'Each course is checked against Boston University\'s transfer equivalency records.',
+      'Courses that need a closer look are reviewed by the academic department.',
+      'The Credit Evaluation Office completes a final review and posts your transfer credit with a grade of T.',
+    ],
     title: 'Transcripts received',
     message: 'Your transcripts have been received for transfer credit evaluation and are now being processed.',
   }),
@@ -51,6 +58,10 @@ const TEMPLATES = {
       body: [
         n ? `${plural(n, 'course')} ${n === 1 ? 'is' : 'are'} now being reviewed by academic department evaluators.` : 'Some courses are now being reviewed by academic department evaluators.',
         'Courses with an established equivalency have already been evaluated. Courses still under review show 0 BU units until they are decided.',
+      ],
+      next: [
+        'Department evaluators review each course; if a syllabus is needed, we will email you.',
+        'Once every course has a decision, the Credit Evaluation Office completes a final review.',
       ],
       title: 'Course evaluation update',
       message: n ? `${plural(n, 'course')} ${n === 1 ? 'is' : 'are'} with academic department evaluators.` : 'Your courses are with academic department evaluators.',
@@ -111,6 +122,106 @@ const TEMPLATES = {
 
 export const TEMPLATE_EVENTS = Object.keys(TEMPLATES);
 
+const FONT = "-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+const SERIF = "Georgia,'Times New Roman',serif";
+
+/**
+ * The shared layout of every student email: email-safe (nested tables, inline styles, web-safe fonts, no images or
+ * external resources), a 600px card that narrows on phones, a bulletproof button with a VML fallback for Outlook.
+ * @param {{ subject, preheader, heading, greeting, intro, id?: {reference_number, status_label}, details?: Array<[string,string]>,
+ *   detailsTitle?, body?: string[], action?, next?: string[], button: {label, href}, note?: string[] }} m
+ */
+export function renderLayout(m) {
+  const tone = /complete|decision available/i.test(m.id?.status_label || '') ? ['#ecfdf5', '#065f46', '#a7f3d0']
+    : /action required/i.test(m.id?.status_label || '') ? ['#fffbeb', '#92400e', '#fcd34d'] : ['#eff6ff', '#1e40af', '#bfdbfe'];
+  const p = (text, extra = '') => `<p style="margin:0 0 12px;font-size:15px;line-height:1.65;color:#1f2937${extra}">${esc(text)}</p>`;
+  const section = (title) => `<div style="margin:0 0 10px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#6b7280">${esc(title)}</div>`;
+  return `<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting">
+<title>${esc(m.subject)}</title>
+<!--[if mso]><style>table,td,p,a,h1,div{font-family:Arial,sans-serif !important}</style><![endif]-->
+<style>
+  @media only screen and (max-width:620px){ .card{width:100% !important} .px{padding-left:22px !important;padding-right:22px !important} .appno{font-size:24px !important} .h1{font-size:23px !important} }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#f4f1ee;-webkit-text-size-adjust:100%">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f4f1ee">${esc(m.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f1ee">
+<tr><td align="center" style="padding:32px 12px">
+  <table role="presentation" class="card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border:1px solid #e7e2dc;border-radius:10px;overflow:hidden">
+    <!-- Header: university wordmark on BU red, with a darker rule -->
+    <tr><td class="px" style="background:#cc0000;padding:26px 36px 22px;border-bottom:4px solid #990000">
+      <div style="font-family:${SERIF};font-size:26px;line-height:1.1;color:#ffffff;letter-spacing:.3px">Boston University</div>
+      <div style="margin-top:6px;font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:1.4px;text-transform:uppercase;color:#ffd9d9">Credit Evaluation Office &nbsp;·&nbsp; Transfer Credit</div>
+    </td></tr>
+    <!-- Heading and greeting -->
+    <tr><td class="px" style="padding:34px 36px 6px;font-family:${FONT}">
+      <h1 class="h1" style="margin:0 0 20px;font-family:${SERIF};font-size:27px;line-height:1.25;font-weight:normal;color:#111827">${esc(m.heading)}</h1>
+      ${p(m.greeting)}
+      ${p(m.intro, ';margin-bottom:24px')}
+    </td></tr>
+    ${m.id ? `<!-- Transfer Credit ID and status -->
+    <tr><td class="px" style="padding:0 36px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#faf8f6;border:1px solid #ece6df;border-left:4px solid #cc0000;border-radius:8px">
+        <tr>
+          <td style="padding:16px 18px;font-family:${FONT}">
+            <div style="font-size:11px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:#6b7280">Transfer Credit ID</div>
+            <div class="appno" style="margin-top:4px;font-family:Consolas,'Courier New',monospace;font-size:26px;font-weight:bold;letter-spacing:1.5px;color:#111827">${esc(m.id.reference_number)}</div>
+          </td>
+          ${m.id.status_label ? `<td align="right" style="padding:16px 18px;font-family:${FONT};vertical-align:middle">
+            <div style="font-size:11px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:#6b7280;margin-bottom:6px">Status</div>
+            <span style="display:inline-block;padding:4px 12px;border-radius:999px;background:${tone[0]};border:1px solid ${tone[2]};color:${tone[1]};font-size:13px;font-weight:bold;white-space:nowrap">${esc(m.id.status_label)}</span>
+          </td>` : ''}
+        </tr>
+      </table>
+    </td></tr>` : ''}
+    ${m.details?.length ? `<!-- Details -->
+    <tr><td class="px" style="padding:26px 36px 0;font-family:${FONT}">
+      ${section(m.detailsTitle || 'Details')}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #ece6df">
+        ${m.details.map(([k, v]) => `<tr><td style="padding:10px 0;border-bottom:1px solid #ece6df;font-size:14px;color:#111827;font-weight:bold">${esc(k)}</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ece6df;font-size:14px;color:#4b5563">${esc(v)}</td></tr>`).join('')}
+      </table>
+    </td></tr>` : ''}
+    ${(m.body?.length || m.action) ? `<tr><td class="px" style="padding:${m.id || m.details?.length ? 24 : 0}px 36px 0;font-family:${FONT}">
+      ${(m.body || []).map((b) => p(b)).join('')}
+      ${m.action ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px"><tr>
+        <td style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.55;color:#78350f">
+          <strong style="display:block;margin-bottom:2px;color:#92400e">What you need to do</strong>${esc(m.action)}
+        </td></tr></table>` : ''}
+    </td></tr>` : ''}
+    ${m.next?.length ? `<!-- What happens next -->
+    <tr><td class="px" style="padding:22px 36px 0;font-family:${FONT}">
+      ${section('What happens next')}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${m.next.map((step, i) => `<tr>
+          <td width="34" valign="top" style="padding:0 0 12px"><div style="width:24px;height:24px;line-height:24px;border-radius:999px;background:#fdecec;color:#cc0000;font-size:12px;font-weight:bold;text-align:center">${i + 1}</div></td>
+          <td valign="top" style="padding:2px 0 12px;font-size:14px;line-height:1.55;color:#374151">${esc(step)}</td>
+        </tr>`).join('')}
+      </table>
+    </td></tr>` : ''}
+    <!-- Call to action -->
+    <tr><td class="px" align="left" style="padding:22px 36px 8px">
+      <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${esc(m.button.href)}" style="height:46px;v-text-anchor:middle;width:260px" arcsize="14%" stroke="f" fillcolor="#cc0000"><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">${esc(m.button.label)}</center></v:roundrect><![endif]-->
+      <!--[if !mso]><!-- --><a href="${esc(m.button.href)}" style="display:inline-block;background:#cc0000;color:#ffffff;text-decoration:none;font-family:${FONT};font-weight:bold;font-size:15px;line-height:46px;padding:0 30px;border-radius:6px">${esc(m.button.label)}</a><!--<![endif]-->
+    </td></tr>
+    <tr><td class="px" style="padding:6px 36px 30px;font-family:${FONT}">
+      ${(m.note || []).map((n) => `<p style="margin:0 0 4px;font-size:13px;line-height:1.55;color:#6b7280">${esc(n)}</p>`).join('')}
+    </td></tr>
+    <!-- Footer -->
+    <tr><td class="px" style="border-top:1px solid #ece6df;background:#faf8f6;padding:20px 36px;font-family:${FONT};font-size:12px;line-height:1.65;color:#8a8178">
+      <div style="font-family:${SERIF};font-size:15px;color:#4b443d;margin-bottom:4px">Boston University</div>
+      Credit Evaluation Office &nbsp;·&nbsp; Transfer Credit Evaluation<br>
+      ${esc(m.footer || 'You are receiving this email because transcripts were submitted for transfer credit evaluation with this address.')}
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
 /** Renders an event for one applicant: the email (subject, text, html) and the in-app title/message. */
 export function renderApplicantEmail(event, ctx) {
   const t = TEMPLATES[event]?.(ctx);
@@ -124,94 +235,56 @@ export function renderApplicantEmail(event, ctx) {
     greeting, '',
     t.intro, '',
     ...(showStatus ? [`Transfer Credit ID: ${ctx.reference_number}`, `Current status: ${ctx.status_label}`, ''] : []),
+    ...(t.details?.length ? [`${t.detailsTitle || 'Details'}:`, ...t.details.map(([k, v]) => `  ${k}: ${v}`), ''] : []),
     ...t.body.flatMap((b) => [b, '']),
     ...(t.action ? [`What you need to do: ${t.action}`, ''] : []),
+    ...(t.next?.length ? ['What happens next:', ...t.next.map((s, i) => `  ${i + 1}. ${s}`), ''] : []),
     `Track your transfer credit: ${link}`,
-    'If you have questions, please refer to your transfer credit details on the tracking page.',
     'You will need your Transfer Credit ID and this email address.', '',
-    'Boston University Transfer Credit Evaluation',
+    'Boston University · Credit Evaluation Office',
     'You are receiving this email because transcripts were submitted for transfer credit evaluation with this address.',
   ].join('\n');
 
-  // Email-safe layout: nested tables, inline styles, web-safe fonts, no images or external resources; a
-  // 600px card that narrows on phones, a bulletproof button (with a VML fallback for Outlook)
-  const FONT = "-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
-  const statusTone = /complete|decision available/i.test(ctx.status_label) ? ['#ecfdf5', '#065f46', '#a7f3d0']
-    : /action required/i.test(ctx.status_label) ? ['#fffbeb', '#92400e', '#fcd34d'] : ['#eff6ff', '#1e40af', '#bfdbfe'];
-  const preheader = `${t.intro} Transfer Credit ID ${ctx.reference_number}.`;
-  const html = `<!DOCTYPE html>
-<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting">
-<title>${esc(subject)}</title>
-<!--[if mso]><style>table,td,p,a,h1{font-family:Arial,sans-serif !important}</style><![endif]-->
-<style>
-  @media only screen and (max-width:620px){ .card{width:100% !important} .px{padding-left:22px !important;padding-right:22px !important} .appno{font-size:24px !important} }
-</style>
-</head>
-<body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f3f4f6">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6">
-<tr><td align="center" style="padding:28px 12px">
-  <table role="presentation" class="card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px">
-    <!-- Header -->
-    <tr><td style="background:#cc0000;border-radius:12px 12px 0 0;padding:22px 32px" class="px">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="width:40px;height:40px;background:#ffffff;border-radius:8px;text-align:center;vertical-align:middle;font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:17px;color:#cc0000">BU</td>
-        <td style="padding-left:12px;font-family:${FONT}">
-          <div style="font-size:17px;font-weight:bold;color:#ffffff;letter-spacing:.2px">Boston University</div>
-          <div style="font-size:13px;color:#fde2e2">Transfer Credit Evaluation</div>
-        </td>
-      </tr></table>
-    </td></tr>
-    <!-- Body -->
-    <tr><td class="px" style="padding:32px 32px 8px;font-family:${FONT};color:#1f2937">
-      <p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#cc0000">Transfer Credit Application Update</p>
-      <h1 style="margin:0 0 18px;font-size:24px;line-height:1.3;color:#111827;font-weight:bold">${esc(t.heading)}</h1>
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.6">${esc(greeting)}</p>
-      <p style="margin:0 0 22px;font-size:15px;line-height:1.6">${esc(t.intro)}</p>
-    </td></tr>
-    ${showStatus ? `<!-- Transfer Credit ID and status -->
-    <tr><td class="px" style="padding:0 32px">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:2px solid #111827;border-bottom:2px solid #111827">
-        <tr><td align="center" style="padding:18px 12px 6px;font-family:${FONT}">
-          <div style="font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#6b7280">Transfer Credit ID</div>
-          <div class="appno" style="margin-top:6px;font-family:Consolas,'Courier New',monospace;font-size:28px;font-weight:bold;letter-spacing:1.5px;color:#111827">${esc(ctx.reference_number)}</div>
-        </td></tr>
-        <tr><td align="center" style="padding:6px 12px 18px;font-family:${FONT}">
-          <span style="font-size:12px;color:#6b7280">Current status&nbsp;&nbsp;</span>
-          <span style="display:inline-block;padding:4px 12px;border-radius:999px;background:${statusTone[0]};border:1px solid ${statusTone[2]};color:${statusTone[1]};font-size:13px;font-weight:bold">${esc(ctx.status_label)}</span>
-        </td></tr>
-      </table>
-    </td></tr>` : ''}
-    <tr><td class="px" style="padding:22px 32px 0;font-family:${FONT};color:#1f2937">
-      ${t.body.map((b) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6">${esc(b)}</p>`).join('')}
-      ${t.action ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 6px"><tr>
-        <td style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.55;color:#78350f">
-          <strong style="display:block;margin-bottom:2px;color:#92400e">What you need to do</strong>${esc(t.action)}
-        </td></tr></table>` : ''}
-    </td></tr>
-    <!-- Call to action -->
-    <tr><td class="px" align="left" style="padding:22px 32px 6px">
-      <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${esc(link)}" style="height:46px;v-text-anchor:middle;width:240px" arcsize="17%" stroke="f" fillcolor="#cc0000"><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">Track Your Application</center></v:roundrect><![endif]-->
-      <!--[if !mso]><!-- --><a href="${esc(link)}" style="display:inline-block;background:#cc0000;color:#ffffff;text-decoration:none;font-family:${FONT};font-weight:bold;font-size:15px;line-height:46px;padding:0 28px;border-radius:8px">Track Your Application</a><!--<![endif]-->
-    </td></tr>
-    <tr><td class="px" style="padding:6px 32px 28px;font-family:${FONT}">
-      <p style="margin:0 0 4px;font-size:13px;line-height:1.5;color:#6b7280">You will need your Transfer Credit ID and this email address.</p>
-      <p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280">If you have questions, please refer to your transfer credit details on the tracking page.</p>
-    </td></tr>
-    <!-- Footer -->
-    <tr><td class="px" style="border-top:1px solid #e5e7eb;background:#f9fafb;border-radius:0 0 12px 12px;padding:18px 32px;font-family:${FONT};font-size:12px;line-height:1.6;color:#9ca3af">
-      <strong style="color:#6b7280">Boston University · Transfer Credit Evaluation</strong><br>
-      You are receiving this email because transcripts were submitted for transfer credit evaluation with this address.
-    </td></tr>
-  </table>
-</td></tr>
-</table>
-</body>
-</html>`;
+  const html = renderLayout({
+    subject,
+    preheader: `${t.intro} Transfer Credit ID ${ctx.reference_number}.`,
+    heading: t.heading,
+    greeting,
+    intro: t.intro,
+    id: showStatus ? { reference_number: ctx.reference_number, status_label: ctx.status_label } : null,
+    details: t.details,
+    detailsTitle: t.detailsTitle,
+    body: t.body,
+    action: t.action,
+    next: t.next,
+    button: { label: 'Track Your Transfer Credit', href: link },
+    note: ['You will need your Transfer Credit ID and this email address.', 'If you have questions, the tracking page shows the details of each course.'],
+  });
 
   return { subject, text, html, title: t.title, message: t.message };
 }
 
-export default { renderApplicantEmail, trackUrl, TEMPLATE_EVENTS };
+/**
+ * Replies to an emailed submission that could not be accepted (there is no Transfer Credit ID yet).
+ * kind: 'no_transcript' (no attachment could be read as a transcript).
+ */
+export function renderIntakeReply(kind, { name = null, files = [] } = {}) {
+  if (kind !== 'no_transcript') throw new Error(`No intake reply for "${kind}"`);
+  const subject = 'We could not find a transcript in your email';
+  const greeting = `Dear ${name || 'Student'},`;
+  const intro = 'Thank you for your email. We could not find an official transcript among its attachments, so a transfer credit evaluation has not been started.';
+  const body = files.length
+    ? [`We received: ${files.join(', ')}. None of these could be read as an academic transcript.`]
+    : ['The email had no attachments.'];
+  const action = 'Reply with your official transcript attached as a PDF (a scan or a photo in JPG or PNG is also accepted), one file per college, or submit it online.';
+  const link = `${env.APP_URL.replace(/\/$/, '')}/apply`;
+  const text = [greeting, '', intro, '', ...body.flatMap((b) => [b, '']), `What you need to do: ${action}`, '', `Submit online: ${link}`, '',
+    'Boston University · Credit Evaluation Office'].join('\n');
+  const html = renderLayout({ subject, preheader: intro, heading: 'Your official transcript is needed', greeting, intro, body, action,
+    button: { label: 'Submit Transcripts Online', href: link },
+    note: ['Only the attached transcript is used for the evaluation; the text of your email is not read.'],
+    footer: 'You are receiving this email because you wrote to the Credit Evaluation Office from this address.' });
+  return { subject, text, html };
+}
+
+export default { renderApplicantEmail, renderIntakeReply, renderLayout, trackUrl, TEMPLATE_EVENTS };

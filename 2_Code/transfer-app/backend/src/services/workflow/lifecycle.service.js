@@ -105,6 +105,7 @@ export async function applyEstablished(applicationId) {
 const COURSE_STATE_SQL = `
   SELECT tc.id, tc.position, tc.institution, tc.course_code, tc.catalog_code, COALESCE(src.title, tc.title) AS title, tc.term,
          tc.credit_system, tc.source_credits, tc.grade, tc.repeat_of, tc.syllabus_received_at, tc.syllabus_document_id,
+         to_jsonb(tc)->'extracted' AS extracted, to_jsonb(tc)->'corrected_fields' AS corrected_fields,
          ce.path, ce.outcome AS engine_outcome, ce.award AS engine_award, ce.suggestion, ce.bu_credits, ce.reasons, ce.rules,
          ce.missing_information, ce.combined_with,
          r.id AS review_id, r.status AS review_status, r.queue, r.evaluator_id, pe.full_name AS evaluator_name, r.target_bu_course,

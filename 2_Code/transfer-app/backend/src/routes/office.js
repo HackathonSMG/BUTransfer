@@ -134,6 +134,9 @@ router.get('/applications/:id', async (req, res, next) => {
           submitted_at: app.submitted_at, posted_at: app.posted_at, evaluator_name: app.evaluator_name, secure_token: undefined,
           deadline_exception: app.deadline_exception, deadline_exception_by: app.deadline_exception_by_name,
           applicant_comments: app.applicant_comments,
+          // Student details changed from what the transcript showed, and details an emailed transcript didn't show
+          details_corrected: (app.academic_history?.corrected_fields || []).map((k) => ({ field: k, transcript: app.academic_history?.extracted?.[k] ?? null })),
+          details_to_confirm: app.academic_history?.details_to_confirm || [],
         },
         institutions: [...new Set(visible.map((c) => c.institution))],
         summary: lifecycle.summarizeCourses(visible),
@@ -150,6 +153,8 @@ router.get('/applications/:id', async (req, res, next) => {
           assignment_reason: c.assignment_reason, missing_information: c.missing_information, combined_with: c.combined_with,
           suggestion: c.suggestion, path: c.path, info_kind: c.info_kind, info_status: c.info_status, syllabus_received_at: c.syllabus_received_at,
           returned_reason: c.returned_reason, can_return: c.state === 'decided',
+          // Values the student corrected on the review step, with the transcript's original reading
+          corrected_fields: c.corrected_fields || [], extracted: c.corrected_fields?.length ? c.extracted : null,
         })),
         documents: documents.rows,
         information_requests: requests.rows,

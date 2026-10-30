@@ -70,6 +70,7 @@ export default function OfficeDashboard() {
   return (
     <div className="space-y-8">
       <PageHeader
+        banner
         eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         title="Credit Evaluation Office"
         subtitle="Process each evaluation's courses, place the ones without a specialist, and post decided transfer credit."

@@ -136,6 +136,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       <PageHeader
+        banner
         eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''} · ${today}`}
         title="Transfer Credit Overview"
         actions={<Link to="/admin/reports" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800"><BarChart3 className="w-4 h-4" />Reports</Link>}

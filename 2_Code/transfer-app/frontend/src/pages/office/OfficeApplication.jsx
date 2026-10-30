@@ -9,7 +9,7 @@ import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { DECISION_LABELS, formatDate } from '../../lib/reviews'
-import { activityLabel, timeAgo } from '../../lib/staffFormat'
+import { activityLabel, timeAgo, correctionsOf } from '../../lib/staffFormat'
 import ReviewAssignment from '../../components/staff/ReviewAssignment'
 import ImpactPanel from '../../components/staff/ImpactPanel'
 import AssignDialog from '../../components/staff/AssignDialog'
@@ -72,6 +72,8 @@ export default function OfficeApplication() {
   const s = d.summary
   const toPost = d.courses.filter(c => c.state === 'decided').length
   const canPost = d.blockers.length === 0
+  // Colleges whose name the student corrected on submission: [name used, name on the transcript]
+  const renamed = [...new Map(d.courses.filter(c => c.corrected_fields?.includes('institution')).map(c => [c.institution, c.extracted?.institution])).entries()]
   const byInstitution = d.courses.reduce((acc, c) => { (acc[c.institution] = acc[c.institution] || []).push(c); return acc }, {})
 
   return (
@@ -86,6 +88,17 @@ export default function OfficeApplication() {
           <p className="text-[15px] text-staff-ink2 mt-1">
             {app.transfer_to_program} · starts {app.expected_start_term || 'term not given'} · {d.institutions.length > 1 ? `${d.institutions.length} institutions` : d.institutions[0] || app.transfer_from_institution}
           </p>
+          {app.details_corrected?.length > 0 && (
+            <p className="text-[13px] text-amber-800 mt-1.5">
+              Edited by the student: {app.details_corrected.map(c => `${DETAIL_LABELS[c.field] || c.field} (transcript: ${c.transcript || 'not shown'})`).join('; ')}
+            </p>
+          )}
+          {renamed.length > 0 && (
+            <p className="text-[13px] text-amber-800 mt-1.5">College name edited by the student: {renamed.map(([now, was]) => `${now} (transcript: ${was || 'not shown'})`).join('; ')}</p>
+          )}
+          {app.details_to_confirm?.length > 0 && (
+            <p className="text-[13px] text-amber-800 mt-1.5">Received by email. To confirm with the student: {app.details_to_confirm.join(', ')}</p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to={`/evaluator/applications/${app.id}`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-staff-line text-[14px] font-medium text-staff-ink2 hover:bg-staff-sunk">
@@ -304,6 +317,8 @@ function Fold({ title, children }) {
   )
 }
 
+const DETAIL_LABELS = { name: 'name', program: 'BU program', term: 'BU start term' }
+
 function CourseRow({ c, onAssign, onReturn }) {
   const [open, setOpen] = useState(false)
   const st = STATE[c.state] || STATE.processing
@@ -317,6 +332,11 @@ function CourseRow({ c, onAssign, onReturn }) {
           <span className="block text-[12.5px] text-staff-muted">
             {[c.term, c.source_credits != null ? `${c.source_credits} ${c.credit_system === 'Quarter' ? 'qtr ' : ''}cr` : 'credits missing', c.grade ? `grade ${c.grade}` : 'no grade'].join(' · ')}
           </span>
+          {correctionsOf(c).length > 0 && (
+            <span className="block text-[12.5px] text-amber-800" title="The transcript file is unchanged; the student's value is used for evaluation">
+              Edited by the student: {correctionsOf(c).join('; ')}
+            </span>
+          )}
         </button>
         <span className="min-w-0 order-3 md:order-none col-span-2 md:col-span-1">
           <span className="block text-[14px] text-staff-ink truncate">{c.decision || (c.target_bu_course ? `Proposed ${c.target_bu_course}` : '—')}</span>

@@ -87,7 +87,9 @@ export async function getReview(reviewId, userId) {
   const [course, target, sponsor, equivalency, transcript, documents, decision, history, next, infoRequests, assignments] = await Promise.all([
     query(`SELECT tc.id, tc.institution, tc.course_code, tc.catalog_code, COALESCE(c.title, tc.title) AS title, tc.term, tc.grade, tc.source_credits, tc.credit_system,
                   c.credits AS catalog_credits, c.program, c.level, c.requirement_type, c.description, c.learning_outcomes, c.syllabus IS NOT NULL AS has_syllabus,
-                  tc.syllabus_document_id, tc.syllabus_received_at, tc.repeat_of, tc.syllabus_text, c.syllabus AS catalog_syllabus
+                  tc.syllabus_document_id, tc.syllabus_received_at, tc.repeat_of, tc.syllabus_text, c.syllabus AS catalog_syllabus,
+                  -- The original reading and the fields the student corrected (null before migration 013)
+                  to_jsonb(tc)->'extracted' AS extracted, to_jsonb(tc)->'corrected_fields' AS corrected_fields
            FROM transcript_courses tc LEFT JOIN catalog_courses c ON c.institution = tc.institution AND c.course_code = COALESCE(tc.catalog_code, tc.course_code)
            WHERE tc.id = $1`, [r.transcript_course_id]),
     targets.length

@@ -28,6 +28,12 @@ const STATUS_EVENTS = {
 };
 
 async function detailFor(event, applicationId) {
+  if (event === 'application_received') {
+    // What arrived: each institution's transcript with the number of courses read from it
+    const { rows } = await query(
+      `SELECT institution, COUNT(*)::int AS courses FROM transcript_courses WHERE application_id = $1 GROUP BY institution ORDER BY MIN(position)`, [applicationId]);
+    return rows.length ? { transcripts: rows } : {};
+  }
   if (event === 'department_review') {
     const { rows: [r] } = await query(
       `SELECT COUNT(*)::int AS n FROM course_reviews WHERE application_id = $1 AND status IN ('queued', 'new', 'in_progress', 'info_requested')`, [applicationId]);

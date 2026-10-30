@@ -106,23 +106,36 @@ export async function removeDraftDocument(req, res, next) {
   } catch (err) { return next(err); }
 }
 
-// Reads one transcript before submission so the student can confirm what was found. Nothing is stored.
+const READABLE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']);
+
+// Why a transcript couldn't be read, in the student's terms (no internal processing words)
+function unreadableReason(r) {
+  if (r.text_layer === false) {
+    return 'This looks like a scanned copy or a photo, and the courses could not be read automatically. You can still submit it: the Credit Evaluation Office will read it and contact you if needed. If you have the digital PDF from your college, upload that instead.';
+  }
+  return 'No courses could be read from this file. If it is your official transcript you can still submit it, and the Credit Evaluation Office will read it; otherwise upload the transcript PDF issued by your college.';
+}
+
+// Reads one transcript before submission so the student can confirm or correct what was found. Nothing is stored.
 export async function readTranscript(req, res, next) {
   try {
     if (!req.file) return next(badRequest('No file was uploaded'));
-    if (req.file.mimetype !== 'application/pdf') {
-      return res.status(200).json({ data: { file_name: req.file.originalname, readable: false, reason: 'Only PDF transcripts can be read automatically.' } });
+    if (!READABLE_TYPES.has(req.file.mimetype)) {
+      return res.status(200).json({ data: { file_name: req.file.originalname, readable: false, reason: 'Upload the transcript as a PDF (or a JPG or PNG image).' } });
     }
     let r;
-    try { r = await readTranscriptFile(req.file.buffer); } catch (err) {
+    try { r = await readTranscriptFile(req.file.buffer, { mimeType: req.file.mimetype }); } catch (err) {
       console.error('[Transcript] Read failed:', err.message);
       return res.status(200).json({ data: { file_name: req.file.originalname, readable: false, reason: 'The file could not be read as a transcript.' } });
     }
-    const readable = Boolean(r.institution) && r.courses.length > 0;
+    // Courses are what matters; an institution the transcript didn't show is asked for on the review step
+    const readable = r.courses.length > 0;
     return res.status(200).json({ data: {
       file_name: req.file.originalname, readable,
-      reason: readable ? null : 'No courses could be read from this file. Upload the official transcript PDF issued by the college.',
+      reason: readable ? null : unreadableReason(r),
       institution: r.institution, credit_system: r.credit_system, student: r.student,
+      // Read without a recognised course table (or by the AI reader): the student is asked to check each course
+      check_carefully: readable && r.method !== 'layout',
       courses: r.courses.map((c) => ({ course_code: c.course_code, title: c.title, term: c.term, credits: c.source_credits, grade: c.grade })),
       // Plain-language notes only; the staff wording and finding types stay internal
       review_notes: readable && r.quality ? {
@@ -183,12 +196,26 @@ export async function myApplications(req, res, next) {
   } catch (err) { return next(err); }
 }
 
+// What the student confirmed for a transcript on the review step (a JSON form field): { institution?, courses? }.
+// Malformed or oversized input is ignored, and the transcript's own reading is stored.
+function reviewedOf(raw) {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(String(raw).slice(0, 200_000));
+    const courses = Array.isArray(v?.courses) && v.courses.length <= 300
+      ? v.courses.map((c) => ({ course_code: c?.course_code, title: c?.title, term: c?.term, source_credits: c?.credits ?? c?.source_credits, grade: c?.grade }))
+      : null;
+    return { institution: typeof v?.institution === 'string' ? v.institution : null, courses };
+  } catch { return null; }
+}
+
 export async function uploadDocument(req, res, next) {
   try {
     if (!req.file) return next(badRequest('No file was uploaded'));
     const { document_type = 'other', notes } = req.body;
     const application = req.application;
-    const document = await documentService.uploadDocument({ buffer: req.file.buffer, originalName: req.file.originalname, fileSize: req.file.size, mimeType: req.file.mimetype, applicationId: application.id, documentType: document_type, uploadedBy: null, uploadSource: 'student', notes: notes || null });
+    const document = await documentService.uploadDocument({ buffer: req.file.buffer, originalName: req.file.originalname, fileSize: req.file.size, mimeType: req.file.mimetype, applicationId: application.id, documentType: document_type, uploadedBy: null, uploadSource: 'student', notes: notes || null,
+      reviewed: document_type === 'transcript' ? reviewedOf(req.body.reviewed) : null });
     return res.status(201).json({ data: { document_id: document.id, file_name: document.file_name, document_type: document.document_type, file_size: document.file_size, created_at: document.created_at } });
   } catch (err) { return next(err); }
 }

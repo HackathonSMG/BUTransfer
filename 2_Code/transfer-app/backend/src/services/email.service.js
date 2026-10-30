@@ -72,48 +72,6 @@ export async function sendEmail({ to, subject, html, text }) {
   }
 }
 
-// ── Email intake templates ──────────────────────────────────────────────────
-// (The application received / status update emails are in notifications/applicant-templates.js.)
+// Every student email, including the replies to emailed transcripts, is rendered in notifications/applicant-templates.js.
 
-export async function sendInfoRequiredEmail(toEmail, studentName, missingFields, referenceNumber = null) {
-  const name = studentName || 'Applicant';
-  const ref = referenceNumber ? ` (Ref: ${referenceNumber})` : '';
-  const fieldList = missingFields.map((f) => `  • ${f}`).join('\n');
-  const fieldListHtml = missingFields.map((f) => `<li>${f}</li>`).join('');
-
-  return sendEmail({
-    to: toEmail,
-    subject: `Additional Information Required${ref} | BU Transfer Office`,
-    text: [
-      `Dear ${name},`,
-      '',
-      `Thank you for contacting the BU Transfer Office${ref}.`,
-      '',
-      'To process your transfer application, we need the following information:',
-      '',
-      fieldList,
-      '',
-      'Please reply to this email with the requested details. If you have a transcript PDF, please attach it.',
-      '',
-      'Boston University Transfer Office',
-    ].join('\n'),
-    html: `
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:24px">
-  <div style="border-left:4px solid #cc0000;padding-left:16px;margin-bottom:24px">
-    <h2 style="margin:0;color:#cc0000">Boston University</h2>
-    <p style="margin:4px 0 0;color:#555;font-size:14px">Transfer Admissions Office</p>
-  </div>
-  <p>Dear ${name},</p>
-  <p>Thank you for contacting the BU Transfer Office${ref}. To process your application we need a few more details:</p>
-  <ul style="line-height:1.8">${fieldListHtml}</ul>
-  <p>Please <strong>reply to this email</strong> with the missing information. If you have a transcript, attach it as a PDF.</p>
-  <hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>
-  <p style="font-size:12px;color:#888">Boston University Transfer Office &nbsp;|&nbsp; 233 Bay State Road, Boston, MA 02215</p>
-</body>
-</html>`,
-  });
-}
-
-export default { isEmailConfigured, emailProvider, isSuppressedAddress, deliverEmail, sendEmail, sendInfoRequiredEmail };
+export default { isEmailConfigured, emailProvider, isSuppressedAddress, deliverEmail, sendEmail };

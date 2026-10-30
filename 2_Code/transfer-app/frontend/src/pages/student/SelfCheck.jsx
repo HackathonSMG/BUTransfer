@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Plus, Trash2, Info, ArrowRight, CheckCircle, HelpCircle, FileText, History } from 'lucide-react'
 import notify from '../../lib/notify'
 import { getSelfCheckInstitutions, runSelfCheck } from '../../api/student'
+import PublicHero from '../../components/layout/PublicHero'
 import Button from '../../components/ui/Button'
 
 // Self-check (step 1 of the transfer process): a preview from the equivalency database, never an official decision
@@ -53,20 +54,12 @@ export default function SelfCheck() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-6">
-        <Link to="/" className="hover:text-gray-700">Home</Link>
-        <ChevronRight className="w-3.5 h-3.5" />
-        <span className="text-gray-900 font-medium">Course Credit Self-Check</span>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Course Credit Self-Check</h1>
-        <p className="text-gray-500 mt-1">
-          Preview how your courses are likely to transfer, which ones may need a syllabus, and what to send.
-          This is a self-check only; the official decision comes after you submit your transcripts.
-        </p>
-      </div>
+    <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
+    <PublicHero title="Course Credit Self-Check"
+      intro="Preview how your courses are likely to transfer, which ones may need a syllabus, and what to send. This is a self-check only; the official decision comes after you submit your transcripts.">
+      <Link to="/" className="inline-flex items-center gap-1 hover:text-white">Home<ChevronRight className="w-3.5 h-3.5" /></Link>
+    </PublicHero>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6">
         <form onSubmit={submit} className="space-y-5">
@@ -153,6 +146,7 @@ export default function SelfCheck() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }
